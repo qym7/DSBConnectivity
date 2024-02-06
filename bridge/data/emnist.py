@@ -16,7 +16,7 @@ class EMNIST(Dataset):
         super(EMNIST, self).__init__()
         self.data = torch.load(os.path.join(root, "data.pt"))
         self.targets = torch.load(os.path.join(root, "targets.pt"))
-        
+
     def __getitem__(self, index):
         img, targets = self.data[index], self.targets[index]
 

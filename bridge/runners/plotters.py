@@ -144,7 +144,6 @@ class ImPlotter(object):
         self.num_plots = 100
         self.num_digits = 20
         self.plot_level = plot_level
-        
 
     def plot(self, initial_sample, x_tot_plot, i, n, forward_or_backward):
         if self.plot_level > 0:
@@ -154,7 +153,7 @@ class ImPlotter(object):
             
             if not os.path.isdir(im_dir):
                 os.mkdir(im_dir)         
-            
+
             if self.plot_level > 0:
                 plt.clf()
                 filename_grid_png = os.path.join(im_dir, 'im_grid_first.png')
@@ -173,7 +172,6 @@ class ImPlotter(object):
                     filename_grid_png = os.path.join(im_dir, 'im_grid_{0}.png'.format(k))    
                     plot_paths.append(filename_grid_png)
                     vutils.save_image(x_tot_plot[k], filename_grid_png, nrow=10)
-                    
 
                 make_gif(plot_paths, output_directory=self.gif_dir, gif_name=name)
 

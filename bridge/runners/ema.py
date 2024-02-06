@@ -27,7 +27,7 @@ class EMAHelper(object):
         for name, param in module.named_parameters():
             if param.requires_grad:
                 param.data.copy_(self.shadow[name].data)
-    
+
     def ema_copy(self, module):
         if isinstance(module, nn.DataParallel) or isinstance(module, nn.parallel.distributed.DistributedDataParallel):
             inner_module = module.module

@@ -29,9 +29,9 @@ ema_rate: 0.999
 grad_clipping: False
 grad_clip: 1.0
 npar: 10000
-batch_size: 512
+batch_size: 2
 num_iter : 10000
-cache_npar: 10000
+cache_npar: 2
 n_ipf: 20
 lr: 0.0001
 
@@ -46,7 +46,7 @@ fast_sampling: True
 
 
 # logging
-plot_npar: 1000
+plot_npar: 2
 log_stride: 50
 gif_stride: ${num_iter}
 

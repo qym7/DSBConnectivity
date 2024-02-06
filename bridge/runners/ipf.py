@@ -1,28 +1,48 @@
-import torch
+
 import os
 import sys
+import time
+import json
+import random
+import datetime
+
+import wandb
+import torch
 import torch.nn.functional as F
 import numpy as np
-from ..langevin import Langevin
 from torch.utils.data import DataLoader
-from .config_getters import get_models, get_optimizers, get_datasets, get_plotter, get_logger
-import datetime
 from tqdm import tqdm
-from .ema import EMAHelper
-from . import repeater
-import time
-import random
 import torch.autograd.profiler as profiler
-from ..data import CacheLoader
 from torch.utils.data import WeightedRandomSampler
 from accelerate import Accelerator, DistributedType
-import time
+
+from .ema import EMAHelper
+from . import repeater
+from .config_getters import get_models, get_optimizers, get_datasets, get_plotter, get_logger
+from ..utils import get_masks
+from ..data import CacheLoader
+from ..langevin import Langevin
+from ..metrics.sampling_metrics import SamplingMetrics
+
+
+
+def setup_wandb(cfg):
+    kwargs = {
+        "name": cfg.Dataset,
+        "project": f"DSB_{cfg.Dataset}",
+        "settings": wandb.Settings(_disable_stats=True),
+        "reinit": True,
+        "mode": cfg.wandb,
+    }
+    wandb.init(**kwargs)
+    wandb.save("*.txt")
 
 
 class IPFBase(torch.nn.Module):
 
     def __init__(self, args):
         super().__init__()
+        setup_wandb(args)
         self.args = args
 
         #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -37,6 +57,7 @@ class IPFBase(torch.nn.Module):
         self.grad_clipping = self.args.grad_clipping
         self.fast_sampling = self.args.fast_sampling
         self.lr = self.args.lr
+        self.graph = self.args.graph
 
         n = self.num_steps//2
         if self.args.gamma_space == 'linspace':
@@ -46,9 +67,12 @@ class IPFBase(torch.nn.Module):
                 self.args.gamma_min, self.args.gamma_max, n)
         gammas = np.concatenate([gamma_half, np.flip(gamma_half)])
         gammas = torch.tensor(gammas).to(self.device)
-        self.T = torch.sum(gammas)
+        self.T = torch.sum(gammas)  # T is more dynamic
+        # import pdb; pdb.set_trace()
+        self.current_epoch = 0  # TODO: this need to be changed learning
 
         # get models
+        print('building models')
         self.build_models()
         self.build_ema()
 
@@ -60,7 +84,19 @@ class IPFBase(torch.nn.Module):
         self.save_logger = self.get_logger('plot_logs')
 
         # get data
-        self.build_dataloaders()
+        print('creating dataloaders')
+        dataloaders = self.build_dataloaders()
+
+        # create metrics for graph dataset
+        if self.graph:
+            print('creating metrics for graph dataset')
+            # create the training/test/val dataloader
+            self.val_sampling_metrics = SamplingMetrics(
+                dataset_infos=None, test=False, dataloaders=dataloaders
+            )
+            self.test_sampling_metrics = SamplingMetrics(
+                dataset_infos=None, test=True, dataloaders=dataloaders
+            )
 
         # langevin
         if self.args.weight_distrib:
@@ -71,13 +107,16 @@ class IPFBase(torch.nn.Module):
             prob_vec = gammas * 0 + 1
         time_sampler = torch.distributions.categorical.Categorical(prob_vec)
 
-        batch = next(self.save_init_dl)[0]
+        # print('next batch debug')
+        batch = next(self.save_init_dl)[0]  # TODO: this next operation is never done
         shape = batch[0].shape
         self.shape = shape
+        # self.shape = shape = (20, 20)
+        print('creating Langevin')
         self.langevin = Langevin(self.num_steps, shape, gammas,
                                  time_sampler, device=self.device,
                                  mean_final=self.mean_final, var_final=self.var_final,
-                                 mean_match=self.args.mean_match)
+                                 mean_match=self.args.mean_match, graph=self.graph)
 
         # checkpoint
         date = str(datetime.datetime.now())[0:10]
@@ -182,9 +221,14 @@ class IPFBase(torch.nn.Module):
     def build_dataloaders(self):
         init_ds, final_ds, mean_final, var_final = get_datasets(self.args)
 
+        # var_final and mean_final are ... ?
         self.mean_final = mean_final.to(self.device)
         self.var_final = var_final.to(self.device)
         self.std_final = torch.sqrt(var_final).to(self.device)
+
+        self.node_dist = None
+        if self.graph:
+            self.node_dist = init_ds.node_dist
 
         def worker_init_fn(worker_id):
             np.random.seed(np.random.get_state()[
@@ -196,6 +240,7 @@ class IPFBase(torch.nn.Module):
                        "drop_last": True}
 
         # get plotter, gifs etc.
+        # what is the difference between save_init—dl and cache_init_dl?
         self.save_init_dl = DataLoader(
             init_ds, batch_size=self.args.plot_npar, shuffle=True, **self.kwargs)
         self.cache_init_dl = DataLoader(
@@ -218,6 +263,18 @@ class IPFBase(torch.nn.Module):
             self.cache_final_dl = None
             self.save_final = None
 
+        # get all type of dataloader
+        init_train_dl = DataLoader(init_ds, batch_size=self.args.plot_npar, shuffle=False)
+        print('creating the val dataloader')
+        init_val_ds, _, _, _ = get_datasets(self.args, split='val')
+        init_test_dl = DataLoader(init_val_ds, batch_size=self.args.plot_npar, shuffle=False)
+        print('creating the test dataloader')
+        init_test_ds, _, _, _ = get_datasets(self.args, split='test')
+        init_val_dl = DataLoader(init_test_ds, batch_size=self.args.plot_npar, shuffle=False)
+        
+        return {'train': init_train_dl, 'val': init_val_dl, 'test': init_test_dl}
+
+
     def new_cacheloader(self, forward_or_backward, n, use_ema=True):
 
         sample_direction = 'f' if forward_or_backward == 'b' else 'b'
@@ -239,7 +296,9 @@ class IPFBase(torch.nn.Module):
                                  batch_size=self.args.cache_npar,
                                  device=self.device,
                                  dataloader_f=self.cache_final_dl,
-                                 transfer=self.args.transfer)
+                                 transfer=self.args.transfer,
+                                 graph=self.graph,
+                                 node_dist=self.node_dist)
 
         else:  # forward
             sample_net = self.accelerator.prepare(sample_net)
@@ -253,7 +312,9 @@ class IPFBase(torch.nn.Module):
                                  batch_size=self.args.cache_npar,
                                  device=self.device,
                                  dataloader_f=self.cache_final_dl,
-                                 transfer=self.args.transfer)
+                                 transfer=self.args.transfer,
+                                 graph=self.graph,
+                                 node_dist=self.node_dist)
 
         new_dl = DataLoader(new_dl, batch_size=self.batch_size)
 
@@ -265,6 +326,9 @@ class IPFBase(torch.nn.Module):
         pass
 
     def save_step(self, i, n, fb):
+        '''
+        Step for sampling and for saving
+        '''
         if self.accelerator.is_local_main_process:
             if ((i % self.stride == 0) or (i % self.stride == 1)) and (i > 0):
 
@@ -295,20 +359,44 @@ class IPFBase(torch.nn.Module):
                 with torch.no_grad():
                     self.set_seed(seed=0 + self.accelerator.process_index)
                     if fb == 'f':
-                        batch = next(self.save_init_dl)[0]
-                        batch = batch.to(self.device)
+                        batch = next(self.save_init_dl)
+                        if self.graph:
+                            batch, n_nodes = batch
+                            batch = (batch.to(self.device), n_nodes.to(self.device))
+                        else:
+                            batch = batch[0].to(self.device)
                     elif self.args.transfer:
-                        batch = next(self.save_final_dl)[0]
-                        batch = batch.to(self.device)
+                        batch = next(self.save_final_dl)
+                        if self.graph:
+                            batch, n_nodes = batch
+                            batch = (batch.to(self.device), n_nodes.to(self.device))
+                        else:
+                            batch = batch[0].to(self.device)
                     else:
+                        if self.graph:
+                            batch_size = self.args.plot_npar
+                            n_nodes = self.node_dist.sample_n(batch_size, self.device)
+                            _, edge_mask = get_masks(
+                                n_nodes, self.node_dist.max_n_nodes, batch_size, self.device)
                         batch = self.mean_final + self.std_final * \
                             torch.randn(
                                 (self.args.plot_npar, *self.shape), device=self.device)
+                        if self.graph:
+                            batch = batch * edge_mask.unsqueeze(1)
+                            batch = (batch, n_nodes.to(self.device))
 
                     x_tot, out, steps_expanded = self.langevin.record_langevin_seq(
                         sample_net, batch, ipf_it=n, sample=True)
+                    if self.graph:
+                        x_tot = x_tot[0]
+                        batch = batch[0]
+
                     shape_len = len(x_tot.shape)
                     x_tot = x_tot.permute(1, 0, *list(range(2, shape_len)))
+                    
+                    # threshouding operation for graph
+                    if self.graph:
+                        x_tot = (x_tot >= 0.5).float()
                     x_tot_plot = x_tot.detach()  # .cpu().numpy()
 
                 init_x = batch.detach().cpu().numpy()
@@ -325,6 +413,56 @@ class IPFBase(torch.nn.Module):
                                               'init_var': std_init**2, 'final_var': std_final**2,
                                               'mean_init': mean_init, 'mean_final': mean_final,
                                               'T': self.T})
+                
+                # add metrics for graphs
+                if self.graph:
+                    # generated_graphs need to be resized, delete the channel dimention
+                    generated_graphs = x_tot_plot.cpu().numpy()  # (n_steps, batch_size, n_channels, n_nodes, n_nodes)
+                    generated_graphs = generated_graphs[0, :, 0, :, :]  # (batch_size, n_nodes, n_nodes)
+                    generated_list = []
+                    for i in range(len(generated_graphs)):
+                        n = n_nodes[i]
+                        generated_list.append(generated_graphs[i][:n, :n])
+                    if self.test_sampling_metrics is not None:
+                        test_to_log = self.test_sampling_metrics.compute_all_metrics(
+                            generated_graphs, current_epoch=0, local_rank=0
+                        )
+                        # save results for testing
+                        print('saving results for testing')
+                        current_path = os.getcwd()
+                        res_path = os.path.join(
+                            current_path,
+                            f"test_epoch{self.current_epoch}.json",
+                        )
+
+                        with open(res_path, 'w') as file:
+                            # Convert the dictionary to a JSON string and write it to the file
+                            json.dump(test_to_log, file)
+
+                        if wandb.run:
+                            test_to_log = {f"val/{k}": test_to_log[k] for k in test_to_log.keys()}
+                            wandb.log(test_to_log, commit=False)
+
+                    elif self.val_sampling_metrics is not None:
+                        val_to_log = self.val_sampling_metrics.compute_all_metrics(
+                            generated_graphs, current_epoch=0, local_rank=0
+                        )
+                        # save results for testing
+                        print('saving results for testing')
+                        current_path = os.getcwd()
+                        res_path = os.path.join(
+                            current_path,
+                            f"val_epoch{self.current_epoch}.json",
+                        )
+
+                        with open(res_path, 'w') as file:
+                            # Convert the dictionary to a JSON string and write it to the file
+                            json.dump(val_to_log, file)
+
+
+                        if wandb.run:
+                            val_to_log = {f"val/{k}": val_to_log[k] for k in val_to_log.keys()}
+                            wandb.log(val_to_log, commit=False)
 
                 self.plotter(batch, x_tot_plot, i, n, fb)
 
@@ -355,9 +493,22 @@ class IPFSequential(IPFBase):
         self.accelerate(forward_or_backward)
 
         for i in tqdm(range(self.num_iter+1)):
-            self.set_seed(seed=n*self.num_iter+i)
-
+            '''
+            training step
+            '''
+            self.set_seed(seed=n*self.num_iter + i)
             x, out, steps_expanded = next(new_dl)
+            # get masks for graph
+            if self.graph:
+                # import pdb; pdb.set_trace()
+                # nbr of nodes need to be passed as an argument
+                x, n_nodes = x
+                bs = x.shape[0]
+                max_n = x.shape[-1]  # for categorical graphs, this need to be changes
+                node_mask, edge_mask = get_masks(n_nodes, max_n, bs, self.device)
+                x = x * edge_mask.unsqueeze(1)
+                out = out * edge_mask.unsqueeze(1)
+
             x = x.to(self.device)
             out = out.to(self.device)
             steps_expanded = steps_expanded.to(self.device)
@@ -369,8 +520,21 @@ class IPFSequential(IPFBase):
                     x, eval_steps) - x
             else:
                 pred = self.net[forward_or_backward](x, eval_steps)
+            # mask pred
+            if self.graph:
+                pred = pred * edge_mask.unsqueeze(1)
 
             loss = F.mse_loss(pred, out)
+
+            if wandb.run:
+                wandb.log({"num_ipf": n}, commit=True)
+                wandb.log({"num_iter": n * self.num_iter + i + 1}, commit=True)
+                wandb.log(
+                    {
+                        f"train/loss_{forward_or_backward}": loss.detach().cpu().numpy().item(),
+                    },
+                    commit=False,
+                )
 
             # loss.backward()
             self.accelerator.backward(loss)
@@ -405,23 +569,33 @@ class IPFSequential(IPFBase):
         self.clear()
 
     def train(self):
-
+        print('Training...')
         # INITIAL FORWARD PASS
         if self.accelerator.is_local_main_process:
-            init_sample = next(self.save_init_dl)[0]
-            init_sample = init_sample.to(self.device)
-            x_tot, _, _ = self.langevin.record_init_langevin(init_sample)
-            shape_len = len(x_tot.shape)
-            x_tot = x_tot.permute(1, 0, *list(range(2, shape_len)))
-            x_tot_plot = x_tot.detach()  # .cpu().numpy()
+            init_sample = next(self.save_init_dl)
+            if self.graph:
+                init_sample, n_nodes = init_sample
+                init_sample = (init_sample.to(self.device), n_nodes.to(self.device))
+            else:
+                init_sample = init_sample[0]
+                init_sample = init_sample.to(self.device)
 
+            x_tot, _, _ = self.langevin.record_init_langevin(init_sample)
+            if self.graph:
+                x_tot = x_tot[0]
+                init_sample = init_sample[0]
+
+            shape_len = len(x_tot.shape)
+            # x_tot = x_tot.permute(1, 0, *list(range(2, shape_len)))
+            x_tot_plot = x_tot.detach()
+ 
+            # import pdb; pdb.set_trace()
             self.plotter(init_sample, x_tot_plot, 0, 0, 'f')
             x_tot_plot = None
             x_tot = None
             torch.cuda.empty_cache()
 
         for n in range(self.checkpoint_it, self.n_ipf+1):
-
             print('IPF iteration: ' + str(n) + '/' + str(self.n_ipf))
             # BACKWARD OPTIMISATION
             if (self.checkpoint_pass == 'f') and (n == self.checkpoint_it):

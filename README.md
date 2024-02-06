@@ -67,12 +67,16 @@ How to use this code?
 ---------------------
 
 3. Train Networks:
+  - comm20:  `CUDA_VISIBLE_DEVICES=1 python main.py dataset=comm20_debug model=UNET`
   - 2d:  `python main.py dataset=2d model=Basic num_steps=20 num_iter=5000`
   - mnist `python main.py dataset=stackedmnist num_steps=30 model=UNET num_iter=5000 data_dir=<insert filepath of data dir <local paths/data/>`
   - celeba `python main.py dataset=celeba num_steps=50 model=UNET num_iter=5000 data_dir=<insert filepath of data dir <local paths/data/>`
 
+  - mnist `CUDA_VISIBLE_DEVICES=3 python main.py dataset=stackedmnist num_steps=3 model=UNET num_iter=5 data_dir=<insert filepath of data dir <local paths/data/>`
+
+
 Checkpoints and sampled images will be saved to a newly created directory. If GPU has insufficient memory, then reduce cache size. 2D dataset should train on CPU. MNIST and CelebA was ran on 2 high-memory V100 GPUs.
-    
+
 
 References
 ----------

@@ -1,15 +1,23 @@
 import torch
+import os
+import os.path as osp
+from torch.utils.data import TensorDataset
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+import pathlib
+from hydra.utils import get_original_cwd
+
+from ..utils import *
+
+from .logger import CSVLogger, NeptuneLogger, Logger
 from ..models import *
 from ..data.two_dim import two_dim_ds
 from ..data.stackedmnist import Stacked_MNIST
 from ..data.emnist import EMNIST
 from ..data.celeba  import CelebA
+from ..data.comm20 import SpectreGraphDataset
 from .plotters import TwoDPlotter, ImPlotter
-from torch.utils.data import TensorDataset
-import torchvision.transforms as transforms
-import os
-from .logger import CSVLogger, NeptuneLogger, Logger
-from torch.utils.data import DataLoader
+
 cmp = lambda x: transforms.Compose([*x])
 
 def get_plotter(runner, args):
@@ -29,7 +37,7 @@ UNET_MODEL = 'UNET'
 
 def get_models(args):
     model_tag = getattr(args, MODEL)
-    
+
     if model_tag == BASIC_MODEL:
         net_f, net_b = ScoreNetwork(), ScoreNetwork()
 
@@ -44,6 +52,8 @@ def get_models(args):
             channel_mult = (1, 2, 2, 2)
         elif image_size == 28:
             channel_mult = (1, 2, 2)
+        elif image_size == 20:  # comm20
+            channel_mult = (1, 1, 2)
         else:
             raise ValueError(f"unsupported image size: {image_size}")
 
@@ -84,9 +94,10 @@ DATASET_2D = '2d'
 DATASET_CELEBA = 'celeba'
 DATASET_STACKEDMNIST = 'stackedmnist'
 DATASET_EMNIST = 'emnist'
+DATASET_COMM20 = 'comm20'
 
 
-def get_datasets(args):
+def get_datasets(args, split='train'):
     dataset_tag = getattr(args, DATASET)
     if args.transfer:
         dataset_transfer_tag = getattr(args, DATASET_TRANSFER)
@@ -96,7 +107,17 @@ def get_datasets(args):
     # INITIAL (DATA) DATASET
 
     # 2D DATASET
-    
+    if dataset_tag == DATASET_COMM20:
+        base_path = pathlib.Path(get_original_cwd()).parents[0]
+        root_path = os.path.join(base_path, 'data/comm20/')
+        init_ds = SpectreGraphDataset(
+                    dataset_name='comm20',
+                    split=split,
+                    root=root_path,
+                    transform=None,
+                    pre_transform=None,
+                    pre_filter=None)
+
     if dataset_tag == DATASET_2D:
         data_tag = args.data
         npar = max(args.npar, args.cache_npar)
@@ -118,9 +139,8 @@ def get_datasets(args):
         if args.data.random_flip:
             train_transform.insert(2, transforms.RandomHorizontalFlip())
 
-
         root = os.path.join(args.data_dir, 'celeba')
-        init_ds = CelebA(root, split='train', transform=cmp(train_transform), download=False)
+        init_ds = CelebA(root, split=split, transform=cmp(train_transform), download=False)
 
     # MNIST DATASET
 
@@ -173,9 +193,11 @@ def get_datasets(args):
 
     # FINAL (GAUSSIAN) DATASET (if no transfer)
 
-    if not(args.transfer):
+    final_ds, mean_final, var_final = None, None, None
+    if not(args.transfer) and split == 'train':
         if args.adaptive_mean:
             NAPPROX = 100
+            # TODO: this batch size causes error when it can not be devided by the datasize
             vec = next(iter(DataLoader(init_ds, batch_size=NAPPROX)))[0]
             mean_final = vec.mean()
             mean_final = vec[0] * 0 + mean_final

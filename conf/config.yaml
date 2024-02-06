@@ -1,4 +1,5 @@
 # @package _global_
+graph: False
 
 defaults:
   - launcher: local
@@ -21,6 +22,7 @@ plot_level: 1
 mean_match: True
 paths: 
   experiments_dir_name: experiments
+wandb: 'online'             # online | offline | disabled
 
 # checkpoint
 checkpoint_run: False

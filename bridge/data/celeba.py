@@ -58,8 +58,8 @@ class CelebA(VisionDataset):
         self.transform = transform
         self.target_transform = target_transform
 
-        if download:
-            self.download()
+        # if download:
+        #     self.download()
 
 
         self.transform = transform
