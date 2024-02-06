@@ -528,7 +528,10 @@ class IPFSequential(IPFBase):
 
             if wandb.run:
                 wandb.log({"num_ipf": n}, commit=True)
-                wandb.log({"num_iter": n * self.num_iter + i + 1}, commit=True)
+                if forward_or_backward == 'f':
+                    wandb.log({"forward_num_iter": n * self.num_iter + i + 1}, commit=True)
+                else:
+                    wandb.log({"backward_num_iter": n * self.num_iter + i + 1}, commit=True)
                 wandb.log(
                     {
                         f"train/loss_{forward_or_backward}": loss.detach().cpu().numpy().item(),
