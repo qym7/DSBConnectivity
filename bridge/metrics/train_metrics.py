@@ -1,6 +1,6 @@
 import torch.nn as nn
 import wandb
-from sparse_diffusion.metrics.abstract_metrics import CrossEntropyMetric
+from ..metrics.abstract_metrics import CrossEntropyMetric
 
 
 class TrainLossDiscrete(nn.Module):

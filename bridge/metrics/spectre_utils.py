@@ -30,8 +30,8 @@ from scipy.stats import chi2
 from string import ascii_uppercase, digits
 from torch_geometric.utils import to_dense_adj, is_undirected, to_networkx
 
-from sparse_diffusion.utils import SparsePlaceHolder
-from sparse_diffusion.analysis.dist_helper import (
+from ..utils import SparsePlaceHolder
+from ..analysis.dist_helper import (
     compute_mmd,
     gaussian_emd,
     gaussian,
@@ -39,15 +39,12 @@ from sparse_diffusion.analysis.dist_helper import (
     gaussian_tv,
     disc,
 )
-from sparse_diffusion.metrics.neural_metrics import (
+from ..metrics.neural_metrics import (
     FIDEvaluation,
     MMDEvaluation,
     load_feature_extractor
 )
 
-
-
-from sparse_diffusion.utils import SparsePlaceHolder
 
 PRINT_TIME = False
 __all__ = [
@@ -466,15 +463,20 @@ def orca(graph):
             "std",
         ]
     )
+    
+    # output = sp.check_output([str(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../analysis/orca/orca")),"node","4",tmp_fname,"std",])
     output = output.decode("utf8").strip()
     idx = output.find(COUNT_START_STR) + len(COUNT_START_STR) + 2
     output = output[idx:]
-    node_orbit_counts = np.array(
-        [
-            list(map(int, node_cnts.strip().split(" ")))
-            for node_cnts in output.strip("\n").split("\n")
-        ]
-    )
+    try:
+        node_orbit_counts = np.array(
+            [
+                list(map(int, node_cnts.strip().split(" ")))
+                for node_cnts in output.strip("\n").split("\n")
+            ]
+        )
+    except:
+        import pdb; pdb.set_trace()
 
     try:
         os.remove(tmp_fname)
@@ -879,7 +881,6 @@ def eval_fraction_unique_non_isomorphic_valid(
 class SpectreSamplingMetrics(nn.Module):
     def __init__(self, dataloaders, compute_emd, metrics_list):
         super().__init__()
-
         self.train_graphs = self.loader_to_nx(dataloaders["train"])
         self.val_graphs = self.loader_to_nx(dataloaders["val"])
         self.test_graphs = self.loader_to_nx(dataloaders["test"])
@@ -892,12 +893,30 @@ class SpectreSamplingMetrics(nn.Module):
         self.metrics_list = metrics_list
 
     def loader_to_nx(self, loader):
+        # networkx_graphs = []
+        # for i, batch in enumerate(loader):
+        #     for j, data in enumerate(batch[0]):
+        #         import pdb; pdb.set_trace()
+        #         n_node = batch[1][j]
+        #         data = data[0, :n_node, :n_node]
+        #         networkx_graphs.append(nx.from_numpy_array(data.long().cpu().numpy()))
+        # return networkx_graphs
         networkx_graphs = []
         for i, batch in enumerate(loader):
-            for j, data in enumerate(batch[0]):
-                n_node = batch[1][j]
-                data = data[0, :n_node, :n_node]
-                networkx_graphs.append(nx.from_numpy_array(data.long().cpu().numpy()))
+            try:
+                data_list = batch.to_data_list()
+            except:
+                import pdb; pdb.set_trace()
+            for j, data in enumerate(data_list):
+                networkx_graphs.append(
+                    to_networkx(
+                        data,
+                        node_attrs=None,
+                        edge_attrs=None,
+                        to_undirected=True,
+                        remove_self_loops=True,
+                    )
+                )
         return networkx_graphs
 
     def neural_metrics(self, generated):
@@ -929,10 +948,9 @@ class SpectreSamplingMetrics(nn.Module):
         
         return fid, rbf
 
-    def forward(self, generated_graphs: SparsePlaceHolder, current_epoch, val_counter):
-        num_generated_graphs = len(generated_graphs)
+    def forward(self, generated_graphs: list, current_epoch, val_counter):
         print(
-            f"Computing sampling metrics between {num_generated_graphs} generated graphs and {len(self.test_graphs)}"
+            f"Computing sampling metrics between {len(generated_graphs)} generated graphs and {len(self.val_graphs)}"
             f" test graphs -- emd computation: {self.compute_emd}"
         )
         networkx_graphs = []
@@ -940,7 +958,8 @@ class SpectreSamplingMetrics(nn.Module):
 
         print("Building networkx graphs...")
         for graph in generated_graphs:
-            A = graph
+            atom_types, edge_types = graph
+            A = edge_types.bool().cpu().numpy()
             adjacency_matrices.append(A)
 
             nx_graph = nx.from_numpy_array(A)
@@ -980,7 +999,7 @@ class SpectreSamplingMetrics(nn.Module):
             spectre = spectral_stats(
                 self.test_graphs,
                 networkx_graphs,
-                is_parallel=True,
+                is_parallel=False,
                 n_eigvals=-1,
                 compute_emd=self.compute_emd,
             )
@@ -1061,7 +1080,6 @@ class SpectreSamplingMetrics(nn.Module):
                 }
             )
 
-
         return to_log
 
     def reset(self):
@@ -1073,7 +1091,8 @@ class Comm20SamplingMetrics(SpectreSamplingMetrics):
         super().__init__(
             dataloaders=dataloaders,
             compute_emd=True,
-            metrics_list=["degree", "clustering", "orbit", "neural"],
+            # metrics_list=["degree", "clustering", "orbit", "spectre", "neural"],
+            metrics_list=["degree", "clustering"],
         )
 
 

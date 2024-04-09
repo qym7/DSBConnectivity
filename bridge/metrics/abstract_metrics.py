@@ -2,7 +2,7 @@ import torch
 from torch import Tensor
 from torch.nn import functional as F
 from torchmetrics import Metric, MeanSquaredError
-from sparse_diffusion.utils import PlaceHolder
+from ..utils import PlaceHolder
 
 
 class TrainAbstractMetricsDiscrete(torch.nn.Module):

@@ -13,11 +13,6 @@ from hydra.utils import get_original_cwd
 from networkx import to_numpy_array
 from torch.utils.data import Dataset
 
-from ..utils import PlaceHolder
-from ..datasets.abstract_dataset import (
-    AbstractDataModule,
-    AbstractDatasetInfos,
-)
 from ..datasets.dataset_utils import (
     load_pickle,
     save_pickle,
@@ -182,10 +177,10 @@ class SpectreGraphDataset(InMemoryDataset):
         train_data = []
         val_data = []
         test_data = []
-        
 
         for i, adj in enumerate(adjs):
             # permute randomly nodes as for molecular datasets
+            adj = adjs[0]
             random_order = torch.randperm(adj.shape[-1])
             adj = adj[random_order, :]
             adj = adj[:, random_order]

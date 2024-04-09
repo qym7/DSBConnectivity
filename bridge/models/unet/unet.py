@@ -49,6 +49,7 @@ class UNetModel(nn.Module):
         num_heads=1,
         num_heads_upsample=-1,
         use_scale_shift_norm=False,
+        graph=False,
     ):
         super().__init__()
 
@@ -81,6 +82,7 @@ class UNetModel(nn.Module):
         self.use_checkpoint = use_checkpoint
         self.num_heads = num_heads
         self.num_heads_upsample = num_heads_upsample
+        self.graph = graph
 
         time_embed_dim = model_channels * 4
         self.time_embed = nn.Sequential(
@@ -203,7 +205,7 @@ class UNetModel(nn.Module):
         self.output_blocks.apply(convert_module_to_f32)
 
 
-    def forward(self, x, timesteps, y=None):
+    def forward(self, x, timesteps, y=None, graph=False):
 
         """
         Apply the model to an input batch.
@@ -233,7 +235,13 @@ class UNetModel(nn.Module):
             cat_in = th.cat([h, hs.pop()], dim=1)
             h = module(cat_in, emb)
         h = h.type(x.dtype)
-        return self.out(h)
+
+        h = self.out(h)
+
+        if self.graph or graph:
+            h = (h.permute(0, 1, 3, 2) + h)/2
+
+        return h
 
     def get_feature_vectors(self, x, timesteps, y=None):
         """

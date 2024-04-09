@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.utils import coalesce
 
-import utils
+from .. import utils
 
 
 def condensed_to_matrix_index(condensed_index, num_nodes):

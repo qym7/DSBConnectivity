@@ -26,8 +26,8 @@ from torchmetrics import (
 from torchmetrics.utilities.data import _flatten_dict, allclose
 from fcd_torch import FCD
 
-import utils
-from sparse_diffusion.metrics.metrics_utils import (
+from .. import utils
+from ..metrics.metrics_utils import (
     counter_to_tensor,
     wasserstein1d,
     total_variation1d,

@@ -8,8 +8,8 @@ from torch_geometric.utils import to_dense_adj
 import torch_geometric.nn.pool as pool
 
 # My files
-import utils
-from sparse_diffusion.diffusion.sample_edges_utils import (
+from .. import utils
+from ..diffusion.sample_edges_utils import (
     matrix_to_condensed_index,
     condensed_to_matrix_index_batch,
     condensed_to_matrix_index,

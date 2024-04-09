@@ -16,7 +16,7 @@ def main(args):
     print('Directory: ' + os.getcwd())
     ipf = IPFSequential(args)
     ipf.train()
-    
+
 
 if __name__ == '__main__':
     main()  

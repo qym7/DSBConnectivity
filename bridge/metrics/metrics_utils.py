@@ -6,7 +6,7 @@ import torch
 from tqdm import tqdm
 from torch_geometric.data import Data
 import torch.nn.functional as F
-from sparse_diffusion.datasets.dataset_utils import Statistics
+from ..datasets.dataset_utils import Statistics
 
 
 def molecules_to_datalist(molecules):

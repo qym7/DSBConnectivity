@@ -52,5 +52,3 @@ gamma_space: linspace
 weight_distrib: True
 weight_distrib_alpha: 100
 fast_sampling: True
-
-

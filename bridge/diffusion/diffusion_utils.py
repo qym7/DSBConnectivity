@@ -3,9 +3,9 @@ from torch.nn import functional as F
 import numpy as np
 import math
 
-from sparse_diffusion.utils import PlaceHolder
-from sparse_diffusion import utils
-from sparse_diffusion.diffusion.sample_edges import sample_query_edges
+from ..utils import PlaceHolder
+from .. import utils
+from ..diffusion.sample_edges import sample_query_edges
 
 
 def sum_except_batch(x):
@@ -17,6 +17,8 @@ def assert_correctly_masked(variable, node_mask):
         variable * (1 - node_mask.long())
     ).detach().abs().max() < 1e-4, "Variables not masked properly."
 
+# (variable * (1 - node_mask.long())
+#     ).detach().abs().max()
 
 def sample_gaussian(size):
     x = torch.randn(size)

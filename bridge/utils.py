@@ -51,21 +51,43 @@ def create_folders(args):
         pass
 
 
-def to_dense(x, edge_index, edge_attr, batch, charge):
+def data_to_dense(graph_data, max_n_nodes):
+    return to_dense(graph_data.x, graph_data.edge_index, graph_data.edge_attr, graph_data.batch, max_num_nodes=max_n_nodes)
+
+
+def to_dense(x, edge_index, edge_attr, batch, max_num_nodes=None, charge=None, y=None, n_nodes=None):
     batch = batch.to(torch.int64)
-    X, node_mask = to_dense_node(x=x, batch=batch)
-    # node_mask = node_mask.float()
-    max_num_nodes = X.size(1)
+    X, node_mask = to_dense_node(x=x, batch=batch, max_num_nodes=max_num_nodes)
+    if max_num_nodes is None:
+        max_num_nodes = X.size(1)
     E = to_dense_edge(edge_index, edge_attr, batch, max_num_nodes)
 
-    if charge.numel() > 0:
-        charge, _ = to_dense_node(x=charge, batch=batch)
+    if charge is not None:
+        if charge.numel() > 0:
+            charge, _ = to_dense_node(x=charge, batch=batch, max_num_nodes=max_num_nodes)
 
-    return PlaceHolder(X=X, E=E, y=None, charge=charge), node_mask
+    graph_data = PlaceHolder(X=X, E=E, y=y, charge=charge, n_nodes=n_nodes, node_mask=node_mask)
+
+    return graph_data, node_mask
 
 
-def to_dense_node(x, batch):
-    X, node_mask = to_dense_batch(x=x, batch=batch)
+def symmetize_edge_matrix(matrix):
+    '''
+    matrix: bs, n, n, de
+    '''
+    upper_triangular_mask = torch.zeros_like(matrix)
+    indices = torch.triu_indices(row=matrix.size(1), col=matrix.size(2), offset=1)
+    upper_triangular_mask[:, indices[0], indices[1], :] = 1
+
+    matrix = matrix * upper_triangular_mask
+    matrix = matrix + torch.transpose(matrix, 1, 2)
+    assert (matrix == torch.transpose(matrix, 1, 2)).all()
+
+    return matrix
+
+
+def to_dense_node(x, batch, max_num_nodes):
+    X, node_mask = to_dense_batch(x=x, batch=batch, max_num_nodes=max_num_nodes)
 
     return X, node_mask
 
@@ -209,7 +231,7 @@ def encode_no_edge(E):
 
 
 class PlaceHolder:
-    def __init__(self, X, E, y, charge=None, t_int=None, t=None, node_mask=None):
+    def __init__(self, X, E, y, charge=None, t_int=None, t=None, node_mask=None, n_nodes=None):
         self.X = X
         self.charge = charge
         self.E = E
@@ -217,6 +239,124 @@ class PlaceHolder:
         self.t_int = t_int
         self.t = t
         self.node_mask = node_mask
+        self.n_nodes = n_nodes
+
+        if y is None:
+            if type(self.X) == torch.Tensor:
+                shape = self.X.shape[:-2]
+                self.y = torch.zeros((*shape, 0), device=self.X.device)
+
+        if self.n_nodes is not None and self.node_mask is None:
+            bs = len(n_nodes)
+            arange = (
+                torch.arange(self.X.shape[-2], device=self.X.device).unsqueeze(0).expand(bs, -1)
+            )
+            self.node_mask = arange < n_nodes.unsqueeze(1)
+
+    def add_n_nodes(self, n_nodes):
+        self.n_nodes = n_nodes
+        if self.n_nodes is not None and self.node_mask is None:
+            bs = len(n_nodes)
+            arange = (
+                torch.arange(self.X.shape[-2], device=self.X.device).unsqueeze(0).expand(bs, -1)
+            )
+            self.node_mask = arange < n_nodes.unsqueeze(1)
+
+    def add(self, graph_data):
+        X = E = None
+        charge = self.charge
+        if (self.X is not None) and (graph_data.X is not None):
+            X = self.X + graph_data.X
+        if (self.E is not None) and (graph_data.E is not None):
+            E = self.E + graph_data.E
+        if (self.charge is not None) and (graph_data.charge is not None):
+            charge = self.charge + graph_data.charge
+        return PlaceHolder(X=X, E=E, y=None, charge=charge, node_mask=self.node_mask)
+
+    def minus(self, graph_data):
+        X = E = None
+        charge = self.charge
+        if (self.X is not None) and (graph_data.X is not None):
+            X = self.X - graph_data.X
+        if (self.E is not None) and (graph_data.E is not None):
+            E = self.E - graph_data.E
+        if (self.charge is not None) and (graph_data.charge is not None):
+            charge = self.charge - graph_data.charge
+        return PlaceHolder(X=X, E=E, y=None, charge=charge, node_mask=self.node_mask)
+
+    def scale(self, mu):
+        if isinstance(mu, PlaceHolder):
+            X = E = None
+            charge = self.charge
+            if self.X is not None:
+                X = self.X * mu.X
+            if self.E is not None:
+                E = self.E * mu.E
+            if self.charge is not None:
+                charge = self.charge * mu.charge
+        else:
+            X = E = None
+            charge = self.charge
+            if self.X is not None:
+                X = self.X * mu
+            if self.E is not None:
+                E = self.E * mu
+            if self.charge is not None:
+                charge = self.charge * mu
+
+        return PlaceHolder(X=X, E=E, y=None, charge=charge, node_mask=self.node_mask)
+
+    def discretize(self):
+        X = self.X.argmax(-1) if self.X is not None else None
+        charge = None
+        if self.charge is not None:
+            if self.charge.numel() > 0:
+                charge = self.charge.argmax(-1)
+        E = self.E.argmax(-1) if self.E is not None else None
+        return PlaceHolder(X=X, E=E, y=self.y, charge=charge, node_mask=self.node_mask)
+
+    def onehot(self):
+        dx = self.X.shape[-1]
+        dc = self.charge.shape[-1] if self.charge is not None else None
+        de = self.E.shape[-1]
+        d_data = self.discretize()
+        d_data.X = F.one_hot(d_data.X, dx)
+        d_data.charge = F.one_hot(d_data.charge, dc) if d_data.charge is not None else None
+        d_data.E = F.one_hot(d_data.E, de)
+
+        d_data.mask()
+
+        return d_data
+
+    def place(self, graph_data, k):
+        if (self.X is not None) and (graph_data.X is not None):
+            self.X[:, k] = graph_data.X
+        if (self.E is not None) and (graph_data.E is not None):
+            self.E[:, k] = graph_data.E
+        if (self.charge is not None) and (graph_data.charge is not None):
+            self.charge[:, k] = graph_data.charge
+        if (self.y is not None) and (graph_data.y is not None) and (self.y.numel()>0):
+            self.y[:, k] = graph_data.y
+        return self
+
+
+    def get_data(self, k, dim=0):
+        if dim==0:
+            return PlaceHolder(
+                X=self.X[k] if self.X is not None else None,
+                E=self.E[k] if self.E is not None else None,
+                y=self.y[k] if (self.y is not None) else None,
+                node_mask=self.node_mask,
+                # charge=self.charge[k] if self.charge is not None else None,
+            )
+        if dim==1:
+            return PlaceHolder(
+                X=self.X[:, k] if self.X is not None else None,
+                E=self.E[:, k] if self.E is not None else None,
+                y=self.y[:, k] if self.y is not None else None,
+                node_mask=self.node_mask,
+                # charge=self.charge[:, k] if self.charge is not None else None,
+            )
 
     def device_as(self, x: torch.Tensor):
         self.X = self.X.to(x.device) if self.X is not None else None
@@ -224,12 +364,49 @@ class PlaceHolder:
         self.E = self.E.to(x.device) if self.E is not None else None
         self.y = self.y.to(x.device) if self.y is not None else None
         return self
+    
+
+    def to_device(self, device: str):
+        self.X = self.X.to(device) if self.X is not None else None
+        # self.charge = self.charge.to(device) if self.charge.numel() > 0 else None
+        self.E = self.E.to(device) if self.E is not None else None
+        self.y = self.y.to(device) if self.y is not None else None
+        return self
+
+    def detach(self):
+        self.X = self.X.detach() if self.X is not None else None
+        # self.charge = self.charge.detach() if self.charge.numel() > 0 else None
+        self.E = self.E.detach() if self.E is not None else None
+        self.y = self.y.detach() if self.y is not None else None
+        return self
+
+    def randn_like(self):
+        new_data = PlaceHolder(
+            X=torch.randn_like(self.X).to(self.X.device) if self.X is not None else None,
+            E=torch.randn_like(self.E).to(self.E.device) if self.E is not None else None,
+            y=torch.randn_like(self.y).to(self.y.device) if self.y is not None else None,
+            charge=torch.randn_like(self.charge).to(self.charge.device) if self.charge is not None else None,
+        )
+        new_data.E = symmetize_edge_matrix(new_data.E)
+        new_data.mask(self.node_mask)
+
+        return new_data
+    
+    def normalize(self):
+        return PlaceHolder(
+                X = self.X / (self.X.abs().sum(-1).unsqueeze(-1)+1e-6),
+                E = self.E / (self.E.abs().sum(-1).unsqueeze(-1)+1e-6),
+                y=self.y,
+                charge=self.charge,
+                node_mask=self.node_mask
+        )
 
     def type_as(self, x: torch.Tensor):
         """Changes the device and dtype of X, E, y."""
         self.X = self.X.type_as(x)
         self.E = self.E.type_as(x)
         self.y = self.y.type_as(x)
+        self.charge = self.charge.type_as(x) if self.charge.numel() > 0 else None
         return self
 
     def mask(self, node_mask=None, collapse=False):
@@ -255,28 +432,64 @@ class PlaceHolder:
         else:
             if self.X is not None:
                 self.X = self.X * x_mask
-            if self.charge.numel() > 0:
-                self.charge = self.charge * x_mask
+            if self.charge is not None:
+                if self.charge.numel() > 0:
+                    self.charge = self.charge * x_mask
             if self.E is not None:
                 self.E = self.E * e_mask1 * e_mask2 * diag_mask
+
         try:
             assert torch.allclose(self.E, torch.transpose(self.E, 1, 2))
         except:
-            import pdb
+            import pdb; pdb.set_trace()
 
-            pdb.set_trace()
+        if self.node_mask is None:
+            self.node_mask = node_mask
+
         return self
 
-    def collapse(self, collapse_charge=None):
+    def split(self):
+        """Split a PlaceHolder representing a batch into a list of placeholders representing individual graphs."""
+        graph_list = []
+        batch_size = self.X.shape[0]
+        for i in range(batch_size):
+            n = torch.sum(self.node_mask[i], dim=0)
+            x = self.X[i, :n]
+            # c = self.charge[i, :n]
+            e = self.E[i, :n, :n]
+            graph_list.append(
+                PlaceHolder(X=x, charge=None, E=e, y=self.y[i], node_mask=None)
+            )
+        return graph_list
+
+    def collapse(self, collapse_charge=None, node_mask=None):
         copy = self.copy()
         copy.X = torch.argmax(self.X, dim=-1)
         # copy.charge = collapse_charge.to(self.charge.device)[torch.argmax(self.charge, dim=-1)]
         copy.E = torch.argmax(self.E, dim=-1)
-        x_mask = self.node_mask.unsqueeze(-1)  # bs, n, 1
+        # len_E = len(copy.E.shape)
+        # copy.E = self.E[..., -1] > 0.3
+        if node_mask is None:
+            node_mask = self.node_mask
+        x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
         e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1, 1
         e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n, 1
-        copy.X[self.node_mask == 0] = -1
-        copy.charge[self.node_mask == 0] = 1000
+        copy.X[node_mask == 0] = -1
+        copy.E[(e_mask1 * e_mask2).squeeze(-1) == 0] = -1
+        return copy
+
+    def collapse(self, collapse_charge=None, node_mask=None):
+        copy = self.copy()
+        copy.X = torch.argmax(self.X, dim=-1)
+        # copy.charge = collapse_charge.to(self.charge.device)[torch.argmax(self.charge, dim=-1)]
+        copy.E = torch.argmax(self.E, dim=-1)
+        if node_mask is None:
+            node_mask = self.node_mask
+        x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
+        e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1, 1
+        e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n, 1
+        copy.X[node_mask == 0] = -1
+        # copy.charge[self.node_mask == 0] = 1000
         copy.E[(e_mask1 * e_mask2).squeeze(-1) == 0] = -1
         return copy
 
@@ -354,6 +567,8 @@ class SparsePlaceHolder:
         # copy.charge = collapse_charge.to(self.charge.device)[torch.argmax(self.charge, dim=-1)]
         self.edge_attr = torch.argmax(self.edge_attr, dim=-1)
 
+        return self
+
 
 def delete_repeated_twice_edges(edge_index, edge_attr):    
     min_edge_index, min_edge_attr = coalesce(
@@ -390,7 +605,6 @@ def undirected_to_directed(edge_index, edge_attr=None):
     else:
         return edge_index[:, top_index]
 
-
 def mask_node(node, node_mask):
     x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
     return node * x_mask
@@ -399,13 +613,26 @@ def get_masks(n_nodes, max_n_nodes, bs, device):
     arange = (
         torch.arange(max_n_nodes, device=device).unsqueeze(0).expand(bs, -1)
     )
+    bs = len(n_nodes)
     node_mask = arange < n_nodes.unsqueeze(1)
     x_mask = node_mask          # bs, n
     e_mask1 = x_mask.unsqueeze(2)             # bs, n, 1
     e_mask2 = x_mask.unsqueeze(1)             # bs, 1, n
-    edge_mask = e_mask1 * e_mask2                # bs, n, n
+    diag_mask = torch.ones(max_n_nodes, max_n_nodes) - torch.eye(max_n_nodes)
+    diag_mask = diag_mask.unsqueeze(0)
+    diag_mask = diag_mask.expand(bs, -1, -1).to(device)
+    edge_mask = e_mask1 * e_mask2 * diag_mask                # bs, n, n
     
     return node_mask, edge_mask
+
+def get_node_mask(n_nodes, max_n_nodes, bs, device):
+    arange = (
+        torch.arange(max_n_nodes, device=device).unsqueeze(0).expand(bs, -1)
+    )
+    bs = len(n_nodes)
+    node_mask = arange < n_nodes.unsqueeze(1)
+    
+    return node_mask
 
 
 def densify_noisy_data(sparse_noisy_data):

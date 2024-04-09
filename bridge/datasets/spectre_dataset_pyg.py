@@ -11,19 +11,19 @@ from torch_geometric.data import InMemoryDataset, download_url
 from hydra.utils import get_original_cwd
 from networkx import to_numpy_array
 
-from sparse_diffusion.utils import PlaceHolder
-from sparse_diffusion.datasets.abstract_dataset import (
+from ..utils import PlaceHolder
+from ..datasets.abstract_dataset import (
     AbstractDataModule,
     AbstractDatasetInfos,
 )
-from sparse_diffusion.datasets.dataset_utils import (
+from ..datasets.dataset_utils import (
     load_pickle,
     save_pickle,
     Statistics,
     to_list,
     RemoveYTransform,
 )
-from sparse_diffusion.metrics.metrics_utils import (
+from ..metrics.metrics_utils import (
     node_counts,
     atom_type_counts,
     edge_counts,
@@ -164,6 +164,7 @@ class SpectreGraphDataset(InMemoryDataset):
 
         for i, adj in enumerate(adjs):
             # permute randomly nodes as for molecular datasets
+            adj = adjs[0][:4, :4]  # TODO: this line and the package of COMM20 are to deleted
             random_order = torch.randperm(adj.shape[-1])
             adj = adj[random_order, :]
             adj = adj[:, random_order]
@@ -213,27 +214,27 @@ class SpectreGraphDataset(InMemoryDataset):
 class SpectreGraphDataModule(AbstractDataModule):
     def __init__(self, cfg):
         self.cfg = cfg
-        self.dataset_name = self.cfg.dataset.name
-        self.datadir = cfg.dataset.datadir
+        self.dataset_name = self.cfg.name
+        self.datadir = cfg.datadir
         base_path = pathlib.Path(get_original_cwd()).parents[0]
         root_path = os.path.join(base_path, self.datadir)
         pre_transform = RemoveYTransform()
 
         datasets = {
             "train": SpectreGraphDataset(
-                dataset_name=self.cfg.dataset.name,
+                dataset_name=self.cfg.name,
                 pre_transform=pre_transform,
                 split="train",
                 root=root_path,
             ),
             "val": SpectreGraphDataset(
-                dataset_name=self.cfg.dataset.name,
+                dataset_name=self.cfg.name,
                 pre_transform=pre_transform,
                 split="val",
                 root=root_path,
             ),
             "test": SpectreGraphDataset(
-                dataset_name=self.cfg.dataset.name,
+                dataset_name=self.cfg.name,
                 pre_transform=pre_transform,
                 split="test",
                 root=root_path,

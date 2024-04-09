@@ -3,8 +3,18 @@ import math
 
 import torch
 import torch.nn.functional as F
-from sparse_diffusion import utils
+from .. import utils
 
+
+
+class DummyExtraFeatures:
+    """This class does not compute anything, just returns empty tensors."""
+    def __call__(self, noisy_data):
+        device = noisy_data.X.device
+        empty_x = torch.zeros((*noisy_data.X.shape[:-1], 0), device=device)
+        empty_e = torch.zeros((*noisy_data.E.shape[:-1], 0), device=device)
+        empty_y = torch.zeros((noisy_data.y.shape[0], 0), device=device)
+        return utils.PlaceHolder(X=empty_x, E=empty_e, y=empty_y)
 
 def batch_trace(X):
     """ Expect a matrix of shape B N N, returns the trace in shape B."""
@@ -20,19 +30,11 @@ def batch_diagonal(X):
 class DummyExtraFeatures:
     """This class does not compute anything, just returns empty tensors."""
     def __call__(self, noisy_data):
-        X = noisy_data["node_t"]
-        if "comp_edge_attr_t" not in noisy_data:
-            E = noisy_data["edge_attr_t"]
-        else:
-            E = noisy_data["comp_edge_attr_t"]
-        y = noisy_data["y_t"]
-        empty_x = X.new_zeros((*X.shape[:-1], 0))
-        empty_e = E.new_zeros((*E.shape[:-1], 0))
-        empty_y = y.new_zeros((y.shape[0], 0))
-        return utils.SparsePlaceHolder(
-            node=empty_x, edge_index=None, edge_attr=empty_e, y=empty_y
-        ), 0., 0.
-
+        device = noisy_data.X.device
+        empty_x = torch.zeros((*noisy_data.X.shape[:-1], 0), device=device)
+        empty_e = torch.zeros((*noisy_data.E.shape[:-1], 0), device=device)
+        empty_y = torch.zeros((noisy_data.y.shape[0], 0), device=device)
+        return utils.PlaceHolder(X=empty_x, E=empty_e, y=empty_y)
 
 class ExtraFeatures:
     def __init__(self, eigenfeatures: bool, edge_features_type, dataset_info, num_eigenvectors,
@@ -47,10 +49,9 @@ class ExtraFeatures:
         if eigenfeatures:
             self.eigenfeatures = EigenFeatures(num_eigenvectors=num_eigenvectors, num_eigenvalues=num_eigenvalues)
 
-    def __call__(self, sparse_noisy_data):
+    def __call__(self, noisy_data):
         # make data dense in the beginning to avoid doing this twice for both cycles and eigenvalues
-        noisy_data = utils.densify_noisy_data(sparse_noisy_data)
-        n = noisy_data["node_mask"].sum(dim=1).unsqueeze(1) / self.max_n_nodes
+        n = noisy_data.node_mask.sum(dim=1).unsqueeze(1) / self.max_n_nodes
         start_time = time.time()
         x_feat, y_feat, edge_feat = self.adj_features(noisy_data)  # (bs, n_cycles)
         y_feat = torch.hstack((y_feat, n))
@@ -76,9 +77,9 @@ class PositionalEncoding:
         self.n_max = n_max_dataset
         self.d = math.floor(D / 2)
 
-    def __call__(self, dense_noisy_data):
-        device = dense_noisy_data['X_t'].device
-        n_max_batch = dense_noisy_data['X_t'].shape[1]
+    def __call__(self, noisy_data):
+        device = noisy_data.X.device
+        n_max_batch = noisy_data.X.shape[1]
 
         arange_n = torch.arange(n_max_batch, device=device)                                    # n_max
         arange_d = torch.arange(self.d, device=device)                                         # d
@@ -88,7 +89,7 @@ class PositionalEncoding:
         cosines = torch.cos(arange_n.unsqueeze(1) * frequencies.unsqueeze(0))   # N, d
         encoding = torch.hstack((sines, cosines))                               # N, D
         extra_x = encoding.unsqueeze(0)                                         # 1, N, D
-        extra_x = extra_x * dense_noisy_data['node_mask'].unsqueeze(-1)             # B, N, D
+        extra_x = extra_x * noisy_data.node_mask.unsqueeze(-1)             # B, N, D
         return extra_x
 
 class EigenFeatures:
@@ -98,17 +99,21 @@ class EigenFeatures:
         self.num_eigenvalues = num_eigenvalues
 
     def compute_features(self, noisy_data):
-        E_t = noisy_data["E_t"]
-        mask = noisy_data["node_mask"]
+        E_t = noisy_data.E
+        mask = noisy_data.node_mask
         A = E_t[..., 1:].sum(dim=-1).float() * mask.unsqueeze(1) * mask.unsqueeze(2)
         L = self.compute_laplacian(A, normalize=False)
-        mask_diag = 2 * L.shape[-1] * torch.eye(A.shape[-1]).type_as(L).unsqueeze(0)
+        mask_diag = 2 * L.shape[-1] * torch.eye(A.shape[-1], device=L.device).type_as(L).unsqueeze(0)
         mask_diag = mask_diag * (~mask.unsqueeze(1)) * (~mask.unsqueeze(2))
+        # print(L.shape, mask.shape, mask_diag.shape, L.max(), L.min(), L.isnan().any())
         L = L * mask.unsqueeze(1) * mask.unsqueeze(2) + mask_diag
 
-        # debug for protein dataset
-        if L.isnan().any():
-            import pdb; pdb.set_trace()
+        # # debug for protein dataset
+        # try:
+        #     if L.isnan().any():
+        #         import pdb; pdb.set_trace()
+        # except:
+        #     import pdb; pdb.set_trace()
         eigvals, eigvectors = torch.linalg.eigh(L)
         eigvals = eigvals.type_as(A) / torch.sum(mask, dim=1, keepdim=True)
         eigvectors = eigvectors * mask.unsqueeze(2) * mask.unsqueeze(1)
@@ -119,7 +124,7 @@ class EigenFeatures:
         # Retrieve eigenvectors features
         evector_feat = self.eigenvector_features(
             vectors=eigvectors,
-            node_mask=noisy_data["node_mask"],
+            node_mask=noisy_data.node_mask,
             n_connected=n_connected_comp,
             num_eigenvectors=self.num_eigenvectors,
         )
@@ -147,8 +152,9 @@ class EigenFeatures:
 
         diag_norm = 1 / torch.sqrt(diag)  # (bs, n)
         D_norm = torch.diag_embed(diag_norm)  # (bs, n, n)
-        L = torch.eye(n).unsqueeze(0) - D_norm @ adjacency @ D_norm
+        L = torch.eye(n, device=D_norm.device).unsqueeze(0) - D_norm @ adjacency @ D_norm
         L[diag0 == 0] = 0
+
         return (L + L.transpose(1, 2)) / 2
 
     def eigenvalues_features(self, eigenvalues, num_eigenvalues):
@@ -219,9 +225,12 @@ class AdjacencyFeatures:
         self.dist_feat = dist_feat
 
     def __call__(self, noisy_data):
-        adj_matrix = noisy_data["E_t"][..., 1:].int().sum(dim=-1)  # (bs, n, n)
-        num_nodes = noisy_data["node_mask"].sum(dim=1)
-        self.calculate_kpowers(adj_matrix)
+        adj_matrix = noisy_data.E[..., 1:].int().sum(dim=-1)  # (bs, n, n)
+        num_nodes = noisy_data.node_mask.sum(dim=1)
+        try:
+            self.calculate_kpowers(adj_matrix)
+        except:
+            import pdb; pdb.set_trace()
 
         k3x, k3y = self.k3_cycle()
         k4x, k4y = self.k4_cycle()
@@ -242,17 +251,17 @@ class AdjacencyFeatures:
         else:
             edge_feats = torch.zeros((*adj_matrix.shape, 0), device=adj_matrix.device)
 
-        kcyclesx = torch.clamp(kcyclesx, 0, 5) / 5 * noisy_data["node_mask"].unsqueeze(-1)
+        kcyclesx = torch.clamp(kcyclesx, 0, 5) / 5 * noisy_data.node_mask.unsqueeze(-1)
         y_feat = [torch.clamp(kcyclesy, 0, 5) / 5]
         edge_feats = torch.clamp(edge_feats, 0, 5) / 5
 
         if self.dist_feat:
         # get degree distribution
-            bs, n = noisy_data["node_mask"].shape
+            bs, n = noisy_data.node_mask.shape
             degree = adj_matrix.sum(dim=-1).long()  # (bs, n)
             degree[degree > self.num_degree] = self.num_degree + 1    # bs, n
             one_hot_degree = F.one_hot(degree, num_classes=self.num_degree + 2).float()  # bs, n, num_degree + 2
-            one_hot_degree[~noisy_data["node_mask"]] = 0
+            one_hot_degree[~noisy_data.node_mask] = 0
             degree_dist = one_hot_degree.sum(dim=1)  # bs, num_degree + 2
             s = degree_dist.sum(dim=-1, keepdim=True)
             s[s == 0] = 1
@@ -260,7 +269,7 @@ class AdjacencyFeatures:
             y_feat.append(degree_dist)
 
             # get node distribution
-            X = noisy_data["X_t"]       # bs, n, dx
+            X = noisy_data.X       # bs, n, dx
             node_dist = X.sum(dim=1)    # bs, dx
             s = node_dist.sum(-1)     # bs
             s[s == 0] = 1
@@ -268,7 +277,7 @@ class AdjacencyFeatures:
             y_feat.append(node_dist)
 
             # get edge distribution
-            E = noisy_data["E_t"]
+            E = noisy_data.E
             edge_dist = E.sum(dim=[1, 2])    # bs, de
             s = edge_dist.sum(-1)     # bs
             s[s == 0] = 1
@@ -368,7 +377,7 @@ class AdjacencyFeatures:
         normed_adj = torch.matmul(normed_adj, normed_adj.transpose(-2, -1))
 
         # mask self-loops to 0
-        mask = torch.eye(normed_adj.shape[-1]).repeat(normed_adj.shape[0], 1, 1).bool()
+        mask = torch.eye(normed_adj.shape[-1], device=normed_adj.device).repeat(normed_adj.shape[0], 1, 1).bool()
         normed_adj[mask] = 0
 
         # normalization

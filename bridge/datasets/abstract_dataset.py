@@ -1,8 +1,8 @@
 import abc
 import numpy as np
 
-from sparse_diffusion.diffusion.distributions import DistributionNodes
-import sparse_diffusion.utils as utils
+from ..diffusion.distributions import DistributionNodes
+from .. import utils
 import torch
 import torch.nn.functional as F
 from torch_geometric.data.lightning import LightningDataset
@@ -14,9 +14,9 @@ class AbstractDataModule(LightningDataset):
             train_dataset=datasets["train"],
             val_dataset=datasets["val"],
             test_dataset=datasets["test"],
-            batch_size=cfg.train.batch_size,
-            num_workers=cfg.train.num_workers,
-            pin_memory=getattr(cfg.dataset, "pin_memory", False),
+            batch_size=cfg.batch_size,
+            num_workers=cfg.num_workers,
+            pin_memory=getattr(cfg, "pin_memory", False),
         )
         self.cfg = cfg
         self.input_dims = None
@@ -178,39 +178,45 @@ class AbstractDatasetInfos:
         data = next(iter(datamodule.train_dataloader()))
         example_batch = self.to_one_hot(data)
         ex_dense, node_mask = utils.to_dense(
-            example_batch.x,
-            example_batch.edge_index,
-            example_batch.edge_attr,
-            example_batch.batch,
-            example_batch.charge,
+            x=example_batch.x,
+            edge_index=example_batch.edge_index,
+            edge_attr=example_batch.edge_attr,
+            batch=example_batch.batch,
+            charge=example_batch.charge,
+            y=example_batch.y,
+            n_nodes=data.n_nodes
         )
+        ex_dense.add_n_nodes(data.n_nodes)
 
         self.input_dims = utils.PlaceHolder(
-            X=example_batch.x.size(1),
-            E=example_batch.edge_attr.size(1),
-            y=example_batch.y.size(1) + 1 if example_batch.y is not None else 1,
+            X=ex_dense.X.size(-1),
+            E=ex_dense.E.size(-1),
+            y=ex_dense.y.size(-1) + 1 if ex_dense.y is not None else 1,
             charge=self.num_charge_types,
         )
 
-        example_data = {
-            "node_t": example_batch.x,
-            "edge_index_t": example_batch.edge_index,
-            "edge_attr_t": example_batch.edge_attr,
-            "batch": example_batch.batch,
-            "y_t": example_batch.y,
-            "charge_t": example_batch.charge,
-        }
+        # print('input', self.input_dims.y)
 
-        ex_extra_feat = extra_features(example_data)
-        if type(ex_extra_feat) == tuple:
-            ex_extra_feat = ex_extra_feat[0]
-        self.input_dims.X += ex_extra_feat.X.size(-1)
-        self.input_dims.E += ex_extra_feat.E.size(-1)
-        self.input_dims.y += ex_extra_feat.y.size(-1)
+        # example_data =  PlaceHolder(X=ex_dense.X)
+        # {
+        #     "node_t": example_batch.x,
+        #     "edge_index_t": example_batch.edge_index,
+        #     "edge_attr_t": example_batch.edge_attr,
+        #     "batch": example_batch.batch,
+        #     "y_t": example_batch.y,
+        #     "charge_t": example_batch.charge,
+        # }
 
-        mol_extra_feat = domain_features(example_data)
-        if type(mol_extra_feat) == tuple:
-            mol_extra_feat = mol_extra_feat[0]
-        self.input_dims.X += mol_extra_feat.node.size(-1)
-        self.input_dims.E += mol_extra_feat.edge_attr.size(-1)
-        self.input_dims.y += mol_extra_feat.y.size(-1)
+        # ex_extra_feat = extra_features(ex_dense)
+        # if type(ex_extra_feat) == tuple:
+        #     ex_extra_feat = ex_extra_feat[0]
+        # self.input_dims.X += ex_extra_feat.X.size(-1)
+        # self.input_dims.E += ex_extra_feat.E.size(-1)
+        # self.input_dims.y += ex_extra_feat.y.size(-1)
+
+        # mol_extra_feat = domain_features(ex_dense)
+        # if type(mol_extra_feat) == tuple:
+        #     mol_extra_feat = mol_extra_feat[0]
+        # self.input_dims.X += mol_extra_feat.X.size(-1)
+        # self.input_dims.E += mol_extra_feat.E.size(-1)
+        # self.input_dims.y += mol_extra_feat.y.size(-1)

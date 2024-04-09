@@ -84,7 +84,7 @@ class SamplingMetrics(nn.Module):
     #     if self.domain_metrics is not None:
     #         self.domain_metrics.reset()
 
-    def compute_all_metrics(self, generated_graphs: list, current_epoch, local_rank):
+    def compute_all_metrics(self, generated_graphs: list, current_epoch, local_rank, fb, i):
         """Compare statistics of the generated data with statistics of the val/test set"""
         # stat = (
         #     self.dataset_infos.statistics["test"]
@@ -131,6 +131,7 @@ class SamplingMetrics(nn.Module):
             )
             to_log.update(do_metrics)
 
+        to_log = {f'{k}_{fb}_{i}': to_log[k]for k in to_log}
         if wandb.run:
             wandb.log(to_log, commit=False)
         # if local_rank == 0:

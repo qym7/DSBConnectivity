@@ -1,5 +1,5 @@
 import torch
-from sparse_diffusion import utils
+from .. import utils
 
 import torch_geometric.nn.pool as pool
 
