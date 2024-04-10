@@ -289,9 +289,12 @@ class GraphTransformer(nn.Module):
         self.n_layers = n_layers
         self.out_dim_X = output_dims.X
         self.out_dim_E = output_dims.E
+        output_dims.E = 1
+        
         self.out_dim_y = output_dims.y
         self.out_dim_charge = output_dims.charge
         self.hidden_mlp_dims = hidden_mlp_dims
+        self.hidden_dims = hidden_dims
         act_fn_in = nn.ReLU()
         act_fn_out = nn.ReLU()
 
@@ -313,8 +316,8 @@ class GraphTransformer(nn.Module):
             act_fn_in,
         )
         self.mlp_in_y = nn.Sequential(
-            # nn.Linear(input_dims.y, hidden_mlp_dims["y"]),
-            nn.Linear(hidden_mlp_dims["y"], hidden_mlp_dims["y"]),
+            nn.Linear(input_dims.y, hidden_mlp_dims["y"]),
+            # nn.Linear(hidden_mlp_dims["y"], hidden_mlp_dims["y"]),
             act_fn_in,
             nn.Linear(hidden_mlp_dims["y"], hidden_dims["dy"]),
             act_fn_in,
@@ -369,13 +372,12 @@ class GraphTransformer(nn.Module):
         E_to_out = model_input.E[..., : self.out_dim_E]
         y_to_out = model_input.y[..., : self.out_dim_y]
 
-        # import pdb; pdb.set_trace()
-        time_emb = timestep_embedding(y, self.hidden_mlp_dims["y"])
+        time_emb = timestep_embedding(y[:, -1].unsqueeze(-1), self.hidden_dims["dy"])
         # import pdb; pdb.set_trace()
         # The code is using a multi-layer perceptron (MLP) to process the input `model_input.y` and
         # assign the result to `time_emb`. The specific details of the MLP implementation are not
         # shown in the provided code snippet.
-        # time_emb = self.mlp_in_y(time_emb)
+        y = self.mlp_in_y(y) + time_emb
         new_E = self.mlp_in_E(model_input.E)
         new_E = (new_E + new_E.transpose(1, 2)) / 2
 
@@ -407,7 +409,8 @@ class GraphTransformer(nn.Module):
 
         final_X = X[..., : self.out_dim_X]
         final_charge = X[..., self.out_dim_X :]
-        
+        final_X = torch.zeros_like(final_X, device=final_X.device)
+
         # import pdb; pdb.set_trace()
         # mask = utils.PlaceHolder(X=final_X, charge=final_charge, E=E, y=y, node_mask=node_mask).mask()
 

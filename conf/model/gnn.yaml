@@ -10,7 +10,7 @@ model:
     sn_hidden_dim: 32
     output_y: False
     dropout: 0.0
-    lambda_train: [1, 10]              # X=1, E = lambda[0], y = lambda[1]
+    lambda_train: [0, 10]              # X=1, E = lambda[0], y = lambda[1]
 
     # Model settings
     diffusion_steps: 500
@@ -19,8 +19,8 @@ model:
     extra_features: 'all'        # 'all', 'cycles', or null
     eigenfeatures: True
     edge_features: 'all'          # 'all', 'dist', 'localngbs' or null
-    num_eigenvectors: 8       # eigenvectors
-    num_eigenvalues: 5      # eigenvalues
+    num_eigenvectors: 10       # eigenvectors
+    num_eigenvalues: 8      # eigenvalues
     use_charge: False
     num_degree: 10
     dist_feat: True

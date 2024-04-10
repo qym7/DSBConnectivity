@@ -18,9 +18,10 @@ from ..utils import PlaceHolder
 
 
 class Visualizer:
-    def __init__(self, dataset_infos):
+    def __init__(self, dataset_infos, thres):
         self.dataset_infos = dataset_infos
         self.is_molecular = self.dataset_infos.is_molecular
+        self.thres = thres
 
         if self.is_molecular:
             self.remove_h = dataset_infos.remove_h
@@ -41,7 +42,8 @@ class Visualizer:
 
         adj = graph.E.cpu().numpy()
         if len(adj.shape) == 3:
-            adj = adj.argmax(-1)
+            # adj = adj.argmax(-1)
+            adj = (adj>self.thres).astype(int).squeeze(-1)
         assert len(adj.shape) == 2
 
         # if adj.max() > 1:

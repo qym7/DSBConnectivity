@@ -86,7 +86,7 @@ class IPFBase(torch.nn.Module):
         # dataloaders = self.build_dataloaders()
         dataloaders = self.build_datamodules()
         self.max_n_nodes = self.datainfos.max_n_nodes
-        self.visualization_tools = Visualizer(dataset_infos=self.datainfos)
+        self.visualization_tools = Visualizer(dataset_infos=self.datainfos, thres=args.thres)
 
         # create metrics for graph dataset
         if self.graph:
@@ -472,24 +472,25 @@ class IPFBase(torch.nn.Module):
                         batch = next(self.save_init_dl)
                         batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
                         batch = batch.minus(self.decart_mean_final)
-                        # import pdb; pdb.set_trace()
                         batch = batch.scale(4)
+                        n_nodes = node_mask.sum(-1)
+                        batch.X = torch.zeros_like(batch.X, device=batch.X.device)
+                        batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                         batch = batch.mask(node_mask)
                     else:
                         batch_size = self.args.plot_npar
                         n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
                         batch = utils.PlaceHolder(
-                            X=torch.randn(batch_size,
+                            X=torch.zeros(batch_size,
                                         self.max_n_nodes,
                                         len(self.datainfos.node_types)).to(self.device),
                             E=torch.randn(batch_size,
                                         self.max_n_nodes,
                                         self.max_n_nodes,
-                                        len(self.datainfos.edge_types)).to(self.device),
+                                        len(self.datainfos.node_types)).to(self.device),
                             y=None, charge=None
                         )
                         batch.E = utils.symmetize_edge_matrix(batch.E)
-                        # batch = batch.scale(self.std_final).add(self.mean_final)
                         arange = (
                             torch.arange(self.max_n_nodes, device=self.device).unsqueeze(0).expand(batch_size, -1)
                         )
@@ -497,7 +498,7 @@ class IPFBase(torch.nn.Module):
                         batch.mask(node_mask)
 
                     x_tot, out, steps_expanded = self.langevin.record_langevin_seq(
-                        sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True)
+                        sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True, fb=fb)
 
                 # # add metrics for graphs
                 # # generated_graphs need to be resized, delete the channel dimention
@@ -508,7 +509,7 @@ class IPFBase(torch.nn.Module):
                 #     n_node = n_nodes[l]
                 #     generated_list.append(generated_graphs[l][:n_node, :n_node])
 
-                to_plot = x_tot.get_data(-1, dim=1).collapse()
+                to_plot = x_tot.get_data(-1, dim=1).collapse(thres=self.args.thres)
 
                 n_nodes = to_plot.node_mask.sum(-1)
                 X = to_plot.X
@@ -545,9 +546,16 @@ class IPFBase(torch.nn.Module):
                                                                 chains=chain,
                                                                 num_nodes=n_nodes,
                                                                 local_rank=0,
-                                                                num_chains_to_visualize=4,
+                                                                num_chains_to_visualize=2,
                                                                 fb=fb
                 )
+                mean_val = chain.E.mean(-1).mean(-1).mean(-1).mean(0).cpu().numpy()
+                np.save(f'{fb}_{n}_mean.npy', mean_val)
+                dataa = [[x, y] for (x, y) in zip(np.arange(chain.E.shape[1]), mean_val)]
+                if mean_val.max() > 10 or mean_val.min() < -10:
+                    import pdb; pdb.set_trace()
+                table = wandb.Table(data=dataa, columns=["steps", "mean"])
+                wandb.log({f'{fb}_{n}_mean_pred': wandb.plot.line(table, "steps", "mean", title=f'{fb}_{n}_mean_pred')})
 
                 if self.test_sampling_metrics is not None:
                     test_to_log = self.test_sampling_metrics.compute_all_metrics(
@@ -603,6 +611,9 @@ class IPFSequential(IPFBase):
         super().__init__(args)
 
     def ipf_step(self, forward_or_backward, n):
+        if n == '3':
+            import pdb; pdb.set_trace()
+
         new_dl = self.new_cacheloader(forward_or_backward, n, self.args.ema)
 
         if not self.args.use_prev_net:
@@ -612,7 +623,11 @@ class IPFSequential(IPFBase):
         self.build_optimizers()
         self.accelerate(forward_or_backward)
 
-        for i in tqdm(range(self.num_iter+1)):
+        cur_num_iter = self.num_iter + 1
+        # if forward_or_backward == 'f':
+        #     cur_num_iter = cur_num_iter * 5
+
+        for i in tqdm(range(cur_num_iter)):
             '''
             training step
             '''
@@ -620,13 +635,24 @@ class IPFSequential(IPFBase):
             x, out, steps_expanded = next(new_dl)
             x = PlaceHolder(X=x[0], E=x[1], y=x[2], charge=x[3], n_nodes=x[4])
             out = PlaceHolder(X=out[0], E=out[1], y=out[2], charge=out[3], n_nodes=out[4])
+            # import pdb; pdb.set_trace()
             eval_steps = self.T - steps_expanded
+            # import pdb; pdb.set_trace()
             pred = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
+
+            # if forward_or_backward == 'f':
+            #     new_x = x.copy()
+            #     new_x.E[0,:,:,0] = torch.Tensor([[0,2,2,2],[2,0,-2,-2], [2,-2,0,-2], [-2,-2,-2,0]]).to(new_x.E.device)
+            #     new_eval_steps = eval_steps.clone()
+            #     new_eval_steps[0] = torch.tensor(1e-5).to(new_x.E.device)
+            #     new_pred = self.forward_graph(self.net[forward_or_backward], new_x, new_eval_steps)
+            #     print(i, new_pred.E[0,:,:,0], x.E[0,:,:,0], new_eval_steps[0])
 
             if self.args.mean_match:
                 pred = pred.minus(x)
-            # params = [p for p in self.net['b'].parameters()]
-            # print(i, params[0][:3, 0])
+
+            # if forward_or_backward == 'f' and i==500:
+            #     import pdb; pdb.set_trace()
 
             node_loss, edge_loss, loss = self.compute_loss(pred, out)
 
@@ -680,8 +706,8 @@ class IPFSequential(IPFBase):
         self.clear()
 
     def compute_loss(self, pred, out):
-        node_loss = self.args.model.lambda_train[0] * F.mse_loss(pred.X, out.X)
-        edge_loss = self.args.model.lambda_train[1] * F.mse_loss(pred.E, out.E)
+        node_loss = self.args.model.lambda_train[0] * F.mse_loss(pred.X, out.X) * 0
+        edge_loss = self.args.model.lambda_train[1] * F.mse_loss(pred.E[:,:,:,-1], out.E[:,:,:,-1])
         # print('loss',  pred.E[0,0,1].detach(), out.E[0,0,1].detach(), pred.E[0,0,1]-out.E[0,0,1])
         loss = node_loss + edge_loss
         # The code is calculating the total loss by adding the node loss and edge loss together.
@@ -710,46 +736,51 @@ class IPFSequential(IPFBase):
                 self.ipf_step('b', n)
                 self.ipf_step('f', n)
 
-
-    def forward_graph(self, net, z_t, t):
-        # step 1: calculate extra features
-        assert z_t.node_mask is not None
-        model_input = z_t.copy()
-        model_input.y = torch.hstack(
-            (z_t.y, t)
-        ).float()
-
-        return net(model_input)
-
-
     # def forward_graph(self, net, z_t, t):
     #     # step 1: calculate extra features
     #     assert z_t.node_mask is not None
-    #     z_t.X = z_t.X / (z_t.X.abs().sum(-1).unsqueeze(-1)+1e-6)
-    #     z_t.E = z_t.E / (z_t.E.abs().sum(-1).unsqueeze(-1)+1e-6)
-
-    #     z_t_discrete = z_t.onehot()
-    #     extra_features, _, _ = self.extra_features(z_t_discrete)
-    #     extra_domain_features = self.domain_features(z_t_discrete)
-    #     # extra_features = self.extra_features(z_t_discrete)
-    #     # extra_domain_features = self.domain_features(z_t_discrete)
-
-    #     # # step 2: forward to the langevin process
-    #     # # Need to copy to preserve dimensions in transition to z_{t-1} in sampling (prevent changing dimensions of z_t
     #     model_input = z_t.copy()
     #     model_input.y = torch.hstack(
     #         (z_t.y, t)
     #     ).float()
 
-    #     model_input.X = torch.cat(
-    #         (z_t.X, extra_features.X, extra_domain_features.X), dim=2
-    #     ).float()
-    #     model_input.E = torch.cat(
-    #         (z_t.E, extra_features.E, extra_domain_features.E), dim=3
-    #     ).float()
-    #     model_input.y = torch.hstack(
-    #         (z_t.y, extra_features.y, extra_domain_features.y, t)
-    #     ).float()
-
-
     #     return net(model_input)
+
+
+    def forward_graph(self, net, z_t, t):
+        # step 1: calculate extra features
+        assert z_t.node_mask is not None
+        # z_t.X = z_t.X / (z_t.X.abs().sum(-1).unsqueeze(-1)+1e-6)
+        # z_t.E = z_t.E / (z_t.E.abs().sum(-1).unsqueeze(-1)+1e-6)
+        z_t = z_t.clip(3)
+
+        z_t_discrete = z_t.collapse()
+        model_input = z_t.copy()
+        # z_t.E = (z_t.E > 0.5).long()
+        extra_features, _, _ = self.extra_features(z_t_discrete)
+        # import pdb; pdb.set_trace()
+        z_t_discrete.E = z_t_discrete.E.unsqueeze(-1)
+        z_t_discrete.X = z_t_discrete.X.unsqueeze(-1)
+        extra_domain_features = self.domain_features(z_t_discrete)
+        # extra_features = self.extra_features(z_t_discrete)
+        # extra_domain_features = self.domain_features(z_t_discrete)
+
+        # # step 2: forward to the langevin process
+        # # Need to copy to preserve dimensions in transition to z_{t-1} in sampling (prevent changing dimensions of z_t
+
+        model_input.X = torch.cat(
+            (z_t.X, extra_features.X, extra_domain_features.X), dim=2
+        ).float()
+        model_input.E = torch.cat(
+            (z_t.E, extra_features.E, extra_domain_features.E), dim=3
+        ).float()
+        model_input.y = torch.hstack(
+            (z_t.y, extra_features.y, extra_domain_features.y, t)
+        ).float()
+        
+        # print('max input', model_input.E.max(), model_input.E.min())
+        res = net(model_input)
+        # res = res.clip(3)
+        # print('max result', res.E.max(), res.E.min())
+
+        return res

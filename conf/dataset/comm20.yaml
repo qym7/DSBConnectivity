@@ -43,20 +43,20 @@ plot_npar: 64
 
 # training
 cache_npar: 64
-use_prev_net: True
+use_prev_net: False
 ema: True
 ema_rate: 0.99
 grad_clipping: True
-grad_clip: 0.1
+grad_clip: 1.0
 n_ipf_init: 1
 batch_size: 64  # must be smaller than the size of datasets
 num_iter : 2000
 n_ipf: 20
-lr: 0.001
+lr: 0.0001
 
 # diffusion schedule
 num_steps : 30
-gamma_max: 0.01
+gamma_max: 0.1
 gamma_min: 0.00001
 gamma_space: linspace
 weight_distrib: False
@@ -66,3 +66,30 @@ fast_sampling: True
 # cache
 num_cache_batches: 1
 cache_refresh_stride: 100
+
+model: 
+    n_layers: 4
+    hidden_dims: {'dx': 256, 'de': 64, 'dy': 256, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 128, 'dim_ffy': 128}
+    hidden_mlp_dims: { 'X': 128, 'E': 64, 'y': 256}
+    # hidden_dims: {'dx': 4, 'de': 4, 'dy': 4, 'n_head': 2, 'dim_ffX': 32, 'dim_ffE': 32, 'dim_ffy': 4}
+    # hidden_mlp_dims: { 'X': 4, 'E': 4, 'y': 4}
+    sn_hidden_dim: 32
+    output_y: False
+    dropout: 0.0
+    lambda_train: [0, 10]              # X=1, E = lambda[0], y = lambda[1]
+
+    # Model settings
+    diffusion_steps: 500
+    diffusion_noise_schedule: 'cosine'              # 'cosine', 'polynomial_2'
+
+    extra_features: 'all'        # 'all', 'cycles', or null
+    eigenfeatures: True
+    edge_features: 'all'          # 'all', 'dist', 'localngbs' or null
+    num_eigenvectors: 10       # eigenvectors
+    num_eigenvalues: 8      # eigenvalues
+    use_charge: False
+    num_degree: 10
+    dist_feat: True
+    positional_encoding: False
+
+    thres: 1.0

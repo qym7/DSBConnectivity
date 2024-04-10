@@ -4,6 +4,7 @@ import time
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
+import wandb
 
 from .. import utils
 
@@ -44,9 +45,10 @@ class CacheLoader(Dataset):
 
         self.data = utils.PlaceHolder(
             X=torch.Tensor(num_batches, batch_size*self.num_steps, 2, self.max_n_nodes, len(dataset_infos.node_types)).to(self.device),
-            E=torch.Tensor(num_batches, batch_size*self.num_steps, 2, self.max_n_nodes, self.max_n_nodes, len(dataset_infos.bond_types)).to(self.device),
+            E=torch.Tensor(num_batches, batch_size*self.num_steps, 2, self.max_n_nodes, self.max_n_nodes, len(dataset_infos.node_types)).to(self.device),
             y=None
         )
+
         self.steps_data = torch.zeros(
             (num_batches, batch_size*self.num_steps, 1)).to(device)  # .cpu() # steps
         self.n_nodes = torch.zeros((num_batches, batch_size*self.num_steps))
@@ -60,38 +62,30 @@ class CacheLoader(Dataset):
                     batch = batch.minus(self.decart_mean_final)
                     batch = batch.scale(4)
                     n_nodes = node_mask.sum(-1)
+                    batch.X = torch.zeros_like(batch.X, device=batch.X.device)
+                    batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                     batch = batch.mask(node_mask)
                 else:
                     n_nodes = self.nodes_dist.sample_n(batch_size, device)
                     batch = utils.PlaceHolder(
-                        X=torch.randn(batch_size,
+                        X=torch.zeros(batch_size,
                                        self.max_n_nodes,
                                        len(dataset_infos.node_types)).to(self.device),
                         E=torch.randn(batch_size,
                                        self.max_n_nodes,
                                        self.max_n_nodes,
-                                       len(dataset_infos.edge_types)).to(self.device),
+                                       len(dataset_infos.node_types)).to(self.device),
                         y=None, charge=None, n_nodes=n_nodes
                     )
-                    # batch = batch.scale(std).add(mean)
                     batch.E = utils.symmetize_edge_matrix(batch.E)
-                    # arange = (
-                    #     torch.arange(self.max_n_nodes, device=device).unsqueeze(0).expand(batch_size, -1)
-                    # )   
-                    # node_mask = arange < n_nodes.unsqueeze(1)
                     batch.mask()
-                    print(b, batch.X[0,0,0])
 
                 if (n == 1) & (fb == 'b'):
                     x, out, steps_expanded = langevin.record_init_langevin(
                         batch, node_mask)
                 else:
                     x, out, steps_expanded = langevin.record_langevin_seq(
-                        sample_net, batch, node_mask=batch.node_mask, ipf_it=n)
-
-                # if fb == 'b':
-                #     if n==2:
-                #         import pdb; pdb.set_trace()
+                        sample_net, batch, node_mask=batch.node_mask, ipf_it=n, fb=fb)
 
                 if b == 0 and self.visualize:
                     self.visualize = False
@@ -109,7 +103,7 @@ class CacheLoader(Dataset):
                                                                     chains=chain,
                                                                     num_nodes=n_nodes,
                                                                     local_rank=0,
-                                                                    num_chains_to_visualize=4,
+                                                                    num_chains_to_visualize=1,
                                                                     fb=reverse_fb)
 
                 batch_X = torch.cat((x.X.unsqueeze(2), out.X.unsqueeze(2)), dim=2).flatten(start_dim=0, end_dim=1)
@@ -125,6 +119,15 @@ class CacheLoader(Dataset):
                 # store n_nodes
                 n_nodes = n_nodes.unsqueeze(-1).repeat(1, self.num_steps)
                 self.n_nodes[b] = n_nodes.flatten()
+
+        fb_r = 'f_learn_b' if fb == 'b' else 'b_learn_f'
+        shape_E = self.data.E.shape
+        E_f = self.data.E.reshape(shape_E[0], batch_size, self.num_steps, shape_E[-4], shape_E[-3], shape_E[-2], shape_E[-1])[0,:,:,0,:,:]
+        E_f = E_f.mean(-1).mean(-1).mean(-1).mean(0).cpu().numpy()
+        E_f = E_f[::-1]
+        dataa = [[x, y] for (x, y) in zip(torch.arange(E_f.shape[0]), E_f)]
+        table = wandb.Table(data=dataa, columns=["steps", "mean"])
+        wandb.log({f'{fb}_{n}_mean_true': wandb.plot.line(table, "steps", "mean", title=f'{fb}_{n}_mean_true')})
 
         self.data = utils.PlaceHolder(
             X=self.data.X.flatten(start_dim=0, end_dim=1),

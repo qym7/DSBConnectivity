@@ -164,7 +164,8 @@ class SpectreGraphDataset(InMemoryDataset):
 
         for i, adj in enumerate(adjs):
             # permute randomly nodes as for molecular datasets
-            adj = adjs[0][:4, :4]  # TODO: this line and the package of COMM20 are to deleted
+            # adj = adjs[0][:4, :4]  # TODO: this line and the package of COMM20 are to deleted
+            adj = adjs[0]
             random_order = torch.randperm(adj.shape[-1])
             adj = adj[random_order, :]
             adj = adj[:, random_order]

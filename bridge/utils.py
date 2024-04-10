@@ -382,7 +382,7 @@ class PlaceHolder:
 
     def randn_like(self):
         new_data = PlaceHolder(
-            X=torch.randn_like(self.X).to(self.X.device) if self.X is not None else None,
+            X=torch.zeros_like(self.X).to(self.X.device) if self.X is not None else None,
             E=torch.randn_like(self.E).to(self.E.device) if self.E is not None else None,
             y=torch.randn_like(self.y).to(self.y.device) if self.y is not None else None,
             charge=torch.randn_like(self.charge).to(self.charge.device) if self.charge is not None else None,
@@ -400,6 +400,17 @@ class PlaceHolder:
                 charge=self.charge,
                 node_mask=self.node_mask
         )
+        
+
+    def clip(self, thres):
+        return PlaceHolder(
+                X = torch.clip(self.X, min=-thres, max=thres),
+                E = torch.clip(self.E, min=-thres, max=thres),
+                y=self.y,
+                charge=self.charge,
+                node_mask=self.node_mask
+        )
+
 
     def type_as(self, x: torch.Tensor):
         """Changes the device and dtype of X, E, y."""
@@ -462,27 +473,30 @@ class PlaceHolder:
             )
         return graph_list
 
-    def collapse(self, collapse_charge=None, node_mask=None):
-        copy = self.copy()
-        copy.X = torch.argmax(self.X, dim=-1)
-        # copy.charge = collapse_charge.to(self.charge.device)[torch.argmax(self.charge, dim=-1)]
-        copy.E = torch.argmax(self.E, dim=-1)
-        # len_E = len(copy.E.shape)
-        # copy.E = self.E[..., -1] > 0.3
-        if node_mask is None:
-            node_mask = self.node_mask
-        x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
-        e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1, 1
-        e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n, 1
-        copy.X[node_mask == 0] = -1
-        copy.E[(e_mask1 * e_mask2).squeeze(-1) == 0] = -1
-        return copy
+    # def collapse(self, collapse_charge=None, node_mask=None):
+    #     copy = self.copy()
+    #     copy.X = torch.argmax(self.X, dim=-1)
+    #     # copy.charge = collapse_charge.to(self.charge.device)[torch.argmax(self.charge, dim=-1)]
+    #     # copy.E = torch.argmax(self.E, dim=-1)
+    #     copy.E = (copy.E > 1).squeeze(-1)
+    #     # len_E = len(copy.E.shape)
+    #     # copy.E = self.E[..., -1] > 0.3
+    #     if node_mask is None:
+    #         node_mask = self.node_mask
+    #     x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
+    #     e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1, 1
+    #     e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n, 1
+    #     copy.X[node_mask == 0] = -1
+    #     copy.E[(e_mask1 * e_mask2).squeeze(-1) == 0] = -1
+    #     return copy
 
-    def collapse(self, collapse_charge=None, node_mask=None):
+    def collapse(self, collapse_charge=None, node_mask=None, thres=1.0):
         copy = self.copy()
         copy.X = torch.argmax(self.X, dim=-1)
+        
         # copy.charge = collapse_charge.to(self.charge.device)[torch.argmax(self.charge, dim=-1)]
-        copy.E = torch.argmax(self.E, dim=-1)
+        # copy.E = torch.argmax(self.E, dim=-1)
+        copy.E = (copy.E > thres).squeeze(-1).int()
         if node_mask is None:
             node_mask = self.node_mask
         x_mask = node_mask.unsqueeze(-1)  # bs, n, 1

@@ -174,6 +174,31 @@ class AbstractDatasetInfos:
         self.max_n_nodes = len(n_nodes) - 1
         self.nodes_dist = DistributionNodes(n_nodes)
 
+    # def compute_input_dims(self, datamodule, extra_features, domain_features):
+    #     data = next(iter(datamodule.train_dataloader()))
+    #     example_batch = self.to_one_hot(data)
+    #     ex_dense, node_mask = utils.to_dense(
+    #         x=example_batch.x,
+    #         edge_index=example_batch.edge_index,
+    #         edge_attr=example_batch.edge_attr,
+    #         batch=example_batch.batch,
+    #         charge=example_batch.charge,
+    #         y=example_batch.y,
+    #         n_nodes=data.n_nodes
+    #     )
+    #     ex_dense.add_n_nodes(data.n_nodes)
+
+    #     self.input_dims = utils.PlaceHolder(
+    #         X=ex_dense.X.size(-1),
+    #         # E=ex_dense.E.size(-1),
+    #         E=ex_dense.X.size(-1),
+    #         y=ex_dense.y.size(-1) + 1 if ex_dense.y is not None else 1,
+    #         charge=self.num_charge_types,
+    #     )
+
+    #     print('input', self.input_dims.y)
+
+
     def compute_input_dims(self, datamodule, extra_features, domain_features):
         data = next(iter(datamodule.train_dataloader()))
         example_batch = self.to_one_hot(data)
@@ -187,36 +212,20 @@ class AbstractDatasetInfos:
             n_nodes=data.n_nodes
         )
         ex_dense.add_n_nodes(data.n_nodes)
+        ex_dense.E = ex_dense.E[:,:,:,1]
 
-        self.input_dims = utils.PlaceHolder(
-            X=ex_dense.X.size(-1),
-            E=ex_dense.E.size(-1),
-            y=ex_dense.y.size(-1) + 1 if ex_dense.y is not None else 1,
-            charge=self.num_charge_types,
-        )
+        ex_extra_feat = extra_features(ex_dense)
+        if type(ex_extra_feat) == tuple:
+            ex_extra_feat = ex_extra_feat[0]
+        self.input_dims.X += ex_extra_feat.X.size(-1)
+        self.input_dims.E += ex_extra_feat.E.size(-1)
+        self.input_dims.y += ex_extra_feat.y.size(-1)
 
-        # print('input', self.input_dims.y)
+        mol_extra_feat = domain_features(ex_dense)
+        if type(mol_extra_feat) == tuple:
+            mol_extra_feat = mol_extra_feat[0]
+        self.input_dims.X += mol_extra_feat.X.size(-1)
+        self.input_dims.E += mol_extra_feat.E.size(-1) - 1 # we delete one dim from the adjacency matrix
+        self.input_dims.y += mol_extra_feat.y.size(-1) + 1
 
-        # example_data =  PlaceHolder(X=ex_dense.X)
-        # {
-        #     "node_t": example_batch.x,
-        #     "edge_index_t": example_batch.edge_index,
-        #     "edge_attr_t": example_batch.edge_attr,
-        #     "batch": example_batch.batch,
-        #     "y_t": example_batch.y,
-        #     "charge_t": example_batch.charge,
-        # }
-
-        # ex_extra_feat = extra_features(ex_dense)
-        # if type(ex_extra_feat) == tuple:
-        #     ex_extra_feat = ex_extra_feat[0]
-        # self.input_dims.X += ex_extra_feat.X.size(-1)
-        # self.input_dims.E += ex_extra_feat.E.size(-1)
-        # self.input_dims.y += ex_extra_feat.y.size(-1)
-
-        # mol_extra_feat = domain_features(ex_dense)
-        # if type(mol_extra_feat) == tuple:
-        #     mol_extra_feat = mol_extra_feat[0]
-        # self.input_dims.X += mol_extra_feat.X.size(-1)
-        # self.input_dims.E += mol_extra_feat.E.size(-1)
-        # self.input_dims.y += mol_extra_feat.y.size(-1)
+        E=ex_dense.X.size(-1)

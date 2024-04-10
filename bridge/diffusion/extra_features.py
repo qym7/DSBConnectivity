@@ -52,6 +52,7 @@ class ExtraFeatures:
     def __call__(self, noisy_data):
         # make data dense in the beginning to avoid doing this twice for both cycles and eigenvalues
         n = noisy_data.node_mask.sum(dim=1).unsqueeze(1) / self.max_n_nodes
+        # n = n.cpu()
         start_time = time.time()
         x_feat, y_feat, edge_feat = self.adj_features(noisy_data)  # (bs, n_cycles)
         y_feat = torch.hstack((y_feat, n))
@@ -101,7 +102,8 @@ class EigenFeatures:
     def compute_features(self, noisy_data):
         E_t = noisy_data.E
         mask = noisy_data.node_mask
-        A = E_t[..., 1:].sum(dim=-1).float() * mask.unsqueeze(1) * mask.unsqueeze(2)
+        # A = E_t[..., 1:].sum(dim=-1).float() * mask.unsqueeze(1) * mask.unsqueeze(2)
+        A = E_t.float() * mask.unsqueeze(1) * mask.unsqueeze(2)
         L = self.compute_laplacian(A, normalize=False)
         mask_diag = 2 * L.shape[-1] * torch.eye(A.shape[-1], device=L.device).type_as(L).unsqueeze(0)
         mask_diag = mask_diag * (~mask.unsqueeze(1)) * (~mask.unsqueeze(2))
@@ -225,7 +227,9 @@ class AdjacencyFeatures:
         self.dist_feat = dist_feat
 
     def __call__(self, noisy_data):
-        adj_matrix = noisy_data.E[..., 1:].int().sum(dim=-1)  # (bs, n, n)
+        # adj_matrix = noisy_data.E[..., 1:].int().sum(dim=-1)  # (bs, n, n)
+        adj_matrix = noisy_data.E
+        adj_matrix[adj_matrix == -1] = 0
         num_nodes = noisy_data.node_mask.sum(dim=1)
         try:
             self.calculate_kpowers(adj_matrix)
@@ -283,6 +287,10 @@ class AdjacencyFeatures:
             s[s == 0] = 1
             edge_dist = edge_dist / s.unsqueeze(-1)     # bs, de
             y_feat.append(edge_dist)
+
+        for i, y in enumerate(y_feat):
+            if len(y.shape) == 1:
+                y_feat[i] = y.unsqueeze(-1)
 
         y_feat = torch.cat(y_feat, dim=-1)
 
