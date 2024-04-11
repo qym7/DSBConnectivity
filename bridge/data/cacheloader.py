@@ -87,24 +87,24 @@ class CacheLoader(Dataset):
                     x, out, steps_expanded = langevin.record_langevin_seq(
                         sample_net, batch, node_mask=batch.node_mask, ipf_it=n, fb=fb)
 
-                if b == 0 and self.visualize:
-                    self.visualize = False
-                    print('Visualizing chains...')
-                    current_path = os.getcwd()
-                    reverse_fb = 'f' if fb == 'b' else 'b'
-                    result_path = os.path.join(current_path, f'cache_chains_{reverse_fb}/'
-                                                            f'ipf{n}/'
-                                                            f'molecule')
+                # if b == 0 and self.visualize:
+                #     self.visualize = False
+                #     print('Visualizing chains...')
+                #     current_path = os.getcwd()
+                #     reverse_fb = 'f' if fb == 'b' else 'b'
+                #     result_path = os.path.join(current_path, f'cache_chains_{reverse_fb}/'
+                #                                             f'ipf{n}/'
+                #                                             f'molecule')
 
-                    chain = x.copy()
-                    chain.X = torch.concatenate((batch.X.unsqueeze(1), chain.X),dim=1)
-                    chain.E = torch.concatenate((batch.E.unsqueeze(1), chain.E),dim=1)
-                    _ = self.visualization_tools.visualize_chains(result_path,
-                                                                    chains=chain,
-                                                                    num_nodes=n_nodes,
-                                                                    local_rank=0,
-                                                                    num_chains_to_visualize=1,
-                                                                    fb=reverse_fb)
+                #     chain = x.copy()
+                #     chain.X = torch.concatenate((batch.X.unsqueeze(1), chain.X),dim=1)
+                #     chain.E = torch.concatenate((batch.E.unsqueeze(1), chain.E),dim=1)
+                #     _ = self.visualization_tools.visualize_chains(result_path,
+                #                                                     chains=chain,
+                #                                                     num_nodes=n_nodes,
+                #                                                     local_rank=0,
+                #                                                     num_chains_to_visualize=1,
+                #                                                     fb=reverse_fb)
 
                 batch_X = torch.cat((x.X.unsqueeze(2), out.X.unsqueeze(2)), dim=2).flatten(start_dim=0, end_dim=1)
                 batch_E = torch.cat((x.E.unsqueeze(2), out.E.unsqueeze(2)), dim=2).flatten(start_dim=0, end_dim=1)
