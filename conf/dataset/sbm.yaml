@@ -44,10 +44,8 @@ dataparallel: True
 num_workers: 8 
 pin_memory: False
 
-# logging
-# log_stride : 10
-log_stride : 20000
-gif_stride: 20000
+log_stride : 50000
+gif_stride: 50000
 plot_npar: 32
 
 # training
@@ -59,7 +57,7 @@ grad_clipping: True
 grad_clip: 1.0
 n_ipf_init: 1
 batch_size: 32  # must be smaller than the size of datasets
-num_iter : 20000
+num_iter : 50000
 n_ipf: 30
 lr: 0.0001
 

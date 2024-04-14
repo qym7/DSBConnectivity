@@ -14,27 +14,26 @@ def grad_gauss(x, m, var):
     return -xout
 
 def graph_grad_gauss(graph_data, m, var):
-    # grad = utils.PlaceHolder(
-    #     X=-(graph_data.X - m.X) / var.X,
-    #     E=-(graph_data.E - m.E) / var.E,
-    #     y=None,
-    #     charge=None,
-    #     node_mask=graph_data.node_mask
-    # )
     grad = utils.PlaceHolder(
-        X=-(graph_data.X),
-        E=-(graph_data.E),
+        X=-(graph_data.X - m.X) / var.X,
+        E=-(graph_data.E - m.E) / var.E,
         y=None,
         charge=None,
         node_mask=graph_data.node_mask
     )
+    # grad = utils.PlaceHolder(
+    #     X=-(graph_data.X),
+    #     E=-(graph_data.E),
+    #     y=None,
+    #     charge=None,
+    #     node_mask=graph_data.node_mask
+    # )
     grad = grad.mask()
 
     return grad
 
 
 def calculate_update(x, gamma, mean_final, var_final, node_mask):
-
     # calculation
     grad = graph_grad_gauss(x, mean_final, var_final)
     t_old = x.add(grad.scale(gamma))
@@ -132,7 +131,7 @@ class Langevin(torch.nn.Module):
             E=torch.Tensor(bs, self.num_steps, self.max_n_nodes, self.max_n_nodes, de).to(self.device),
             y=None
         )
-
+        # import pdb; pdb.set_trace()
         steps_expanded = self.time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))  # TODO: this might not be correct
 
         for k in range(self.num_steps):
@@ -140,6 +139,7 @@ class Langevin(torch.nn.Module):
             # print(k, gamma)
             # print(k, x_k.E[0,0,1])
             x_k, out_k = calculate_update(x_k, gamma, mean_final, var_final, node_mask)
+            # x_k, out_k = calculate_update(x_k, gamma, mean_final, std_final, node_mask)
             # print(x_k.E[0,0,1], x_k.E.shape)x
             # x_k, out_k = calculate_update(x_k, self.gammas[k], mean_final, std_final, node_mask)
             x_tot.place(x_k, k)
@@ -170,7 +170,7 @@ class Langevin(torch.nn.Module):
 
         steps_expanded = self.time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
         x = init_samples.copy()
-        print(x.E[0, 0, 1, 0])
+        # print(x.E[0, 0, 1, 0])
 
         for k in tqdm(range(self.num_steps)):
             t = steps_expanded[:, k, :]  # (bs, 1)
@@ -182,8 +182,8 @@ class Langevin(torch.nn.Module):
                     x = t_old
                 else:
                     z = t_old.randn_like().scale(torch.sqrt(2 * gamma))
-                    if k == 0 and sample and fb=='f':
-                        print(t_old.E[0, 0, 1, 0], x.E[0,0,1,0])
+                    # if k == 0 and sample and fb=='f':
+                        # print(t_old.E[0, 0, 1, 0], x.E[0,0,1,0])
                         # import pdb; pdb.set_trace()
                     x = t_old.add(z)
                 t_new = self.forward_graph(net, x, t)

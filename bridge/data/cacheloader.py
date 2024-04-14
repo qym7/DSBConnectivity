@@ -24,7 +24,8 @@ class CacheLoader(Dataset):
                  nodes_dist=None,
                  dataset_infos=None,
                  visualization_tools=None,
-                 visualize=False):
+                 visualize=False,
+                 scale=1):
 
         super().__init__()
         self.max_n_nodes = langevin.max_n_nodes
@@ -35,6 +36,7 @@ class CacheLoader(Dataset):
         self.device = device
         self.mean = mean
         self.std = std
+        self.scale = scale
         self.decart_mean_final = utils.PlaceHolder(
             X=torch.ones(1).to(self.device),
             E=torch.ones(2).to(self.device)*0.5,
@@ -59,11 +61,11 @@ class CacheLoader(Dataset):
                     loader = dataloader_b if fb == 'b' else dataloader_f
                     batch = next(loader)
                     batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
+                    batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                     batch = batch.minus(self.decart_mean_final)
-                    batch = batch.scale(4)
+                    batch = batch.scale(self.scale)
                     n_nodes = node_mask.sum(-1)
                     batch.X = torch.zeros_like(batch.X, device=batch.X.device)
-                    batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                     batch = batch.mask(node_mask)
                 else:
                     n_nodes = self.nodes_dist.sample_n(batch_size, device)
@@ -77,6 +79,7 @@ class CacheLoader(Dataset):
                                        len(dataset_infos.node_types)).to(self.device),
                         y=None, charge=None, n_nodes=n_nodes
                     )
+                    batch = batch.scale(self.std).add(self.mean)
                     batch.E = utils.symmetize_edge_matrix(batch.E)
                     batch.mask()
 

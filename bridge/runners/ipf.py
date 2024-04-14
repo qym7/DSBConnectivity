@@ -307,28 +307,32 @@ class IPFBase(torch.nn.Module):
 
         # get final stats
         init_ds = self.datamodule.inner
-        self.mean_final = PlaceHolder(
-            X=torch.ones(1).to(self.device)*0,
-            E=torch.ones(2).to(self.device)*0.5*0,
+        
+        self.decart_mean_final = PlaceHolder(
+            X=torch.ones(1).to(self.device),
+            E=torch.ones(2).to(self.device)[1]*0.5,
             y=None
         )
+
+        self.mean_final = PlaceHolder(
+            X=(self.datainfos.node_types).to(self.device),
+            E=(self.datainfos.edge_types)[1].to(self.device),
+            y=None
+        ).minus(self.decart_mean_final).scale(self.args.scale)
+
         # import pdb; pdb.set_trace()
         self.var_final = PlaceHolder(
             X=torch.ones(self.datainfos.num_node_types, device=self.device)*1e0,
-            E=torch.ones(self.datainfos.num_edge_types, device=self.device)*1e0,
+            E=torch.ones(self.datainfos.num_edge_types, device=self.device)[1]*1e0,
             y=None
         )
+
         self.std_final = PlaceHolder(
             X = torch.sqrt(self.var_final.X),
             E = torch.sqrt(self.var_final.E),
             y=None
         )
 
-        self.decart_mean_final = PlaceHolder(
-            X=torch.ones(1).to(self.device),
-            E=torch.ones(2).to(self.device)*0.5,
-            y=None
-        )
         # # import pdb; pdb.set_trace()
         # self.decart_var_final = PlaceHolder(
         #     X=torch.ones(self.datainfos.num_node_types, device=self.device)*1e0,
@@ -405,7 +409,8 @@ class IPFBase(torch.nn.Module):
                                  nodes_dist=self.nodes_dist,
                                  dataset_infos=self.datainfos,
                                  visualization_tools=self.visualization_tools,
-                                 visualize=True)
+                                 visualize=True,
+                                 scale=self.args.scale)
         else:  # forward
             sample_net = self.accelerator.prepare(sample_net)
             new_dl = CacheLoader('f',
@@ -423,7 +428,8 @@ class IPFBase(torch.nn.Module):
                                  nodes_dist=self.nodes_dist,
                                  dataset_infos=self.datainfos,
                                  visualization_tools=self.visualization_tools,
-                                 visualize=True)
+                                 visualize=True,
+                                 scale=self.args.scale)
 
         new_dl = pygloader.DataLoader(new_dl, batch_size=self.batch_size, shuffle=True)
 
@@ -471,12 +477,13 @@ class IPFBase(torch.nn.Module):
                     if fb == 'f' or self.args.transfer:
                         batch = next(self.save_init_dl)
                         batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
+                        batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                         batch = batch.minus(self.decart_mean_final)
-                        batch = batch.scale(4)
+                        batch = batch.scale(self.args.scale)
                         n_nodes = node_mask.sum(-1)
                         batch.X = torch.zeros_like(batch.X, device=batch.X.device)
-                        batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                         batch = batch.mask(node_mask)
+                        import pdb; pdb.set_trace()
                     else:
                         batch_size = self.args.plot_npar
                         n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
@@ -490,6 +497,7 @@ class IPFBase(torch.nn.Module):
                                         len(self.datainfos.node_types)).to(self.device),
                             y=None, charge=None
                         )
+                        batch = batch.scale(self.std_final).add(self.mean_final)
                         batch.E = utils.symmetize_edge_matrix(batch.E)
                         arange = (
                             torch.arange(self.max_n_nodes, device=self.device).unsqueeze(0).expand(batch_size, -1)
@@ -497,6 +505,8 @@ class IPFBase(torch.nn.Module):
                         node_mask = arange < n_nodes.unsqueeze(1)
                         batch.mask(node_mask)
 
+                    # import pdb; pdb.set_trace()
+                    # import pdb; pdb.set_trace()
                     x_tot, out, steps_expanded = self.langevin.record_langevin_seq(
                         sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True, fb=fb)
 
@@ -558,15 +568,17 @@ class IPFBase(torch.nn.Module):
                 wandb.log({f'{fb}_{n}_mean_pred': wandb.plot.line(table, "steps", "mean", title=f'{fb}_{n}_mean_pred')})
 
                 if self.test_sampling_metrics is not None:
+
                     test_to_log = self.test_sampling_metrics.compute_all_metrics(
                         generated_list, current_epoch=0, local_rank=0, fb=fb, i=np.round(i/(self.num_iter+1),2)
                     )
+
                     # save results for testing
                     print('saving results for testing')
                     current_path = os.getcwd()
                     res_path = os.path.join(
                         current_path,
-                        f"test_epoch{self.current_epoch}.json",
+                        f"test_{fb}_{n}.json",
                     )
 
                     with open(res_path, 'w') as file:
@@ -582,7 +594,7 @@ class IPFBase(torch.nn.Module):
                     current_path = os.getcwd()
                     res_path = os.path.join(
                         current_path,
-                        f"val_epoch{self.current_epoch}.json",
+                        f"val_{fb}_{n}.json",
                     )
 
                     with open(res_path, 'w') as file:
@@ -656,12 +668,22 @@ class IPFSequential(IPFBase):
 
             node_loss, edge_loss, loss = self.compute_loss(pred, out)
 
-            if wandb.run:
-                wandb.log({"num_ipf": n}, commit=True)
-                if forward_or_backward == 'f':
-                    wandb.log({"forward_num_iter": n * self.num_iter + i + 1}, commit=True)
-                else:
-                    wandb.log({"backward_num_iter": n * self.num_iter + i + 1}, commit=True)
+            num_log = 5000
+            if self.num_steps <= num_log:
+                gap = 1
+            else:
+                gap = self.num_steps // num_log
+
+            if wandb.run and i % gap == 0:
+                # The above code is using the Weights & Biases library (wandb) in Python to log the
+                # value of a variable `n` with the key "num_ipf". The `commit=True` argument indicates
+                # that the logged data should be committed immediately. This can be useful for
+                # tracking and visualizing the value of `n` during the execution of a program.
+                # wandb.log({"num_ipf": n}, commit=True)
+                # if forward_or_backward == 'f':
+                #     wandb.log({"forward_num_iter": n * self.num_iter + i + 1}, commit=True)
+                # else:
+                #     wandb.log({"backward_num_iter": n * self.num_iter + i + 1}, commit=True)
                 wandb.log(
                     {
                         f"train/loss_{forward_or_backward}_{n}": loss.detach().cpu().numpy().item(),
@@ -671,7 +693,6 @@ class IPFSequential(IPFBase):
                     commit=False,
                 )
 
-            # loss.backward()
             self.accelerator.backward(loss)
 
             if self.grad_clipping:
