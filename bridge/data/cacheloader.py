@@ -25,7 +25,8 @@ class CacheLoader(Dataset):
                  dataset_infos=None,
                  visualization_tools=None,
                  visualize=False,
-                 scale=1):
+                 scale=1,
+                 decart_mean_final=None):
 
         super().__init__()
         self.max_n_nodes = langevin.max_n_nodes
@@ -37,11 +38,12 @@ class CacheLoader(Dataset):
         self.mean = mean
         self.std = std
         self.scale = scale
-        self.decart_mean_final = utils.PlaceHolder(
-            X=torch.ones(1).to(self.device),
-            E=torch.ones(2).to(self.device)*0.5,
-            y=None
-        )
+        self.decart_mean_final = decart_mean_final
+        # utils.PlaceHolder(
+        #     X=torch.ones(1).to(self.device),
+        #     E=torch.ones(2).to(self.device)*0.5,
+        #     y=None
+        # )
         self.visualization_tools = visualization_tools
         self.visualize = visualize
 
@@ -61,8 +63,8 @@ class CacheLoader(Dataset):
                     loader = dataloader_b if fb == 'b' else dataloader_f
                     batch = next(loader)
                     batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
-                    batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                     batch = batch.minus(self.decart_mean_final)
+                    batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                     batch = batch.scale(self.scale)
                     n_nodes = node_mask.sum(-1)
                     batch.X = torch.zeros_like(batch.X, device=batch.X.device)
@@ -83,12 +85,17 @@ class CacheLoader(Dataset):
                     batch.E = utils.symmetize_edge_matrix(batch.E)
                     batch.mask()
 
+                # import pdb; pdb.set_trace()
+
                 if (n == 1) & (fb == 'b'):
                     x, out, steps_expanded = langevin.record_init_langevin(
                         batch, node_mask)
                 else:
-                    x, out, steps_expanded = langevin.record_langevin_seq(
-                        sample_net, batch, node_mask=batch.node_mask, ipf_it=n, fb=fb)
+                    try:
+                        x, out, steps_expanded = langevin.record_langevin_seq(
+                            sample_net, batch, node_mask=batch.node_mask, ipf_it=n, fb=fb)
+                    except:
+                        import pdb; pdb.set_trace()
 
                 # if b == 0 and self.visualize:
                 #     self.visualize = False

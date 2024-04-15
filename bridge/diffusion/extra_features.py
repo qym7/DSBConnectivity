@@ -231,10 +231,10 @@ class AdjacencyFeatures:
         adj_matrix = noisy_data.E
         adj_matrix[adj_matrix == -1] = 0
         num_nodes = noisy_data.node_mask.sum(dim=1)
-        try:
-            self.calculate_kpowers(adj_matrix)
-        except:
-            import pdb; pdb.set_trace()
+        # try:
+        self.calculate_kpowers(adj_matrix)
+        # except:
+        #     import pdb; pdb.set_trace()
 
         k3x, k3y = self.k3_cycle()
         k4x, k4y = self.k4_cycle()

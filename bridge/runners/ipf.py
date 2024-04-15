@@ -410,7 +410,8 @@ class IPFBase(torch.nn.Module):
                                  dataset_infos=self.datainfos,
                                  visualization_tools=self.visualization_tools,
                                  visualize=True,
-                                 scale=self.args.scale)
+                                 scale=self.args.scale,
+                                 decart_mean_final=self.decart_mean_final)
         else:  # forward
             sample_net = self.accelerator.prepare(sample_net)
             new_dl = CacheLoader('f',
@@ -429,7 +430,8 @@ class IPFBase(torch.nn.Module):
                                  dataset_infos=self.datainfos,
                                  visualization_tools=self.visualization_tools,
                                  visualize=True,
-                                 scale=self.args.scale)
+                                 scale=self.args.scale,
+                                 decart_mean_final=self.decart_mean_final)
 
         new_dl = pygloader.DataLoader(new_dl, batch_size=self.batch_size, shuffle=True)
 
@@ -477,13 +479,13 @@ class IPFBase(torch.nn.Module):
                     if fb == 'f' or self.args.transfer:
                         batch = next(self.save_init_dl)
                         batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
-                        batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                         batch = batch.minus(self.decart_mean_final)
+                        batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                         batch = batch.scale(self.args.scale)
                         n_nodes = node_mask.sum(-1)
                         batch.X = torch.zeros_like(batch.X, device=batch.X.device)
                         batch = batch.mask(node_mask)
-                        import pdb; pdb.set_trace()
+                        # import pdb; pdb.set_trace()
                     else:
                         batch_size = self.args.plot_npar
                         n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
@@ -507,8 +509,11 @@ class IPFBase(torch.nn.Module):
 
                     # import pdb; pdb.set_trace()
                     # import pdb; pdb.set_trace()
-                    x_tot, out, steps_expanded = self.langevin.record_langevin_seq(
-                        sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True, fb=fb)
+                    try:
+                        x_tot, out, steps_expanded = self.langevin.record_langevin_seq(
+                            sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True, fb=fb)
+                    except:
+                        import pdb; pdb.set_trace()
 
                 # # add metrics for graphs
                 # # generated_graphs need to be resized, delete the channel dimention
