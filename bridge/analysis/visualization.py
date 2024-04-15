@@ -35,15 +35,18 @@ class Visualizer:
         nx_graph = nx.Graph()
         if len(graph.X.shape) == 2:
             graph.X = graph.X.argmax(-1)
-        graph.X = graph.X.cpu().numpy()
+        graph.X = graph.X.detach().cpu().numpy()
 
         for i in range(len(graph.X)):
             nx_graph.add_node(i, number=i, symbol=graph.X[i], color_val=graph.X[i])
 
-        adj = graph.E.cpu().numpy()
+        adj = graph.E.detach().cpu().numpy()
         if len(adj.shape) == 3:
             # adj = adj.argmax(-1)
-            adj = (adj>self.thres).astype(int).squeeze(-1)
+            # adj = (adj>self.thres).astype(int).squeeze(-1)
+            # adj = adj.argmax(-1)
+            # adj = ((adj[..., 1] - adj[..., 0])>self.thres).astype(int)
+            adj = adj.argmax(-1)
         assert len(adj.shape) == 2
 
         # if adj.max() > 1:

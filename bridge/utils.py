@@ -306,25 +306,34 @@ class PlaceHolder:
 
         return PlaceHolder(X=X, E=E, y=None, charge=charge, node_mask=self.node_mask)
 
-    def discretize(self):
+
+    def discretize(self, thres=1.0):
         X = self.X.argmax(-1) if self.X is not None else None
         charge = None
         if self.charge is not None:
             if self.charge.numel() > 0:
                 charge = self.charge.argmax(-1)
+        # preprocessing of the data
+        # E = self.E.clone()
+        # E[E.abs() < thres] = 0
+        # E[:, :, :, 0] = self.E[:, :, :, 0]  # E is only assigned to a class if the value is over thres, otherwise it is highly possible to be non-existing, this is a safer way for sampling
         E = self.E.argmax(-1) if self.E is not None else None
+        # E = (self.E[..., 1] - self.E[..., 0])>thres
+        # E = E.long()
         return PlaceHolder(X=X, E=E, y=self.y, charge=charge, node_mask=self.node_mask)
 
-    def onehot(self):
+
+    def onehot(self, thres):
         dx = self.X.shape[-1]
         dc = self.charge.shape[-1] if self.charge is not None else None
         de = self.E.shape[-1]
-        d_data = self.discretize()
-        d_data.X = F.one_hot(d_data.X, dx)
-        d_data.charge = F.one_hot(d_data.charge, dc) if d_data.charge is not None else None
-        d_data.E = F.one_hot(d_data.E, de)
+        d_data = self.discretize(thres=thres)
+        d_data.X = F.one_hot(d_data.X, dx).float()
+        d_data.charge = F.one_hot(d_data.charge, dc).float() if d_data.charge is not None else None
+        d_data.E = F.one_hot(d_data.E, de).float()
 
         d_data.mask()
+        # import pdb; pdb.set_trace()
 
         return d_data
 
@@ -338,7 +347,6 @@ class PlaceHolder:
         if (self.y is not None) and (graph_data.y is not None) and (self.y.numel()>0):
             self.y[:, k] = graph_data.y
         return self
-
 
     def get_data(self, k, dim=0):
         if dim==0:
@@ -473,39 +481,36 @@ class PlaceHolder:
             )
         return graph_list
 
-    # def collapse(self, collapse_charge=None, node_mask=None):
-    #     copy = self.copy()
-    #     copy.X = torch.argmax(self.X, dim=-1)
-    #     # copy.charge = collapse_charge.to(self.charge.device)[torch.argmax(self.charge, dim=-1)]
-    #     # copy.E = torch.argmax(self.E, dim=-1)
-    #     copy.E = (copy.E > 1).squeeze(-1)
-    #     # len_E = len(copy.E.shape)
-    #     # copy.E = self.E[..., -1] > 0.3
-    #     if node_mask is None:
-    #         node_mask = self.node_mask
-    #     x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
-    #     e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1, 1
-    #     e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n, 1
-    #     copy.X[node_mask == 0] = -1
-    #     copy.E[(e_mask1 * e_mask2).squeeze(-1) == 0] = -1
-    #     return copy
-
     def collapse(self, collapse_charge=None, node_mask=None, thres=1.0):
         copy = self.copy()
         copy.X = torch.argmax(self.X, dim=-1)
-        
-        # copy.charge = collapse_charge.to(self.charge.device)[torch.argmax(self.charge, dim=-1)]
-        # copy.E = torch.argmax(self.E, dim=-1)
-        copy.E = (copy.E > thres).squeeze(-1).int()
+        copy.E = torch.argmax(self.E, dim=-1)
+        # copy.E = (self.E[..., 1] - self.E[..., 0])>thres
         if node_mask is None:
             node_mask = self.node_mask
         x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
         e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1, 1
         e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n, 1
         copy.X[node_mask == 0] = -1
-        # copy.charge[self.node_mask == 0] = 1000
         copy.E[(e_mask1 * e_mask2).squeeze(-1) == 0] = -1
         return copy
+
+    # def collapse(self, collapse_charge=None, node_mask=None, thres=1.0):
+    #     copy = self.copy()
+    #     copy.X = torch.argmax(self.X, dim=-1)
+        
+    #     # copy.charge = collapse_charge.to(self.charge.device)[torch.argmax(self.charge, dim=-1)]
+    #     # copy.E = torch.argmax(self.E, dim=-1)
+    #     copy.E = (copy.E > thres).squeeze(-1).int()
+    #     if node_mask is None:
+    #         node_mask = self.node_mask
+    #     x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
+    #     e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1, 1
+    #     e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n, 1
+    #     copy.X[node_mask == 0] = -1
+    #     # copy.charge[self.node_mask == 0] = 1000
+    #     copy.E[(e_mask1 * e_mask2).squeeze(-1) == 0] = -1
+    #     return copy
 
     def __repr__(self):
         return (

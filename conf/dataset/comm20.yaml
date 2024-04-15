@@ -52,7 +52,7 @@ n_ipf_init: 1
 batch_size: 64  # must be smaller than the size of datasets
 num_iter : 20000
 n_ipf: 16
-lr: 0.0001
+lr: 0.001
 
 # diffusion schedule
 num_steps : 50
@@ -66,6 +66,8 @@ fast_sampling: True
 # cache
 num_cache_batches: 1
 cache_refresh_stride: 100
+
+thres: 1.0
 
 model: 
     n_layers: 4
@@ -92,4 +94,4 @@ model:
     dist_feat: True
     positional_encoding: False
 
-    thres: 1.0
+    

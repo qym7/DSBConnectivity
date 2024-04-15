@@ -42,14 +42,14 @@ class CacheLoader(Dataset):
         # utils.PlaceHolder(
         #     X=torch.ones(1).to(self.device),
         #     E=torch.ones(2).to(self.device)*0.5,
-        #     y=None
+        #     y=None[1]
         # )
         self.visualization_tools = visualization_tools
         self.visualize = visualize
 
         self.data = utils.PlaceHolder(
             X=torch.Tensor(num_batches, batch_size*self.num_steps, 2, self.max_n_nodes, len(dataset_infos.node_types)).to(self.device),
-            E=torch.Tensor(num_batches, batch_size*self.num_steps, 2, self.max_n_nodes, self.max_n_nodes, len(dataset_infos.node_types)).to(self.device),
+            E=torch.Tensor(num_batches, batch_size*self.num_steps, 2, self.max_n_nodes, self.max_n_nodes, len(dataset_infos.edge_types)).to(self.device),
             y=None
         )
 
@@ -64,7 +64,7 @@ class CacheLoader(Dataset):
                     batch = next(loader)
                     batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
                     batch = batch.minus(self.decart_mean_final)
-                    batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
+                    # batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                     batch = batch.scale(self.scale)
                     n_nodes = node_mask.sum(-1)
                     batch.X = torch.zeros_like(batch.X, device=batch.X.device)
@@ -78,7 +78,7 @@ class CacheLoader(Dataset):
                         E=torch.randn(batch_size,
                                        self.max_n_nodes,
                                        self.max_n_nodes,
-                                       len(dataset_infos.node_types)).to(self.device),
+                                       len(dataset_infos.edge_types)).to(self.device),
                         y=None, charge=None, n_nodes=n_nodes
                     )
                     batch = batch.scale(self.std).add(self.mean)
@@ -86,16 +86,14 @@ class CacheLoader(Dataset):
                     batch.mask()
 
                 # import pdb; pdb.set_trace()
+                # print('batch data as start', batch.E[0,0,1])
 
                 if (n == 1) & (fb == 'b'):
                     x, out, steps_expanded = langevin.record_init_langevin(
                         batch, node_mask)
                 else:
-                    try:
-                        x, out, steps_expanded = langevin.record_langevin_seq(
-                            sample_net, batch, node_mask=batch.node_mask, ipf_it=n, fb=fb)
-                    except:
-                        import pdb; pdb.set_trace()
+                    x, out, steps_expanded = langevin.record_langevin_seq(
+                        sample_net, batch, node_mask=batch.node_mask, ipf_it=n, fb=fb)
 
                 # if b == 0 and self.visualize:
                 #     self.visualize = False
@@ -133,7 +131,7 @@ class CacheLoader(Dataset):
         fb_r = 'f_learn_b' if fb == 'b' else 'b_learn_f'
         shape_E = self.data.E.shape
         E_f = self.data.E.reshape(shape_E[0], batch_size, self.num_steps, shape_E[-4], shape_E[-3], shape_E[-2], shape_E[-1])[0,:,:,0,:,:]
-        E_f = E_f.mean(-1).mean(-1).mean(-1).mean(0).cpu().numpy()
+        E_f = E_f[..., 0].mean(-1).mean(-1).mean(0).cpu().numpy() - E_f[..., 1].mean(-1).mean(-1).mean(0).cpu().numpy()
         E_f = E_f[::-1]
         dataa = [[x, y] for (x, y) in zip(torch.arange(E_f.shape[0]), E_f)]
         table = wandb.Table(data=dataa, columns=["steps", "mean"])

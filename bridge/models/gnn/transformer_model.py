@@ -289,7 +289,7 @@ class GraphTransformer(nn.Module):
         self.n_layers = n_layers
         self.out_dim_X = output_dims.X
         self.out_dim_E = output_dims.E
-        output_dims.E = 1
+        # output_dims.E = 1
         
         self.out_dim_y = output_dims.y
         self.out_dim_charge = output_dims.charge

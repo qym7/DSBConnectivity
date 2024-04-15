@@ -212,8 +212,12 @@ class AbstractDatasetInfos:
             n_nodes=data.n_nodes
         )
         ex_dense.add_n_nodes(data.n_nodes)
-        ex_dense.E = ex_dense.E[:,:,:,1]
-
+        
+        # double dim
+        self.input_dims.X += self.input_dims.X
+        self.input_dims.E += self.input_dims.E
+        # self.input_dims.y += self.input_dims.y
+        
         ex_extra_feat = extra_features(ex_dense)
         if type(ex_extra_feat) == tuple:
             ex_extra_feat = ex_extra_feat[0]
@@ -225,7 +229,7 @@ class AbstractDatasetInfos:
         if type(mol_extra_feat) == tuple:
             mol_extra_feat = mol_extra_feat[0]
         self.input_dims.X += mol_extra_feat.X.size(-1)
-        self.input_dims.E += mol_extra_feat.E.size(-1) - 1 # we delete one dim from the adjacency matrix
+        # self.input_dims.E += mol_extra_feat.E.size(-1) - 1 # we delete one dim from the adjacency matrix
+        self.input_dims.E += mol_extra_feat.E.size(-1)
         self.input_dims.y += mol_extra_feat.y.size(-1) + 1
-
-        E=ex_dense.X.size(-1)
+        # print(self.input_dims.y)

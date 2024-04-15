@@ -55,6 +55,7 @@ class ExtraFeatures:
         # n = n.cpu()
         start_time = time.time()
         x_feat, y_feat, edge_feat = self.adj_features(noisy_data)  # (bs, n_cycles)
+        # import pdb; pdb.set_trace()
         y_feat = torch.hstack((y_feat, n))
         cycle_time = round(time.time() - start_time, 2)
         eigen_time = 0.
@@ -102,8 +103,8 @@ class EigenFeatures:
     def compute_features(self, noisy_data):
         E_t = noisy_data.E
         mask = noisy_data.node_mask
-        # A = E_t[..., 1:].sum(dim=-1).float() * mask.unsqueeze(1) * mask.unsqueeze(2)
-        A = E_t.float() * mask.unsqueeze(1) * mask.unsqueeze(2)
+        A = E_t[..., 1:].sum(dim=-1).float() * mask.unsqueeze(1) * mask.unsqueeze(2)
+        # A = E_t.float() * mask.unsqueeze(1) * mask.unsqueeze(2)
         L = self.compute_laplacian(A, normalize=False)
         mask_diag = 2 * L.shape[-1] * torch.eye(A.shape[-1], device=L.device).type_as(L).unsqueeze(0)
         mask_diag = mask_diag * (~mask.unsqueeze(1)) * (~mask.unsqueeze(2))
@@ -230,11 +231,13 @@ class AdjacencyFeatures:
         # adj_matrix = noisy_data.E[..., 1:].int().sum(dim=-1)  # (bs, n, n)
         adj_matrix = noisy_data.E
         adj_matrix[adj_matrix == -1] = 0
+        adj_matrix = adj_matrix[..., 1:].sum(-1)
+        # import pdb; pdb.set_trace()
         num_nodes = noisy_data.node_mask.sum(dim=1)
-        # try:
-        self.calculate_kpowers(adj_matrix)
-        # except:
-        #     import pdb; pdb.set_trace()
+        try:
+            self.calculate_kpowers(adj_matrix)
+        except:
+            import pdb; pdb.set_trace()
 
         k3x, k3y = self.k3_cycle()
         k4x, k4y = self.k4_cycle()
@@ -261,7 +264,6 @@ class AdjacencyFeatures:
 
         if self.dist_feat:
         # get degree distribution
-            bs, n = noisy_data.node_mask.shape
             degree = adj_matrix.sum(dim=-1).long()  # (bs, n)
             degree[degree > self.num_degree] = self.num_degree + 1    # bs, n
             one_hot_degree = F.one_hot(degree, num_classes=self.num_degree + 2).float()  # bs, n, num_degree + 2

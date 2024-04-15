@@ -152,7 +152,6 @@ def get_datamodules(cfg):
 
     return train_metrics, domain_features, datamodule, dataset_infos
 
-
 # MODEL = 'Model'
 # BASIC_MODEL = 'Basic'
 # UNET_MODEL = 'UNET'

@@ -125,7 +125,8 @@ class IPFBase(torch.nn.Module):
                                  extra_features=self.extra_features,
                                  domain_features=self.domain_features,
                                  tf_extra_features=self.tf_extra_features,
-                                 tf_domain_features=self.tf_domain_features)
+                                 tf_domain_features=self.tf_domain_features,
+                                 thres=self.args.thres)
 
         # checkpoint
         date = str(datetime.datetime.now())[0:10]
@@ -290,11 +291,11 @@ class IPFBase(torch.nn.Module):
         self.train_metrics, self.domain_features, self.datamodule, self.datainfos, \
             self.tf_train_metrics, self.tf_domain_features, self.tf_datamodule, self.tf_datainfos = out
 
-        # get extra_features
         self.extra_features, self.datainfos = self.get_extra_features(
             self.datainfos,
             self.datamodule,
             self.domain_features)
+
         self.nodes_dist = self.datainfos.nodes_dist
         if self.args.transfer:
             self.tf_extra_features, self.tf_datainfos = self.get_extra_features(
@@ -310,20 +311,22 @@ class IPFBase(torch.nn.Module):
         
         self.decart_mean_final = PlaceHolder(
             X=torch.ones(1).to(self.device),
-            E=torch.ones(2).to(self.device)[1]*0.5,
+            E=torch.ones(2).to(self.device)*0.5,
             y=None
         )
 
         self.mean_final = PlaceHolder(
-            X=(self.datainfos.node_types).to(self.device),
-            E=(self.datainfos.edge_types)[1].to(self.device),
+            # X=(self.datainfos.node_types).to(self.device),
+            # E=(self.datainfos.edge_types).to(self.device),
+            X=torch.ones_like(self.datainfos.node_types).to(self.device),
+            E=torch.ones_like(self.datainfos.edge_types).to(self.device)*0.5,
             y=None
         ).minus(self.decart_mean_final).scale(self.args.scale)
+        print(self.mean_final.X, self.mean_final.E)
 
-        # import pdb; pdb.set_trace()
         self.var_final = PlaceHolder(
             X=torch.ones(self.datainfos.num_node_types, device=self.device)*1e0,
-            E=torch.ones(self.datainfos.num_edge_types, device=self.device)[1]*1e0,
+            E=torch.ones(self.datainfos.num_edge_types, device=self.device)*1e0,
             y=None
         )
 
@@ -332,18 +335,6 @@ class IPFBase(torch.nn.Module):
             E = torch.sqrt(self.var_final.E),
             y=None
         )
-
-        # # import pdb; pdb.set_trace()
-        # self.decart_var_final = PlaceHolder(
-        #     X=torch.ones(self.datainfos.num_node_types, device=self.device)*1e0,
-        #     E=torch.ones(self.datainfos.num_edge_types, device=self.device)*1e0,
-        #     y=None
-        # )
-        # self.decart_std_final = PlaceHolder(
-        #     X = torch.sqrt(self.var_final.X),
-        #     E = torch.sqrt(self.var_final.E),
-        #     y=None
-        # )
 
         # get dataloaders from datamodules
         # what is the difference between save_init—dl and cache_init_dl?
@@ -480,7 +471,7 @@ class IPFBase(torch.nn.Module):
                         batch = next(self.save_init_dl)
                         batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
                         batch = batch.minus(self.decart_mean_final)
-                        batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
+                        # batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                         batch = batch.scale(self.args.scale)
                         n_nodes = node_mask.sum(-1)
                         batch.X = torch.zeros_like(batch.X, device=batch.X.device)
@@ -496,7 +487,7 @@ class IPFBase(torch.nn.Module):
                             E=torch.randn(batch_size,
                                         self.max_n_nodes,
                                         self.max_n_nodes,
-                                        len(self.datainfos.node_types)).to(self.device),
+                                        len(self.datainfos.edge_types)).to(self.device),
                             y=None, charge=None
                         )
                         batch = batch.scale(self.std_final).add(self.mean_final)
@@ -507,22 +498,8 @@ class IPFBase(torch.nn.Module):
                         node_mask = arange < n_nodes.unsqueeze(1)
                         batch.mask(node_mask)
 
-                    # import pdb; pdb.set_trace()
-                    # import pdb; pdb.set_trace()
-                    try:
-                        x_tot, out, steps_expanded = self.langevin.record_langevin_seq(
-                            sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True, fb=fb)
-                    except:
-                        import pdb; pdb.set_trace()
-
-                # # add metrics for graphs
-                # # generated_graphs need to be resized, delete the channel dimention
-                # generated_graphs = x_tot_plot.cpu().numpy()  # (n_steps, batch_size, n_channels, n_nodes, n_nodes)
-                # generated_graphs = generated_graphs[0, :, 0, :, :]  # (batch_size, n_nodes, n_nodes)
-                # generated_list = []
-                # for l in range(len(generated_graphs)):
-                #     n_node = n_nodes[l]
-                #     generated_list.append(generated_graphs[l][:n_node, :n_node])
+                x_tot, out, steps_expanded = self.langevin.record_langevin_seq(
+                    sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True, fb=fb)
 
                 to_plot = x_tot.get_data(-1, dim=1).collapse(thres=self.args.thres)
 
@@ -564,7 +541,7 @@ class IPFBase(torch.nn.Module):
                                                                 num_chains_to_visualize=2,
                                                                 fb=fb
                 )
-                mean_val = chain.E.mean(-1).mean(-1).mean(-1).mean(0).cpu().numpy()
+                mean_val = chain.E[..., 0].mean(-1).mean(-1).mean(0).cpu().detach().numpy() - chain.E[..., 1].mean(-1).mean(-1).mean(0).cpu().detach().numpy()
                 np.save(f'{fb}_{n}_mean.npy', mean_val)
                 dataa = [[x, y] for (x, y) in zip(np.arange(chain.E.shape[1]), mean_val)]
                 if mean_val.max() > 10 or mean_val.min() < -10:
@@ -679,16 +656,16 @@ class IPFSequential(IPFBase):
             else:
                 gap = self.num_steps // num_log
 
-            if wandb.run and i % gap == 0:
+            if wandb.run and (i % gap == 0):
                 # The above code is using the Weights & Biases library (wandb) in Python to log the
                 # value of a variable `n` with the key "num_ipf". The `commit=True` argument indicates
                 # that the logged data should be committed immediately. This can be useful for
                 # tracking and visualizing the value of `n` during the execution of a program.
                 # wandb.log({"num_ipf": n}, commit=True)
-                # if forward_or_backward == 'f':
-                #     wandb.log({"forward_num_iter": n * self.num_iter + i + 1}, commit=True)
-                # else:
-                #     wandb.log({"backward_num_iter": n * self.num_iter + i + 1}, commit=True)
+                if forward_or_backward == 'f':
+                    wandb.log({"forward_num_iter": n * self.num_iter + i + 1}, commit=True)
+                else:
+                    wandb.log({"backward_num_iter": n * self.num_iter + i + 1}, commit=True)
                 wandb.log(
                     {
                         f"train/loss_{forward_or_backward}_{n}": loss.detach().cpu().numpy().item(),
@@ -733,9 +710,10 @@ class IPFSequential(IPFBase):
 
     def compute_loss(self, pred, out):
         node_loss = self.args.model.lambda_train[0] * F.mse_loss(pred.X, out.X) * 0
-        edge_loss = self.args.model.lambda_train[1] * F.mse_loss(pred.E[:,:,:,-1], out.E[:,:,:,-1])
-        # print('loss',  pred.E[0,0,1].detach(), out.E[0,0,1].detach(), pred.E[0,0,1]-out.E[0,0,1])
+        edge_loss = self.args.model.lambda_train[1] * F.mse_loss(pred.E, out.E)
+        # print('loss',  pred.E[0,0,1].detach(), out.E[0,0,1].detach())
         loss = node_loss + edge_loss
+        # print()
         # The code is calculating the total loss by adding the node loss and edge loss together.
         # loss = edge_loss
         if pred.charge.numel() > 0:
@@ -762,51 +740,29 @@ class IPFSequential(IPFBase):
                 self.ipf_step('b', n)
                 self.ipf_step('f', n)
 
-    # def forward_graph(self, net, z_t, t):
-    #     # step 1: calculate extra features
-    #     assert z_t.node_mask is not None
-    #     model_input = z_t.copy()
-    #     model_input.y = torch.hstack(
-    #         (z_t.y, t)
-    #     ).float()
-
-    #     return net(model_input)
-
-
     def forward_graph(self, net, z_t, t):
         # step 1: calculate extra features
         assert z_t.node_mask is not None
-        # z_t.X = z_t.X / (z_t.X.abs().sum(-1).unsqueeze(-1)+1e-6)
-        # z_t.E = z_t.E / (z_t.E.abs().sum(-1).unsqueeze(-1)+1e-6)
-        z_t = z_t.clip(3)
+        # z_t = z_t.clip(3)
 
-        z_t_discrete = z_t.collapse()
         model_input = z_t.copy()
-        # z_t.E = (z_t.E > 0.5).long()
-        extra_features, _, _ = self.extra_features(z_t_discrete)
-        # import pdb; pdb.set_trace()
-        z_t_discrete.E = z_t_discrete.E.unsqueeze(-1)
-        z_t_discrete.X = z_t_discrete.X.unsqueeze(-1)
-        extra_domain_features = self.domain_features(z_t_discrete)
-        # extra_features = self.extra_features(z_t_discrete)
-        # extra_domain_features = self.domain_features(z_t_discrete)
-
-        # # step 2: forward to the langevin process
-        # # Need to copy to preserve dimensions in transition to z_{t-1} in sampling (prevent changing dimensions of z_t
+        with torch.no_grad():
+            z_t_discrete = z_t.onehot(thres=self.args.thres)
+            extra_features, _, _ = self.extra_features(z_t_discrete)
+            extra_domain_features = self.domain_features(z_t_discrete)
+        # print(z_t_discrete.E[0,:,:,1])
 
         model_input.X = torch.cat(
-            (z_t.X, extra_features.X, extra_domain_features.X), dim=2
+            (z_t.X, z_t_discrete.X, extra_features.X, extra_domain_features.X), dim=2
         ).float()
         model_input.E = torch.cat(
-            (z_t.E, extra_features.E, extra_domain_features.E), dim=3
+            (z_t.E, z_t_discrete.E, extra_features.E, extra_domain_features.E), dim=3
         ).float()
         model_input.y = torch.hstack(
-            (z_t.y, extra_features.y, extra_domain_features.y, t)
+            (z_t.y, z_t_discrete.y, extra_features.y, extra_domain_features.y, t)
         ).float()
-        
-        # print('max input', model_input.E.max(), model_input.E.min())
+
+        # import pdb; pdb.set_trace()
         res = net(model_input)
-        # res = res.clip(3)
-        # print('max result', res.E.max(), res.E.min())
 
         return res

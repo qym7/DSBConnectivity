@@ -78,12 +78,13 @@ class Langevin(torch.nn.Module):
     def __init__(self, num_steps, max_n_nodes, gammas, time_sampler, device=None,
                  mean_final=torch.tensor([0., 0.]), var_final=torch.tensor([.5, .5]), mean_match=True,
                  graph=False, extra_features=None, domain_features=None,
-                 tf_extra_features=None, tf_domain_features=None):
+                 tf_extra_features=None, tf_domain_features=None, thres=1.0):
         super().__init__()
 
         self.mean_match = mean_match
         self.mean_final = mean_final
         self.var_final = var_final
+        self.thres = thres
         self.std_final = utils.PlaceHolder(
             X=torch.sqrt(self.var_final.X),
             E=torch.sqrt(self.var_final.E),
@@ -114,12 +115,11 @@ class Langevin(torch.nn.Module):
         std_final = self.std_final
 
         x_k = x.copy()
-        x_k.E = x_k.E[:,:,:,-1].unsqueeze(-1)
+        # x_k.E = x_k.E[:,:,:,-1].unsqueeze(-1)
 
         bs = x_k.X.shape[0]
         dx = x_k.X.shape[-1]
         de = x_k.E.shape[-1]
-
 
         x_tot = utils.PlaceHolder(
             X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(self.device),
@@ -144,9 +144,11 @@ class Langevin(torch.nn.Module):
             # x_k, out_k = calculate_update(x_k, self.gammas[k], mean_final, std_final, node_mask)
             x_tot.place(x_k, k)
             out.place(out_k, k)
+            # print(k, x_k.E[0,0,1], out_k.E[0,0,1])
 
         # import pdb; pdb.set_trace()
-        print('mean of langevin init', 'b', x_tot.E[:,-1].mean(), x_tot.E[:,-1].var())
+        # print('b', 'init', x_tot.E[0, :, 0, 1, 0])
+        # print('mean of langevin init', 'b', x_tot.E[:,-1].mean(), x_tot.E[:,-1].var())
 
         return x_tot, out, steps_expanded
 
@@ -170,7 +172,6 @@ class Langevin(torch.nn.Module):
 
         steps_expanded = self.time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
         x = init_samples.copy()
-        # print(x.E[0, 0, 1, 0])
 
         for k in tqdm(range(self.num_steps)):
             t = steps_expanded[:, k, :]  # (bs, 1)
@@ -182,11 +183,11 @@ class Langevin(torch.nn.Module):
                     x = t_old
                 else:
                     z = t_old.randn_like().scale(torch.sqrt(2 * gamma))
-                    # if k == 0 and sample and fb=='f':
-                        # print(t_old.E[0, 0, 1, 0], x.E[0,0,1,0])
-                        # import pdb; pdb.set_trace()
                     x = t_old.add(z)
-                t_new = self.forward_graph(net, x, t)
+                try:
+                    t_new = self.forward_graph(net, x, t)
+                except:
+                    import pdb; pdb.set_trace()
             else:
                 # print(k, x.E[0,1,2], x.E[0,2,1])
                 # print(k, out.E[0,1,2], out.E[0,2,1])
@@ -223,48 +224,33 @@ class Langevin(torch.nn.Module):
 
         return x_tot, out, steps_expanded
 
-    # def forward_graph(self, net, z_t, t):
-    #     # step 1: calculate extra features
-    #     assert z_t.node_mask is not None
-    #     model_input = z_t.copy()
-    #     model_input.y = torch.hstack(
-    #         (z_t.y, t)
-    #     ).float()
 
-    #     return net(model_input)
     def forward_graph(self, net, z_t, t):
         # step 1: calculate extra features
         assert z_t.node_mask is not None
-        z_t = z_t.clip(3)
-        z_t.X = torch.zeros_like(z_t.X, device=z_t.X.device)
-        # z_t.X = z_t.X / (z_t.X.abs().sum(-1).unsqueeze(-1)+1e-6)
-        # z_t.E = z_t.E / (z_t.E.abs().sum(-1).unsqueeze(-1)+1e-6)
+        # print('noise', z_t.E[0,0,1], t[0])
+        # z_t = z_t.clip(3)
 
-        z_t_discrete = z_t.collapse()
         model_input = z_t.copy()
-        # z_t.E = (z_t.E > 0.5).long()
-        extra_features, _, _ = self.extra_features(z_t_discrete)
-        z_t_discrete.E = z_t_discrete.E.unsqueeze(-1)
-        z_t_discrete.X = z_t_discrete.X.unsqueeze(-1)
-        extra_domain_features = self.domain_features(z_t_discrete)
-        # extra_features = self.extra_features(z_t_discrete)
-        # extra_domain_features = self.domain_features(z_t_discrete)
+        with torch.no_grad():
+            z_t_discrete = z_t.onehot(thres=self.thres)
+            # print(self.thres)
+            extra_features, _, _ = self.extra_features(z_t_discrete)
+            extra_domain_features = self.domain_features(z_t_discrete)
 
-        # # step 2: forward to the langevin process
-        # # Need to copy to preserve dimensions in transition to z_{t-1} in sampling (prevent changing dimensions of z_t
-
+        # print(z_t_discrete.E[0,:,:,0])
         model_input.X = torch.cat(
-            (z_t.X, extra_features.X, extra_domain_features.X), dim=2
+            (z_t.X, z_t_discrete.X, extra_features.X, extra_domain_features.X), dim=2
         ).float()
         model_input.E = torch.cat(
-            (z_t.E, extra_features.E, extra_domain_features.E), dim=3
+            (z_t.E, z_t_discrete.E, extra_features.E, extra_domain_features.E), dim=3
         ).float()
         model_input.y = torch.hstack(
-            (z_t.y, extra_features.y, extra_domain_features.y, t)
+            (z_t.y, z_t_discrete.y, extra_features.y, extra_domain_features.y, t)
         ).float()
-        # print('max input', model_input.E.max(), model_input.E.min())
+        # import pdb; pdb.set_trace()
+
         res = net(model_input)
-        # res = res.clip(3)
-        # print('max result', res.E.max(), res.E.min())
+        # print(res.E[0,0,1])
 
         return res
