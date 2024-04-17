@@ -1,29 +1,71 @@
 # @package _global_
+project_name: debug_transfer
+wandb: disabled # offline/disabled/online
 
 # data 
-Dataset: comm20
+Dataset: sbm1
 graph: True
-project_name: comm20
-
-data:
-  dataset: "comm20"
-  image_size: 20
-  channels: 1
-  random_flip: true  
 
 dataset:
-  name: comm20
-  remove_h: null
-  molecules: False
-  spectre: True
-  datadir: 'data/comm20/'
-
   batch_size: 128
   num_workers: 8
 
+  name: sbm_syn
+  remove_h: null
+  molecules: False
+  spectre: True
+  datadir: 'data/sbm1b/'
+
+  # min_num_communities * max_community_size > num_nodes
+  # num_graphs: 200
+  # num_nodes: 20
+  # min_num_communities: 3
+  # max_num_communities: 4
+  # min_community_size: 4
+  # max_community_size: 8
+  # intra_prob: 0.005
+  # inter_prob: 0.3
+
+  num_graphs: 200
+  num_nodes: 40
+  min_num_communities: 4
+  max_num_communities: 5
+  min_community_size: 8
+  max_community_size: 15
+  intra_prob: 0.005
+  inter_prob: 0.3
+
 # transfer
-transfer: False
-Dataset_transfer: mnist
+transfer: True
+Dataset_transfer: sbm2
+
+dataset_transfer:
+  batch_size: 128
+  num_workers: 8
+
+  name: sbm_syn
+  remove_h: null
+  molecules: False
+  spectre: True
+  datadir: 'data/sbm2b/'
+
+  # num_graphs: 200
+  # num_nodes: 20
+  # min_num_communities: 2
+  # max_num_communities: 3
+  # min_community_size: 6
+  # max_community_size: 12
+  # intra_prob: 0.005
+  # inter_prob: 0.3
+
+  num_graphs: 200
+  num_nodes: 40
+  min_num_communities: 2
+  max_num_communities: 3
+  min_community_size: 18
+  max_community_size: 24
+  intra_prob: 0.005
+  inter_prob: 0.3
 
 final_adaptive: False
 adaptive_mean: True

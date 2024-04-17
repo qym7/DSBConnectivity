@@ -305,6 +305,7 @@ class IPFBase(torch.nn.Module):
             self.tf_nodes_dist = self.tf_datainfos.nodes_dist
         else:
             self.tf_extra_features = self.tf_datainfos = self.tf_nodes_dist = None
+            self.tf_datainfos = self.datainfos
 
         # get final stats
         init_ds = self.datamodule.inner
@@ -315,13 +316,22 @@ class IPFBase(torch.nn.Module):
             y=None
         )
 
+        # self.mean_final = PlaceHolder(
+        #     X=(self.datainfos.node_types).to(self.device),
+        #     E=(self.datainfos.edge_types).to(self.device),
+        #     # X=torch.ones_like(self.datainfos.node_types).to(self.device),
+        #     # E=torch.ones_like(self.datainfos.edge_types).to(self.device)*0.5,
+        #     y=None
+        # ).minus(self.decart_mean_final).scale(self.args.scale)
+
         self.mean_final = PlaceHolder(
-            # X=(self.datainfos.node_types).to(self.device),
-            # E=(self.datainfos.edge_types).to(self.device),
-            X=torch.ones_like(self.datainfos.node_types).to(self.device),
-            E=torch.ones_like(self.datainfos.edge_types).to(self.device)*0.5,
+            X=(self.tf_datainfos.node_types).to(self.device),
+            E=(self.tf_datainfos.edge_types).to(self.device),
+            # X=torch.ones_like(self.datainfos.node_types).to(self.device),
+            # E=torch.ones_like(self.datainfos.edge_types).to(self.device)*0.5,
             y=None
         ).minus(self.decart_mean_final).scale(self.args.scale)
+
         print(self.mean_final.X, self.mean_final.E)
 
         self.var_final = PlaceHolder(
@@ -400,7 +410,7 @@ class IPFBase(torch.nn.Module):
                                  nodes_dist=self.nodes_dist,
                                  dataset_infos=self.datainfos,
                                  visualization_tools=self.visualization_tools,
-                                 visualize=True,
+                                 visualize=self.args.visualize_loader,
                                  scale=self.args.scale,
                                  decart_mean_final=self.decart_mean_final)
         else:  # forward
@@ -420,7 +430,7 @@ class IPFBase(torch.nn.Module):
                                  nodes_dist=self.nodes_dist,
                                  dataset_infos=self.datainfos,
                                  visualization_tools=self.visualization_tools,
-                                 visualize=True,
+                                 visualize=self.args.visualize_loader,
                                  scale=self.args.scale,
                                  decart_mean_final=self.decart_mean_final)
 
@@ -474,14 +484,14 @@ class IPFBase(torch.nn.Module):
                         # batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                         batch = batch.scale(self.args.scale)
                         n_nodes = node_mask.sum(-1)
-                        batch.X = torch.zeros_like(batch.X, device=batch.X.device)
+                        # batch.X = torch.zeros_like(batch.X, device=batch.X.device)
                         batch = batch.mask(node_mask)
                         # import pdb; pdb.set_trace()
                     else:
                         batch_size = self.args.plot_npar
                         n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
                         batch = utils.PlaceHolder(
-                            X=torch.zeros(batch_size,
+                            X=torch.randn(batch_size,
                                         self.max_n_nodes,
                                         len(self.datainfos.node_types)).to(self.device),
                             E=torch.randn(batch_size,
@@ -498,8 +508,8 @@ class IPFBase(torch.nn.Module):
                         node_mask = arange < n_nodes.unsqueeze(1)
                         batch.mask(node_mask)
 
-                x_tot, out, steps_expanded = self.langevin.record_langevin_seq(
-                    sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True, fb=fb)
+                    x_tot, out, steps_expanded = self.langevin.record_langevin_seq(
+                        sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True, fb=fb)
 
                 to_plot = x_tot.get_data(-1, dim=1).collapse(thres=self.args.thres)
 
@@ -618,8 +628,6 @@ class IPFSequential(IPFBase):
         self.accelerate(forward_or_backward)
 
         cur_num_iter = self.num_iter + 1
-        # if forward_or_backward == 'f':
-        #     cur_num_iter = cur_num_iter * 5
 
         for i in tqdm(range(cur_num_iter)):
             '''
@@ -629,24 +637,11 @@ class IPFSequential(IPFBase):
             x, out, steps_expanded = next(new_dl)
             x = PlaceHolder(X=x[0], E=x[1], y=x[2], charge=x[3], n_nodes=x[4])
             out = PlaceHolder(X=out[0], E=out[1], y=out[2], charge=out[3], n_nodes=out[4])
-            # import pdb; pdb.set_trace()
             eval_steps = self.T - steps_expanded
-            # import pdb; pdb.set_trace()
             pred = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
-
-            # if forward_or_backward == 'f':
-            #     new_x = x.copy()
-            #     new_x.E[0,:,:,0] = torch.Tensor([[0,2,2,2],[2,0,-2,-2], [2,-2,0,-2], [-2,-2,-2,0]]).to(new_x.E.device)
-            #     new_eval_steps = eval_steps.clone()
-            #     new_eval_steps[0] = torch.tensor(1e-5).to(new_x.E.device)
-            #     new_pred = self.forward_graph(self.net[forward_or_backward], new_x, new_eval_steps)
-            #     print(i, new_pred.E[0,:,:,0], x.E[0,:,:,0], new_eval_steps[0])
 
             if self.args.mean_match:
                 pred = pred.minus(x)
-
-            # if forward_or_backward == 'f' and i==500:
-            #     import pdb; pdb.set_trace()
 
             node_loss, edge_loss, loss = self.compute_loss(pred, out)
 
@@ -709,13 +704,11 @@ class IPFSequential(IPFBase):
         self.clear()
 
     def compute_loss(self, pred, out):
-        node_loss = self.args.model.lambda_train[0] * F.mse_loss(pred.X, out.X) * 0
+        node_loss = self.args.model.lambda_train[0] * F.mse_loss(pred.X, out.X)
         edge_loss = self.args.model.lambda_train[1] * F.mse_loss(pred.E, out.E)
         # print('loss',  pred.E[0,0,1].detach(), out.E[0,0,1].detach())
+        # print('loss',  pred.X[0,0].detach(), out.X[0,0].detach())
         loss = node_loss + edge_loss
-        # print()
-        # The code is calculating the total loss by adding the node loss and edge loss together.
-        # loss = edge_loss
         if pred.charge.numel() > 0:
             loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)
 
@@ -750,7 +743,6 @@ class IPFSequential(IPFBase):
             z_t_discrete = z_t.onehot(thres=self.args.thres)
             extra_features, _, _ = self.extra_features(z_t_discrete)
             extra_domain_features = self.domain_features(z_t_discrete)
-        # print(z_t_discrete.E[0,:,:,1])
 
         model_input.X = torch.cat(
             (z_t.X, z_t_discrete.X, extra_features.X, extra_domain_features.X), dim=2
@@ -762,7 +754,6 @@ class IPFSequential(IPFBase):
             (z_t.y, z_t_discrete.y, extra_features.y, extra_domain_features.y, t)
         ).float()
 
-        # import pdb; pdb.set_trace()
         res = net(model_input)
 
         return res

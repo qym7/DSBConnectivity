@@ -12,7 +12,7 @@ from hydra.utils import get_original_cwd
 from networkx import to_numpy_array
 
 from ..utils import PlaceHolder
-from ..datasets.dataset_utils import (
+from .dataset_utils import (
     load_pickle,
     save_pickle,
     Statistics,
@@ -123,7 +123,7 @@ class SyntheticGraphDataset(InMemoryDataset):
                 inter_prob=self.dataset_cfg.inter_prob,
                 )
             adjs = [torch.Tensor(to_numpy_array(network)).fill_diagonal_(0) for network in networks]
-            
+
         g_cpu = torch.Generator()
         g_cpu.manual_seed(1234)
         self.num_graphs = len(adjs)

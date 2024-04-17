@@ -55,21 +55,22 @@ class SamplingMetrics(nn.Module):
                 EgoSamplingMetrics
             )
 
-            self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
+            if dataset_infos.dataset_name == "comm20":
+                self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
             # if dataset_infos.dataset_name == "comm20":
             #     self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
-            # elif dataset_infos.dataset_name == "planar":
-            #     self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
-            # elif dataset_infos.dataset_name == "sbm":
-            #     self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
-            # elif dataset_infos.dataset_name == "protein":
-            #     self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders)
-            # elif dataset_infos.dataset_name == "ego":
-            #     self.domain_metrics = EgoSamplingMetrics(dataloaders=dataloaders)
-            # else:
-            #     raise ValueError(
-            #         "Dataset {} not implemented".format(dataset_infos.dataset_name)
-            #     )
+            elif dataset_infos.dataset_name == "planar":
+                self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
+            elif "sbm" in dataset_infos.dataset_name:
+                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "protein":
+                self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "ego":
+                self.domain_metrics = EgoSamplingMetrics(dataloaders=dataloaders)
+            else:
+                raise ValueError(
+                    "Dataset {} not implemented".format(dataset_infos.dataset_name)
+                )
 
     # def reset(self):
     #     for metric in [

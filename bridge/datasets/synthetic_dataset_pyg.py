@@ -28,12 +28,6 @@ from ..metrics.metrics_utils import (
     atom_type_counts,
     edge_counts,
 )
-from ..data.synthetic_graphs import (
-    generate_sbm_graphs,
-    generate_tree_graphs,
-    generate_planar_graphs,
-    generate_sbm_graphs_fixed_size,
-)
 
 
 class SpectreGraphDataset(InMemoryDataset):
@@ -45,13 +39,11 @@ class SpectreGraphDataset(InMemoryDataset):
         transform=None,
         pre_transform=None,
         pre_filter=None,
-        cfg=None,
     ):
         self.sbm_file = "sbm_200.pt"
         self.planar_file = "planar_64_200.pt"
         self.comm20_file = "community_12_21_100.pt"
         self.dataset_name = dataset_name
-        self.cfg = cfg
 
         self.split = split
         if self.split == "train":
@@ -121,28 +113,13 @@ class SpectreGraphDataset(InMemoryDataset):
             raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/community_12_21_100.pt"
         elif self.dataset_name == "ego":        
             raw_url = "https://raw.githubusercontent.com/tufts-ml/graph-generation-EDGE/main/graphs/Ego.pkl"
-        elif self.dataset_name == 'sbm_syn':
-            networks = generate_sbm_graphs_fixed_size(
-                num_graphs=self.cfg.num_graphs,
-                num_nodes=self.cfg.num_nodes,
-                min_num_communities=self.cfg.min_num_communities,
-                max_num_communities=self.cfg.max_num_communities,
-                min_community_size=self.cfg.min_community_size,
-                max_community_size=self.cfg.max_community_size,
-                intra_prob=self.cfg.intra_prob,
-                inter_prob=self.cfg.inter_prob,
-                )
-            adjs = [torch.Tensor(to_numpy_array(network)).fill_diagonal_(0) for network in networks]
         else:
             raise ValueError(f"Unknown dataset {self.dataset_name}")
-        if 'syn' not in self.dataset_name:
-            file_path = download_url(raw_url, self.raw_dir)
+        file_path = download_url(raw_url, self.raw_dir)
 
         if self.dataset_name == 'ego':
             networks = pkl.load(open(file_path, 'rb'))
             adjs = [torch.Tensor(to_numpy_array(network)).fill_diagonal_(0) for network in networks]
-        elif self.dataset_name == 'sbm_syn':
-            pass
         else:
             (
                 adjs,
@@ -186,6 +163,8 @@ class SpectreGraphDataset(InMemoryDataset):
         test_data = []
 
         for i, adj in enumerate(adjs):
+            # permute randomly nodes as for molecular datasets
+            # adj = adjs[0][:4, :4]  # TODO: this line and the package of COMM20 are to deleted
             adj = adjs[0]
             random_order = torch.randperm(adj.shape[-1])
             adj = adj[random_order, :]
@@ -248,21 +227,18 @@ class SpectreGraphDataModule(AbstractDataModule):
                 pre_transform=pre_transform,
                 split="train",
                 root=root_path,
-                cfg=cfg
             ),
             "val": SpectreGraphDataset(
                 dataset_name=self.cfg.name,
                 pre_transform=pre_transform,
                 split="val",
                 root=root_path,
-                cfg=cfg
             ),
             "test": SpectreGraphDataset(
                 dataset_name=self.cfg.name,
                 pre_transform=pre_transform,
                 split="test",
                 root=root_path,
-                cfg=cfg
             ),
         }
 
@@ -321,9 +297,6 @@ class SBMDataModule(SpectreGraphDataModule):
     def __init__(self, cfg):
         super().__init__(cfg)
 
-class SBMSynDataModule(SpectreGraphDataModule):
-    def __init__(self, cfg):
-        super().__init__(cfg)
 
 class PlanarDataModule(SpectreGraphDataModule):
     def __init__(self, cfg):

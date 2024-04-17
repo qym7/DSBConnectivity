@@ -39,11 +39,6 @@ class CacheLoader(Dataset):
         self.std = std
         self.scale = scale
         self.decart_mean_final = decart_mean_final
-        # utils.PlaceHolder(
-        #     X=torch.ones(1).to(self.device),
-        #     E=torch.ones(2).to(self.device)*0.5,
-        #     y=None[1]
-        # )
         self.visualization_tools = visualization_tools
         self.visualize = visualize
 
@@ -64,15 +59,14 @@ class CacheLoader(Dataset):
                     batch = next(loader)
                     batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
                     batch = batch.minus(self.decart_mean_final)
-                    # batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                     batch = batch.scale(self.scale)
                     n_nodes = node_mask.sum(-1)
-                    batch.X = torch.zeros_like(batch.X, device=batch.X.device)
+                    # batch.X = torch.zeros_like(batch.X, device=batch.X.device)
                     batch = batch.mask(node_mask)
                 else:
                     n_nodes = self.nodes_dist.sample_n(batch_size, device)
                     batch = utils.PlaceHolder(
-                        X=torch.zeros(batch_size,
+                        X=torch.randn(batch_size,
                                        self.max_n_nodes,
                                        len(dataset_infos.node_types)).to(self.device),
                         E=torch.randn(batch_size,
@@ -85,9 +79,6 @@ class CacheLoader(Dataset):
                     batch.E = utils.symmetize_edge_matrix(batch.E)
                     batch.mask()
 
-                # import pdb; pdb.set_trace()
-                # print('batch data as start', batch.E[0,0,1])
-
                 if (n == 1) & (fb == 'b'):
                     x, out, steps_expanded = langevin.record_init_langevin(
                         batch, node_mask)
@@ -95,24 +86,24 @@ class CacheLoader(Dataset):
                     x, out, steps_expanded = langevin.record_langevin_seq(
                         sample_net, batch, node_mask=batch.node_mask, ipf_it=n, fb=fb)
 
-                # if b == 0 and self.visualize:
-                #     self.visualize = False
-                #     print('Visualizing chains...')
-                #     current_path = os.getcwd()
-                #     reverse_fb = 'f' if fb == 'b' else 'b'
-                #     result_path = os.path.join(current_path, f'cache_chains_{reverse_fb}/'
-                #                                             f'ipf{n}/'
-                #                                             f'molecule')
+                if b == 0 and self.visualize:
+                    self.visualize = False
+                    print('Visualizing chains...')
+                    current_path = os.getcwd()
+                    reverse_fb = 'f' if fb == 'b' else 'b'
+                    result_path = os.path.join(current_path, f'cache_chains_{reverse_fb}/'
+                                                            f'ipf{n}/'
+                                                            f'molecule')
 
-                #     chain = x.copy()
-                #     chain.X = torch.concatenate((batch.X.unsqueeze(1), chain.X),dim=1)
-                #     chain.E = torch.concatenate((batch.E.unsqueeze(1), chain.E),dim=1)
-                #     _ = self.visualization_tools.visualize_chains(result_path,
-                #                                                     chains=chain,
-                #                                                     num_nodes=n_nodes,
-                #                                                     local_rank=0,
-                #                                                     num_chains_to_visualize=1,
-                #                                                     fb=reverse_fb)
+                    chain = x.copy()
+                    chain.X = torch.concatenate((batch.X.unsqueeze(1), chain.X),dim=1)
+                    chain.E = torch.concatenate((batch.E.unsqueeze(1), chain.E),dim=1)
+                    _ = self.visualization_tools.visualize_chains(result_path,
+                                                                    chains=chain,
+                                                                    num_nodes=n_nodes,
+                                                                    local_rank=0,
+                                                                    num_chains_to_visualize=1,
+                                                                    fb='f')
 
                 batch_X = torch.cat((x.X.unsqueeze(2), out.X.unsqueeze(2)), dim=2).flatten(start_dim=0, end_dim=1)
                 batch_E = torch.cat((x.E.unsqueeze(2), out.E.unsqueeze(2)), dim=2).flatten(start_dim=0, end_dim=1)
@@ -147,7 +138,6 @@ class CacheLoader(Dataset):
         self.n_nodes = self.n_nodes.flatten()
 
     def __getitem__(self, index):
-        # import pdb; pdb.set_trace()
         item = self.data.get_data(index, dim=0)  # X -> (2, max_n_node, dx)
         steps = self.steps_data[index]
         n_nodes = self.n_nodes[index]

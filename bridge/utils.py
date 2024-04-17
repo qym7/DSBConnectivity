@@ -390,7 +390,7 @@ class PlaceHolder:
 
     def randn_like(self):
         new_data = PlaceHolder(
-            X=torch.zeros_like(self.X).to(self.X.device) if self.X is not None else None,
+            X=torch.randn_like(self.X).to(self.X.device) if self.X is not None else None,
             E=torch.randn_like(self.E).to(self.E.device) if self.E is not None else None,
             y=torch.randn_like(self.y).to(self.y.device) if self.y is not None else None,
             charge=torch.randn_like(self.charge).to(self.charge.device) if self.charge is not None else None,

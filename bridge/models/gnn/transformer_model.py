@@ -373,10 +373,6 @@ class GraphTransformer(nn.Module):
         y_to_out = model_input.y[..., : self.out_dim_y]
 
         time_emb = timestep_embedding(y[:, -1].unsqueeze(-1), self.hidden_dims["dy"])
-        # import pdb; pdb.set_trace()
-        # The code is using a multi-layer perceptron (MLP) to process the input `model_input.y` and
-        # assign the result to `time_emb`. The specific details of the MLP implementation are not
-        # shown in the provided code snippet.
         y = self.mlp_in_y(y) + time_emb
         new_E = self.mlp_in_E(model_input.E)
         new_E = (new_E + new_E.transpose(1, 2)) / 2
@@ -384,7 +380,6 @@ class GraphTransformer(nn.Module):
         features = utils.PlaceHolder(
             X=self.mlp_in_X(X),
             E=new_E,
-            # y=self.mlp_in_y(model_input.y),
             y=time_emb,
             charge=None,
             node_mask=node_mask,
@@ -399,8 +394,6 @@ class GraphTransformer(nn.Module):
         X = X + X_to_out
         E = E + E_to_out
         E = 1 / 2 * (E + torch.transpose(E, 1, 2))  # symmetrize E
-        # import pdb; pdb.set_trace()
-        # print('inner model',  E[0,0,1].detach()-E_to_out[0,0,1].detach())
 
         if self.predicts_final_y:
             y = self.mlp_out_y(features.y)
@@ -409,10 +402,7 @@ class GraphTransformer(nn.Module):
 
         final_X = X[..., : self.out_dim_X]
         final_charge = X[..., self.out_dim_X :]
-        final_X = torch.zeros_like(final_X, device=final_X.device)
-
-        # import pdb; pdb.set_trace()
-        # mask = utils.PlaceHolder(X=final_X, charge=final_charge, E=E, y=y, node_mask=node_mask).mask()
+        # final_X = torch.zeros_like(final_X, device=final_X.device)
 
         return utils.PlaceHolder(
             X=final_X, charge=final_charge, E=E, y=y, node_mask=node_mask

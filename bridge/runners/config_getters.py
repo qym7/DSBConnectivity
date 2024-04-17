@@ -60,11 +60,12 @@ def get_graph_models(args, dataset_infos):
 #--------------------------------------------------------------------------------
 def get_both_datamodules(cfg):
     dataset_config = cfg["dataset"]
+    dataset_config_transfer = cfg["dataset_transfer"]
     pl.seed_everything(cfg.seed)
     # get datamodules for the initial and transfer dataset
     train_metrics, domain_features, datamodule, datainfos = get_datamodules(dataset_config)
     if cfg.transfer:
-        tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = get_datamodules(dataset_config)
+        tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = get_datamodules(dataset_config_transfer)
     else:
         tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = None, None, None, None
 
@@ -81,9 +82,10 @@ def get_datamodules(cfg):
     # step 1: get datamodules according to dataset name
 
     print('creating datasets')
-    if cfg["name"] in ["sbm", "comm20", "planar", "ego"]:
+    if cfg["name"] in ["sbm", "comm20", "planar", "ego", "sbm_syn"]:
         from ..datasets.spectre_dataset_pyg import (
             SBMDataModule,
+            SBMSynDataModule,
             Comm20DataModule,
             EgoDataModule,
             PlanarDataModule,
@@ -92,6 +94,8 @@ def get_datamodules(cfg):
 
         if cfg["name"] == "sbm":
             datamodule = SBMDataModule(cfg)
+        if cfg["name"] == "sbm_sym":
+            datamodule = SBMSynDataModule(cfg)
         elif cfg["name"] == "comm20":
             datamodule = Comm20DataModule(cfg)
         elif cfg["name"] == "ego":
@@ -152,59 +156,6 @@ def get_datamodules(cfg):
 
     return train_metrics, domain_features, datamodule, dataset_infos
 
-# MODEL = 'Model'
-# BASIC_MODEL = 'Basic'
-# UNET_MODEL = 'UNET'
-
-
-# def get_models(args):
-#     model_tag = getattr(args, MODEL)
-
-#     if model_tag == BASIC_MODEL:
-#         net_f, net_b = ScoreNetwork(), ScoreNetwork()
-
-#     if model_tag == UNET_MODEL:
-#         image_size=args.data.image_size
-
-#         if image_size == 256:
-#             channel_mult = (1, 1, 2, 2, 4, 4)
-#         elif image_size == 64:
-#             channel_mult = (1, 2, 3, 4)
-#         elif image_size == 32:
-#             channel_mult = (1, 2, 2, 2)
-#         elif image_size == 28:
-#             channel_mult = (1, 2, 2)
-#         elif image_size == 20:  # comm20
-#             channel_mult = (1, 1, 2)
-#         elif image_size == 100:  # synthetic sbm graphs
-#             channel_mult = (1, 2, 2, 2)
-#         else:
-#             raise ValueError(f"unsupported image size: {image_size}")
-
-#         attention_ds = []
-#         for res in args.model.attention_resolutions.split(","):
-#             attention_ds.append(image_size // int(res))
-        
-#         kwargs = {
-#                     "in_channels": args.data.channels,
-#                     "model_channels": args.model.num_channels,
-#                     "out_channels": args.data.channels,
-#                     "num_res_blocks": args.model.num_res_blocks,
-#                     "attention_resolutions": tuple(attention_ds),
-#                     "dropout": args.model.dropout,
-#                     "channel_mult": channel_mult,
-#                     "num_classes": None,
-#                     "use_checkpoint": args.model.use_checkpoint,
-#                     "num_heads": args.model.num_heads,
-#                     "num_heads_upsample": args.model.num_heads_upsample,
-#                     "use_scale_shift_norm": args.model.use_scale_shift_norm,
-#                     "graph": args.graph,
-#                 }
-
-#         net_f, net_b = UNetModel(**kwargs), UNetModel(**kwargs)   
-       
-#     return net_f, net_b
-
 
 # Optimizer
 #--------------------------------------------------------------------------------
@@ -225,172 +176,6 @@ DATASET_COMM20 = 'comm20'
 DATASET_SBM1 = 'sbm1'
 DATASET_SBM2 = 'sbm2'
 
-# def get_datasets(args, split='train'):
-#     dataset_tag = getattr(args, DATASET)
-#     if args.transfer:
-#         dataset_transfer_tag = getattr(args, DATASET_TRANSFER)
-#     else:
-#         dataset_transfer_tag = None
-    
-#     # INITIAL (DATA) DATASET
-#     if dataset_tag == DATASET_COMM20:
-#         base_path = pathlib.Path(get_original_cwd()).parents[0]
-#         root_path = os.path.join(base_path, 'data/comm20/')
-#         init_ds = SpectreGraphDataset(
-#                     dataset_name='comm20',
-#                     split=split,
-#                     root=root_path,
-#                     transform=None,
-#                     pre_transform=None,
-#                     pre_filter=None)
-
-#     if dataset_tag == DATASET_SBM1:
-#         base_path = pathlib.Path(get_original_cwd()).parents[0]
-#         root_path = os.path.join(base_path, 'data/sym_sbm/')
-#         init_ds = SyntheticGraphDataset(
-#                     dataset_name='sbm',
-#                     split=split,
-#                     root=root_path,
-#                     dataset_cfg=args.data,
-#                     transform=None,
-#                     pre_transform=None,
-#                     pre_filter=None)
-
-#     if dataset_transfer_tag == DATASET_SBM1:
-#         base_path = pathlib.Path(get_original_cwd()).parents[0]
-#         root_path = os.path.join(base_path, 'data/sym_sbm/')
-#         final_ds = SyntheticGraphDataset(
-#                     dataset_name='sbm',
-#                     split=split,
-#                     root=root_path,
-#                     dataset_cfg=args.data_transfer,
-#                     transform=None,
-#                     pre_transform=None,
-#                     pre_filter=None)
-#         mean_final = torch.tensor(0.)
-#         var_final = torch.tensor(1.*10**3)
-
-#     if dataset_tag == DATASET_SBM2:
-#         base_path = pathlib.Path(get_original_cwd()).parents[0]
-#         root_path = os.path.join(base_path, 'data/sym_sbm/')
-#         init_ds = SyntheticGraphDataset(
-#                     dataset_name='sbm',
-#                     split=split,
-#                     root=root_path,
-#                     dataset_cfg=args.data,
-#                     transform=None,
-#                     pre_transform=None,
-#                     pre_filter=None)
-
-#     if dataset_transfer_tag == DATASET_SBM2:
-#         base_path = pathlib.Path(get_original_cwd()).parents[0]
-#         root_path = os.path.join(base_path, 'data/sym_sbm/')
-#         final_ds = SyntheticGraphDataset(
-#                     dataset_name='sbm',
-#                     split=split,
-#                     root=root_path,
-#                     dataset_cfg=args.data_transfer,
-#                     transform=None,
-#                     pre_transform=None,
-#                     pre_filter=None)
-#         mean_final = torch.tensor(0.)
-#         var_final = torch.tensor(1.*10**3)
-
-#     # 2D DATASET
-#     if dataset_tag == DATASET_2D:
-#         data_tag = args.data
-#         npar = max(args.npar, args.cache_npar)
-#         init_ds = two_dim_ds(npar, data_tag)
-
-#     if dataset_transfer_tag == DATASET_2D:
-#         data_tag = args.data_transfer
-#         npar = max(args.npar, args.cache_npar)
-#         final_ds = two_dim_ds(npar, data_tag)
-#         mean_final = torch.tensor(0.)
-#         var_final = torch.tensor(1.*10**3) #infty like
-
-#     # CELEBA DATASET
-
-#     if dataset_tag == DATASET_CELEBA:
-
-#         train_transform = [transforms.CenterCrop(140), transforms.Resize(args.data.image_size), transforms.ToTensor()]
-#         test_transform = [transforms.CenterCrop(140), transforms.Resize(args.data.image_size), transforms.ToTensor()]
-#         if args.data.random_flip:
-#             train_transform.insert(2, transforms.RandomHorizontalFlip())
-
-#         root = os.path.join(args.data_dir, 'celeba')
-#         init_ds = CelebA(root, split=split, transform=cmp(train_transform), download=False)
-
-#     # MNIST DATASET
-#     if dataset_tag ==  DATASET_STACKEDMNIST:
-#         root = os.path.join(args.data_dir, 'mnist')
-#         saved_file = os.path.join(root, "data.pt")
-#         load = os.path.exists(saved_file) 
-#         load = args.load
-#         init_ds = Stacked_MNIST(root, load=load, source_root=root, 
-#                                 train=True, num_channels = args.data.channels, 
-#                                 imageSize=args.data.image_size,
-#                                 device=args.device)
-
-#     if dataset_transfer_tag == DATASET_STACKEDMNIST:
-#         root = os.path.join(args.data_dir, 'mnist')
-#         saved_file = os.path.join(root, "data.pt")
-#         load = os.path.exists(saved_file)
-#         load = args.load
-#         final_ds = Stacked_MNIST(root, load=load, source_root=root,
-#                                 train=True, num_channels = args.data.channels,
-#                                 imageSize=args.data.image_size,
-#                                 device=args.device)
-#         mean_final = torch.tensor(0.)
-#         var_final = torch.tensor(1.*10**3)
-
-#     # EMNIST DATASET
-#     if dataset_tag == DATASET_EMNIST:
-#         root = os.path.join(args.data_dir, 'EMNIST')
-#         saved_file = os.path.join(root, "data.pt")
-#         load = os.path.exists(saved_file)
-#         load = args.load
-#         init_ds = EMNIST(root, load=load, source_root=root,
-#                                 train=True, num_channels = args.data.channels,
-#                                 imageSize=args.data.image_size,
-#                                 device=args.device)
-
-#     if dataset_transfer_tag == DATASET_EMNIST:
-#         root = os.path.join(args.data_dir, 'EMNIST')
-#         saved_file = os.path.join(root, "data.pt")
-#         load = os.path.exists(saved_file)
-#         load = args.load
-#         final_ds = EMNIST(root, load=load, source_root=root,
-#                                 train=True, num_channels = args.data.channels,
-#                                 imageSize=args.data.image_size,
-#                                 device=args.device)
-#         mean_final = torch.tensor(0.)
-#         var_final = torch.tensor(1.*10**3)
-
-#     # FINAL (GAUSSIAN) DATASET (if no transfer)
-#     if not args.transfer:
-#         final_ds, mean_final, var_final = None, None, None
-#     if not(args.transfer) and split == 'train':
-#         if args.adaptive_mean:
-#             NAPPROX = 100
-#             # TODO: this batch size causes error when it can not be devided by the datasize
-#             vec = next(iter(DataLoader(init_ds, batch_size=NAPPROX)))[0]
-#             mean_final = vec.mean()
-#             mean_final = vec[0] * 0 + mean_final
-#             var_final = eval(args.var_final)
-#             final_ds = None
-#         elif args.final_adaptive:
-#             NAPPROX = 100
-#             vec = next(iter(DataLoader(init_ds, batch_size=NAPPROX)))[0]
-#             mean_final = vec.mean(axis=0)
-#             var_final = vec.var()
-#             final_ds = None
-#         else:
-#             mean_final = eval(args.mean_final)
-#             var_final = eval(args.var_final)
-#             final_ds = None
-
-#     return init_ds, final_ds, mean_final, var_final
 
 
 # Logger

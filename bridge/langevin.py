@@ -136,19 +136,10 @@ class Langevin(torch.nn.Module):
 
         for k in range(self.num_steps):
             gamma = self.gammas[k]
-            # print(k, gamma)
-            # print(k, x_k.E[0,0,1])
             x_k, out_k = calculate_update(x_k, gamma, mean_final, var_final, node_mask)
-            # x_k, out_k = calculate_update(x_k, gamma, mean_final, std_final, node_mask)
-            # print(x_k.E[0,0,1], x_k.E.shape)x
-            # x_k, out_k = calculate_update(x_k, self.gammas[k], mean_final, std_final, node_mask)
             x_tot.place(x_k, k)
             out.place(out_k, k)
             # print(k, x_k.E[0,0,1], out_k.E[0,0,1])
-
-        # import pdb; pdb.set_trace()
-        # print('b', 'init', x_tot.E[0, :, 0, 1, 0])
-        # print('mean of langevin init', 'b', x_tot.E[:,-1].mean(), x_tot.E[:,-1].var())
 
         return x_tot, out, steps_expanded
 
@@ -189,8 +180,6 @@ class Langevin(torch.nn.Module):
                 except:
                     import pdb; pdb.set_trace()
             else:
-                # print(k, x.E[0,1,2], x.E[0,2,1])
-                # print(k, out.E[0,1,2], out.E[0,2,1])
                 t_old = x.add(self.forward_graph(net, x, t))
 
                 if sample & (k == self.num_steps-1):
@@ -206,21 +195,10 @@ class Langevin(torch.nn.Module):
             t_new = t_new.mask()
             out_k = t_old.minus(t_new)
 
-            x.X = torch.zeros_like(x.X, device=x_tot.X.device)
-            out_k.X = torch.zeros_like(out_k.X, device=out.X.device)
-
+            # x.X = torch.zeros_like(x.X, device=x_tot.X.device)
+            # out_k.X = torch.zeros_like(out_k.X, device=out.X.device)
             x_tot = x_tot.place(x.copy(), k)
             out = out.place(out_k.copy(), k)
-
-        print(fb, sample, x_tot.E[0, :, 0, 1, 0])
-
-        # network = 'b' if (sample and fb=='b') or (not sample and fb=='f') else 'f'
-        # sample_print = 'sample' if sample else 'cache'
-        # if network == 'f':
-        #     print('noise data stat', sample_print, x_tot.E[:,-1].mean(), x_tot.E[:,-1].var())
-        #     # print('clean data stat', sample_print, batch.E.mean(), batch.E.var())
-        # else:
-        #     print('clean data stat', sample_print, x_tot.E[:,-1].mean(), x_tot.E[:,-1].var())
 
         return x_tot, out, steps_expanded
 
@@ -228,17 +206,14 @@ class Langevin(torch.nn.Module):
     def forward_graph(self, net, z_t, t):
         # step 1: calculate extra features
         assert z_t.node_mask is not None
-        # print('noise', z_t.E[0,0,1], t[0])
         # z_t = z_t.clip(3)
 
         model_input = z_t.copy()
         with torch.no_grad():
             z_t_discrete = z_t.onehot(thres=self.thres)
-            # print(self.thres)
             extra_features, _, _ = self.extra_features(z_t_discrete)
             extra_domain_features = self.domain_features(z_t_discrete)
 
-        # print(z_t_discrete.E[0,:,:,0])
         model_input.X = torch.cat(
             (z_t.X, z_t_discrete.X, extra_features.X, extra_domain_features.X), dim=2
         ).float()
@@ -248,9 +223,7 @@ class Langevin(torch.nn.Module):
         model_input.y = torch.hstack(
             (z_t.y, z_t_discrete.y, extra_features.y, extra_domain_features.y, t)
         ).float()
-        # import pdb; pdb.set_trace()
 
         res = net(model_input)
-        # print(res.E[0,0,1])
 
         return res

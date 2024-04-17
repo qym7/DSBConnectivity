@@ -1057,28 +1057,29 @@ class SpectreSamplingMetrics(nn.Module):
             if wandb.run is not None:
                 wandb.run.summary["planar_acc"] = planar_acc
 
-        if "sbm" or "planar" in self.metrics_list:
-            print("Computing all fractions...")
-            (
-                frac_unique,
-                frac_unique_non_isomorphic,
-                fraction_unique_non_isomorphic_valid,
-            ) = eval_fraction_unique_non_isomorphic_valid(
-                networkx_graphs,
-                self.train_graphs,
-                is_sbm_graph if "sbm" in self.metrics_list else is_planar_graph,
-            )
-            frac_non_isomorphic = 1.0 - eval_fraction_isomorphic(
-                networkx_graphs, self.train_graphs
-            )
-            to_log.update(
-                {
-                    "sampling/frac_unique": frac_unique,
-                    "sampling/frac_unique_non_iso": frac_unique_non_isomorphic,
-                    "sampling/frac_unic_non_iso_valid": fraction_unique_non_isomorphic_valid,
-                    "sampling/frac_non_iso": frac_non_isomorphic,
-                }
-            )
+        print(self.metrics_list)
+        # if "sbm" or "planar" in self.metrics_list:
+        #     print("Computing all fractions...")
+        #     (
+        #         frac_unique,
+        #         frac_unique_non_isomorphic,
+        #         fraction_unique_non_isomorphic_valid,
+        #     ) = eval_fraction_unique_non_isomorphic_valid(
+        #         networkx_graphs,
+        #         self.train_graphs,
+        #         is_sbm_graph if "sbm" in self.metrics_list else is_planar_graph,
+        #     )
+        #     frac_non_isomorphic = 1.0 - eval_fraction_isomorphic(
+        #         networkx_graphs, self.train_graphs
+        #     )
+        #     to_log.update(
+        #         {
+        #             "sampling/frac_unique": frac_unique,
+        #             "sampling/frac_unique_non_iso": frac_unique_non_isomorphic,
+        #             "sampling/frac_unic_non_iso_valid": fraction_unique_non_isomorphic_valid,
+        #             "sampling/frac_non_iso": frac_non_isomorphic,
+        #         }
+        #     )
 
         return to_log
 
@@ -1110,7 +1111,9 @@ class SBMSamplingMetrics(SpectreSamplingMetrics):
         super().__init__(
             dataloaders=dataloaders,
             compute_emd=False,
-            metrics_list=["degree", "clustering", "orbit", "spectre", "sbm", "neural"],
+            # metrics_list=["degree", "clustering", "orbit", "spectre", "sbm", "neural"],
+            # metrics_list=["degree", "clustering", "orbit", "spectre", "neural"],
+            metrics_list=["degree", "clustering", "spectre"],
         )
 
 

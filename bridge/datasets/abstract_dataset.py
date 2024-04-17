@@ -21,7 +21,7 @@ class AbstractDataModule(LightningDataset):
         self.cfg = cfg
         self.input_dims = None
         self.output_dims = None
-        
+
         self.dataset_stat()
 
     def dataset_stat(self):

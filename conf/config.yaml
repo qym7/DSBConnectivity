@@ -36,3 +36,4 @@ checkpoint_b: ""
 seed: 1234
 thres: 1.5
 scale: 4
+visualize_loader: False
