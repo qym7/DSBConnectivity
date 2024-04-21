@@ -18,7 +18,8 @@ import torch.nn.functional as F
 
 
 def setup_wandb(cfg):
-    config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    config_dict = OmegaConf.to_container(cfg, resolve=True)
+    import pdb; pdb.set_trace()
     name = cfg.dataset.name
     if name == "qm9" and cfg.dataset.remove_h == False:
         name = "qm9_h"

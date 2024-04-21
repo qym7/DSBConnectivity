@@ -13,7 +13,7 @@ class EMAHelper(object):
         for name, param in module.named_parameters():
             if param.requires_grad:
                 self.shadow[name] = param.data.clone()
-                
+
     def update(self, module):
         if isinstance(module, nn.DataParallel) or isinstance(module, nn.parallel.distributed.DistributedDataParallel):
             module = module.module

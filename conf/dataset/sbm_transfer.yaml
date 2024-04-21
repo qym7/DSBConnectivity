@@ -3,10 +3,10 @@ project_name: debug_transfer
 wandb: disabled # offline/disabled/online
 
 # data 
-Dataset: sbm1
+Dataset: sbm_transfer
 graph: True
 
-dataset:
+dataset_transfer:
   batch_size: 128
   num_workers: 8
 
@@ -39,7 +39,7 @@ dataset:
 transfer: True
 Dataset_transfer: sbm2
 
-dataset_transfer:
+dataset:
   batch_size: 128
   num_workers: 8
 
@@ -84,7 +84,7 @@ gif_stride: 20000
 plot_npar: 64
 
 # training
-cache_npar: 64
+cache_npar: 128
 use_prev_net: False
 ema: True
 ema_rate: 0.999
@@ -107,12 +107,12 @@ fast_sampling: True
 
 # cache
 num_cache_batches: 1
-cache_refresh_stride: 100
+cache_refresh_stride: 200
 
 thres: 1.0
 
 model: 
-    n_layers: 4
+    n_layers: 8
     hidden_dims: {'dx': 256, 'de': 64, 'dy': 256, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 128, 'dim_ffy': 128}
     hidden_mlp_dims: { 'X': 128, 'E': 64, 'y': 256}
     # hidden_dims: {'dx': 4, 'de': 4, 'dy': 4, 'n_head': 2, 'dim_ffX': 32, 'dim_ffE': 32, 'dim_ffy': 4}
@@ -120,7 +120,7 @@ model:
     sn_hidden_dim: 32
     output_y: False
     dropout: 0.0
-    lambda_train: [1, 5]              # X=1, E = lambda[0], y = lambda[1]
+    lambda_train: [1, 10]              # X=1, E = lambda[0], y = lambda[1]
 
     # Model settings
     diffusion_steps: 500
@@ -136,4 +136,4 @@ model:
     dist_feat: True
     positional_encoding: False
 
-    
+

@@ -3,7 +3,6 @@ graph: False
 
 defaults:
   - launcher: local
-  - job
   - dataset: 2d #celeba, 2d, stackedmnist
   - model: Basic #Basic, UNET
 
@@ -22,6 +21,7 @@ mean_match: True
 paths: 
   experiments_dir_name: experiments
 wandb: 'online'             # online | offline | disabled
+project_name: debug
 
 # checkpoint
 checkpoint_run: False
@@ -37,3 +37,11 @@ seed: 1234
 thres: 1.5
 scale: 4
 visualize_loader: False
+
+hydra:
+  job:
+    chdir: True
+
+  run:
+    # Output directory for normal runs
+    dir: ./experiments/${now:%Y-%m-%d}/${now:%H-%M-%S}-${project_name}

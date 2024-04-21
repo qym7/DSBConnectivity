@@ -6,6 +6,7 @@ import json
 import random
 import datetime
 
+import yaml
 import wandb
 import torch
 import torch.nn.functional as F
@@ -33,15 +34,25 @@ from ..diffusion.extra_features_molecular import ExtraMolecularFeatures
 
 
 def setup_wandb(cfg):
+    # config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+
     kwargs = {
         "name": cfg.project_name,
         "project": f"DSB_{cfg.Dataset}",
         "settings": wandb.Settings(_disable_stats=True),
         "reinit": True,
+        # 'config': config_dict,
         "mode": cfg.wandb,
     }
+
     wandb.init(**kwargs)
     wandb.save("*.txt")
+
+    wandb.config.update(cfg)
+    
+    # import pdb; pdb.set_trace()
+    # with open(os.path.join(wandb.run.dir, "config.yaml"), "w") as f:
+    #     yaml.dump(cfg, f)
 
 
 class IPFBase(torch.nn.Module):
@@ -89,15 +100,24 @@ class IPFBase(torch.nn.Module):
         self.visualization_tools = Visualizer(dataset_infos=self.datainfos, thres=args.thres)
 
         # create metrics for graph dataset
-        if self.graph:
-            print('creating metrics for graph dataset')
-            # create the training/test/val dataloader
-            self.val_sampling_metrics = SamplingMetrics(
-                dataset_infos=self.datainfos, test=False, dataloaders=dataloaders
+        print('creating metrics for graph dataset')
+        # create the training/test/val dataloader
+        self.val_sampling_metrics = SamplingMetrics(
+            dataset_infos=self.datainfos, test=False, dataloaders=dataloaders
+        )
+        self.test_sampling_metrics = SamplingMetrics(
+            dataset_infos=self.datainfos, test=True, dataloaders=dataloaders
+        )
+
+        if self.args.transfer:
+            self.tf_val_sampling_metrics = SamplingMetrics(
+                dataset_infos=self.tf_datainfos, test=False, dataloaders=dataloaders
             )
-            self.test_sampling_metrics = SamplingMetrics(
-                dataset_infos=self.datainfos, test=True, dataloaders=dataloaders
+            self.tf_test_sampling_metrics = SamplingMetrics(
+                dataset_infos=self.tf_datainfos, test=True, dataloaders=dataloaders
             )
+        else:
+            self.tf_val_sampling_metrics = self.tf_test_sampling_metrics = None
 
         # get models
         print('building models')
@@ -105,7 +125,7 @@ class IPFBase(torch.nn.Module):
         self.build_ema()
 
         # get optims
-        self.build_optimizers()
+        self.build_optimizers(n=0)
 
         # langevin
         if self.args.weight_distrib:
@@ -221,9 +241,10 @@ class IPFBase(torch.nn.Module):
                     sample_net_b = sample_net_b.to(self.device)
                     self.ema_helpers['b'].register(sample_net_b)
 
-    def build_optimizers(self):
+    def build_optimizers(self, n):
+        lr = self.lr / (n+1)  # decay in learning rate
         optimizer_f, optimizer_b = get_optimizers(
-            self.net['f'], self.net['b'], self.lr)
+            self.net['f'], self.net['b'], lr)
         optimizer_b = optimizer_b
         optimizer_f = optimizer_f
         self.optimizer = {'f': optimizer_f, 'b': optimizer_b}
@@ -309,7 +330,7 @@ class IPFBase(torch.nn.Module):
 
         # get final stats
         init_ds = self.datamodule.inner
-        
+
         self.decart_mean_final = PlaceHolder(
             X=torch.ones(1).to(self.device),
             E=torch.ones(2).to(self.device)*0.5,
@@ -478,15 +499,13 @@ class IPFBase(torch.nn.Module):
                 with torch.no_grad():
                     self.set_seed(seed=0 + self.accelerator.process_index)
                     if fb == 'f' or self.args.transfer:
-                        batch = next(self.save_init_dl)
+                        loader = self.save_init_dl if fb == 'f' else self.save_final_dl
+                        batch = next(loader)
                         batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
                         batch = batch.minus(self.decart_mean_final)
-                        # batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                         batch = batch.scale(self.args.scale)
                         n_nodes = node_mask.sum(-1)
-                        # batch.X = torch.zeros_like(batch.X, device=batch.X.device)
                         batch = batch.mask(node_mask)
-                        # import pdb; pdb.set_trace()
                     else:
                         batch_size = self.args.plot_npar
                         n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
@@ -501,7 +520,10 @@ class IPFBase(torch.nn.Module):
                             y=None, charge=None
                         )
                         batch = batch.scale(self.std_final).add(self.mean_final)
-                        batch.E = utils.symmetize_edge_matrix(batch.E)
+                        try:
+                            batch.E = utils.symmetize_edge_matrix(batch.E)
+                        except:
+                            import pdb; pdb.set_trace()
                         arange = (
                             torch.arange(self.max_n_nodes, device=self.device).unsqueeze(0).expand(batch_size, -1)
                         )
@@ -554,31 +576,34 @@ class IPFBase(torch.nn.Module):
                 mean_val = chain.E[..., 0].mean(-1).mean(-1).mean(0).cpu().detach().numpy() - chain.E[..., 1].mean(-1).mean(-1).mean(0).cpu().detach().numpy()
                 np.save(f'{fb}_{n}_mean.npy', mean_val)
                 dataa = [[x, y] for (x, y) in zip(np.arange(chain.E.shape[1]), mean_val)]
-                if mean_val.max() > 10 or mean_val.min() < -10:
+                if mean_val.max() > 100 or mean_val.min() < -100:
                     import pdb; pdb.set_trace()
                 table = wandb.Table(data=dataa, columns=["steps", "mean"])
                 wandb.log({f'{fb}_{n}_mean_pred': wandb.plot.line(table, "steps", "mean", title=f'{fb}_{n}_mean_pred')})
 
-                if self.test_sampling_metrics is not None:
+                test_sampling_metrics = self.test_sampling_metrics if fb=='b' else self.tf_test_sampling_metrics
+                val_sampling_metrics = self.val_sampling_metrics if fb=='b' else self.tf_val_sampling_metrics
 
-                    test_to_log = self.test_sampling_metrics.compute_all_metrics(
-                        generated_list, current_epoch=0, local_rank=0, fb=fb, i=np.round(i/(self.num_iter+1),2)
-                    )
+                # if test_sampling_metrics is not None:
 
-                    # save results for testing
-                    print('saving results for testing')
-                    current_path = os.getcwd()
-                    res_path = os.path.join(
-                        current_path,
-                        f"test_{fb}_{n}.json",
-                    )
+                #     test_to_log = test_sampling_metrics.compute_all_metrics(
+                #         generated_list, current_epoch=0, local_rank=0, fb=fb, i=np.round(i/(self.num_iter+1),2)
+                #     )
 
-                    with open(res_path, 'w') as file:
-                        # Convert the dictionary to a JSON string and write it to the file
-                        json.dump(test_to_log, file)
+                #     # save results for testing
+                #     print('saving results for testing')
+                #     current_path = os.getcwd()
+                #     res_path = os.path.join(
+                #         current_path,
+                #         f"test_{fb}_{n}.json",
+                #     )
 
-                elif self.val_sampling_metrics is not None:
-                    val_to_log = self.val_sampling_metrics.compute_all_metrics(
+                #     with open(res_path, 'w') as file:
+                #         # Convert the dictionary to a JSON string and write it to the file
+                #         json.dump(test_to_log, file)
+
+                if val_sampling_metrics is not None:
+                    val_to_log = val_sampling_metrics.compute_all_metrics(
                         generated_list, current_epoch=0, local_rank=0, fb=fb, i=np.round(i/(self.num_iter+1),2)
                     )
                     # save results for testing
@@ -593,11 +618,6 @@ class IPFBase(torch.nn.Module):
                         # Convert the dictionary to a JSON string and write it to the file
                         json.dump(val_to_log, file)
 
-                    # if wandb.run:
-                    #     val_to_log = {f"sampling/{k}_{fb}": val_to_log[k] for k in val_to_log.keys()}
-                    #     wandb.log(val_to_log, commit=True, step=n)
-
-                # self.plotter(batch, x_tot_plot, i, n, fb)
 
     def set_seed(self, seed=0):
         torch.manual_seed(seed)
@@ -620,11 +640,12 @@ class IPFSequential(IPFBase):
 
         new_dl = self.new_cacheloader(forward_or_backward, n, self.args.ema)
 
+        print(self.args.use_prev_net)
         if not self.args.use_prev_net:
             self.build_models(forward_or_backward)
             self.update_ema(forward_or_backward)
 
-        self.build_optimizers()
+        self.build_optimizers(n=n)
         self.accelerate(forward_or_backward)
 
         cur_num_iter = self.num_iter + 1
@@ -664,8 +685,8 @@ class IPFSequential(IPFBase):
                 wandb.log(
                     {
                         f"train/loss_{forward_or_backward}_{n}": loss.detach().cpu().numpy().item(),
-                        f"train/loss_edge_{forward_or_backward}_{n}": edge_loss.detach().cpu().numpy().item(),
-                        f"train/loss_node_{forward_or_backward}_{n}": node_loss.detach().cpu().numpy().item(),
+                        # f"train/loss_edge_{forward_or_backward}_{n}": edge_loss.detach().cpu().numpy().item(),
+                        # f"train/loss_node_{forward_or_backward}_{n}": node_loss.detach().cpu().numpy().item(),
                     },
                     commit=False,
                 )
@@ -709,6 +730,7 @@ class IPFSequential(IPFBase):
         # print('loss',  pred.E[0,0,1].detach(), out.E[0,0,1].detach())
         # print('loss',  pred.X[0,0].detach(), out.X[0,0].detach())
         loss = node_loss + edge_loss
+
         if pred.charge.numel() > 0:
             loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)
 

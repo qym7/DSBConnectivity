@@ -74,7 +74,7 @@ class ExtraFeatures:
         return utils.PlaceHolder(X=x_feat, E=edge_feat, y=y_feat), cycle_time, eigen_time
 
 
-class PositionalEncoding:
+class   PositionalEncoding:
     def __init__(self, n_max_dataset, D=30):
         self.n_max = n_max_dataset
         self.d = math.floor(D / 2)
