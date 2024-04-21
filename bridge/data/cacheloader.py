@@ -61,7 +61,6 @@ class CacheLoader(Dataset):
                     batch = batch.minus(self.decart_mean_final)
                     batch = batch.scale(self.scale)
                     n_nodes = node_mask.sum(-1)
-                    # batch.X = torch.zeros_like(batch.X, device=batch.X.device)
                     batch = batch.mask(node_mask)
                 else:
                     n_nodes = self.nodes_dist.sample_n(batch_size, device)
@@ -79,6 +78,7 @@ class CacheLoader(Dataset):
                     batch.E = utils.symmetize_edge_matrix(batch.E)
                     batch.mask()
 
+                print(fb, n, batch.E[0, 0, 1])
                 if (n == 1) & (fb == 'b'):
                     x, out, steps_expanded = langevin.record_init_langevin(
                         batch, node_mask)

@@ -60,11 +60,11 @@ def get_graph_models(args, dataset_infos):
 #--------------------------------------------------------------------------------
 def get_both_datamodules(cfg):
     dataset_config = cfg["dataset"]
-    dataset_config_transfer = cfg["dataset_transfer"]
     pl.seed_everything(cfg.seed)
     # get datamodules for the initial and transfer dataset
     train_metrics, domain_features, datamodule, datainfos = get_datamodules(dataset_config)
     if cfg.transfer:
+        dataset_config_transfer = cfg["dataset_transfer"]
         tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = get_datamodules(dataset_config_transfer)
     else:
         tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = None, None, None, None
