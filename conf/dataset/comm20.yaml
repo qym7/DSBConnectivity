@@ -30,6 +30,7 @@ adaptive_mean: True
 mean_final: torch.zeros([${data.channels}, ${data.image_size}, ${data.image_size}])
 var_final: .5 * torch.ones([${data.channels}, ${data.image_size}, ${data.image_size}])
 load: False
+var: 1.0
 
 # device
 device: cuda

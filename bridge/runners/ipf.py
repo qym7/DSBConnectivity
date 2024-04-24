@@ -123,6 +123,7 @@ class IPFBase(torch.nn.Module):
         print('building models')
         net_f, net_b = self.build_models()
         self.update_models(net_f, net_b)
+        self.build_ema()
 
         # get optims
         self.build_optimizers(n=0)
@@ -648,11 +649,12 @@ class IPFSequential(IPFBase):
         # print(self.args.use_prev_net)
         if not self.args.use_prev_net:
             net_f, net_b = self.build_models()
-            self.update_models(net_f, net_b, forward_or_backward)
+            self.update_models(net_f, net_b)
             self.update_ema(forward_or_backward)
         else:
-            net, _ = self.build_models(forward_or_backward)
+            net, _ = self.build_models()
             self.net[forward_or_backward] = self.combine_models(self.net[forward_or_backward], net, alpha=0.8)
+            self.update_ema(forward_or_backward)
 
         self.build_optimizers(n=n)
         self.accelerate(forward_or_backward)
