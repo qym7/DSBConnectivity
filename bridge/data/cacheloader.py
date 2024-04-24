@@ -58,8 +58,6 @@ class CacheLoader(Dataset):
                     loader = dataloader_b if fb == 'b' else dataloader_f
                     batch = next(loader)
                     batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
-                    # print(batch.E[..., -1].sum(-1).sum(-1))
-                    # import pdb; pdb.set_trace()
                     batch = batch.minus(self.decart_mean_final)
                     batch = batch.scale(self.scale)
                     n_nodes = node_mask.sum(-1)

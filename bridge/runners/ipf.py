@@ -121,8 +121,8 @@ class IPFBase(torch.nn.Module):
 
         # get models
         print('building models')
-        self.build_models()
-        self.build_ema()
+        net_f, net_b = self.build_models()
+        self.update_models(net_f, net_b)
 
         # get optims
         self.build_optimizers(n=0)
@@ -180,7 +180,7 @@ class IPFBase(torch.nn.Module):
     def get_plotter(self):
         return get_plotter(self, self.args)
 
-    def build_models(self, forward_or_backward=None):
+    def build_models(self):
         # running network
         net_f, net_b = get_graph_models(self.args, self.datainfos)
 
@@ -193,7 +193,10 @@ class IPFBase(torch.nn.Module):
         if self.args.dataparallel:
             net_f = torch.nn.DataParallel(net_f)
             net_b = torch.nn.DataParallel(net_b)
-
+            
+        return net_f, net_b
+    
+    def update_models(self, net_f, net_b, forward_or_backward=None):
         if forward_or_backward is None:
             net_f = net_f.to(self.device)
             net_b = net_b.to(self.device)
@@ -346,18 +349,18 @@ class IPFBase(torch.nn.Module):
         # ).minus(self.decart_mean_final).scale(self.args.scale)
 
         self.mean_final = PlaceHolder(
-            X=(self.tf_datainfos.node_types).to(self.device),
-            E=(self.tf_datainfos.edge_types).to(self.device),
-            # X=torch.ones_like(self.datainfos.node_types).to(self.device),
-            # E=torch.ones_like(self.datainfos.edge_types).to(self.device)*0.5,
+            # X=(self.tf_datainfos.node_types).to(self.device),
+            # E=(self.tf_datainfos.edge_types).to(self.device),
+            X=torch.ones_like(self.datainfos.node_types).to(self.device),
+            E=torch.ones_like(self.datainfos.edge_types).to(self.device)*0.5,
             y=None
         ).minus(self.decart_mean_final).scale(self.args.scale)
 
-        print(self.mean_final.X, self.mean_final.E)
-
         self.var_final = PlaceHolder(
-            X=torch.ones(self.datainfos.num_node_types, device=self.device)*1e0,
-            E=torch.ones(self.datainfos.num_edge_types, device=self.device)*1e0,
+            X=torch.ones(self.datainfos.num_node_types, device=self.device)*self.args.var,
+            E=torch.ones(self.datainfos.num_edge_types, device=self.device)*self.args.var,
+            # X=self.args.var_final,
+            # E=self.args.var_final,
             y=None
         )
 
@@ -498,7 +501,7 @@ class IPFBase(torch.nn.Module):
             if ((i % (2*self.stride) == 0) or ( i == self.num_iter)) and (i > 0):
                 with torch.no_grad():
                     self.set_seed(seed=0 + self.accelerator.process_index)
-                    if fb == 'f' or self.args.transfer:
+                    if fb == 'f' or (fb == 'b' and self.args.transfer):
                         loader = self.save_init_dl if fb == 'f' else self.save_final_dl
                         batch = next(loader)
                         batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
@@ -520,10 +523,7 @@ class IPFBase(torch.nn.Module):
                             y=None, charge=None
                         )
                         batch = batch.scale(self.std_final).add(self.mean_final)
-                        try:
-                            batch.E = utils.symmetize_edge_matrix(batch.E)
-                        except:
-                            import pdb; pdb.set_trace()
+                        batch.E = utils.symmetize_edge_matrix(batch.E)
                         arange = (
                             torch.arange(self.max_n_nodes, device=self.device).unsqueeze(0).expand(batch_size, -1)
                         )
@@ -581,8 +581,8 @@ class IPFBase(torch.nn.Module):
                 table = wandb.Table(data=dataa, columns=["steps", "mean"])
                 wandb.log({f'{fb}_{n}_mean_pred': wandb.plot.line(table, "steps", "mean", title=f'{fb}_{n}_mean_pred')})
 
-                test_sampling_metrics = self.test_sampling_metrics if fb=='b' else self.tf_test_sampling_metrics
-                val_sampling_metrics = self.val_sampling_metrics if fb=='b' else self.tf_val_sampling_metrics
+                test_sampling_metrics = self.tf_test_sampling_metrics if fb=='f' else self.test_sampling_metrics
+                val_sampling_metrics = self.tf_val_sampling_metrics if fb=='f' else self.val_sampling_metrics
 
                 # if test_sampling_metrics is not None:
 
@@ -606,6 +606,7 @@ class IPFBase(torch.nn.Module):
                     val_to_log = val_sampling_metrics.compute_all_metrics(
                         generated_list, current_epoch=0, local_rank=0, fb=fb, i=np.round(i/(self.num_iter+1),2)
                     )
+
                     # save results for testing
                     print('saving results for testing')
                     current_path = os.getcwd()
@@ -634,16 +635,24 @@ class IPFSequential(IPFBase):
     def __init__(self, args):
         super().__init__(args)
 
+    def combine_models(self, model_a, model_b, alpha):
+        for a_param, b_param in zip(model_a.parameters(), model_b.parameters()):
+            a_param.data = alpha * a_param.data + (1 - alpha) * b_param.data
+
+        return model_a
+
     def ipf_step(self, forward_or_backward, n):
-        if n == '3':
-            import pdb; pdb.set_trace()
-
         new_dl = self.new_cacheloader(forward_or_backward, n, self.args.ema)
+        print(f'training with {forward_or_backward}')
 
-        print(self.args.use_prev_net)
+        # print(self.args.use_prev_net)
         if not self.args.use_prev_net:
-            self.build_models(forward_or_backward)
+            net_f, net_b = self.build_models()
+            self.update_models(net_f, net_b, forward_or_backward)
             self.update_ema(forward_or_backward)
+        else:
+            net, _ = self.build_models(forward_or_backward)
+            self.net[forward_or_backward] = self.combine_models(self.net[forward_or_backward], net, alpha=0.8)
 
         self.build_optimizers(n=n)
         self.accelerate(forward_or_backward)

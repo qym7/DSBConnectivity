@@ -17,23 +17,23 @@ dataset_transfer:
   datadir: 'data/sbm1b/'
 
   # min_num_communities * max_community_size > num_nodes
-  # num_graphs: 200
-  # num_nodes: 20
-  # min_num_communities: 3
-  # max_num_communities: 4
-  # min_community_size: 4
-  # max_community_size: 8
-  # intra_prob: 0.005
-  # inter_prob: 0.3
-
   num_graphs: 200
-  num_nodes: 40
-  min_num_communities: 4
-  max_num_communities: 5
-  min_community_size: 8
-  max_community_size: 15
+  num_nodes: 20
+  min_num_communities: 3
+  max_num_communities: 4
+  min_community_size: 4
+  max_community_size: 8
   intra_prob: 0.005
   inter_prob: 0.3
+
+  # num_graphs: 200
+  # num_nodes: 40
+  # min_num_communities: 4
+  # max_num_communities: 5
+  # min_community_size: 8
+  # max_community_size: 15
+  # intra_prob: 0.005
+  # inter_prob: 0.3
 
 # transfer
 transfer: True
@@ -49,28 +49,28 @@ dataset:
   spectre: True
   datadir: 'data/sbm2b/'
 
-  # num_graphs: 200
-  # num_nodes: 20
-  # min_num_communities: 2
-  # max_num_communities: 3
-  # min_community_size: 6
-  # max_community_size: 12
-  # intra_prob: 0.005
-  # inter_prob: 0.3
-
   num_graphs: 200
-  num_nodes: 40
+  num_nodes: 20
   min_num_communities: 2
   max_num_communities: 3
-  min_community_size: 18
-  max_community_size: 24
+  min_community_size: 6
+  max_community_size: 12
   intra_prob: 0.005
   inter_prob: 0.3
+
+  # num_graphs: 200
+  # num_nodes: 40
+  # min_num_communities: 2
+  # max_num_communities: 3
+  # min_community_size: 18
+  # max_community_size: 24
+  # intra_prob: 0.005
+  # inter_prob: 0.3
 
 final_adaptive: False
 adaptive_mean: True
 mean_final: torch.zeros([${data.channels}, ${data.image_size}, ${data.image_size}])
-var_final: .5 * torch.ones([${data.channels}, ${data.image_size}, ${data.image_size}])
+var_final: 100 * torch.ones([${data.channels}, ${data.image_size}, ${data.image_size}])
 load: False
 
 # device
@@ -92,9 +92,9 @@ grad_clipping: True
 grad_clip: 1.0
 n_ipf_init: 1
 batch_size: 64  # must be smaller than the size of datasets
-num_iter : 20000
+num_iter : 10000
 n_ipf: 16
-lr: 0.001
+lr: 0.0001
 
 # diffusion schedule
 num_steps : 50
@@ -135,5 +135,3 @@ model:
     num_degree: 10
     dist_feat: True
     positional_encoding: False
-
-
