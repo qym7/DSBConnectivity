@@ -72,58 +72,22 @@ class SamplingMetrics(nn.Module):
                     "Dataset {} not implemented".format(dataset_infos.dataset_name)
                 )
 
-    # def reset(self):
-    #     for metric in [
-    #         self.mean_components,
-    #         self.max_components,
-    #         self.disconnected,
-    #         self.num_nodes_w1,
-    #         self.node_types_tv,
-    #         self.edge_types_tv,
-    #     ]:
-    #         metric.reset()
-    #     if self.domain_metrics is not None:
-    #         self.domain_metrics.reset()
+    def reset(self):
+        # we do not support those metrics yet
+        # for metric in [
+        #     self.mean_components,
+        #     self.max_components,
+        #     self.disconnected,
+        #     self.num_nodes_w1,
+        #     self.node_types_tv,
+        #     self.edge_types_tv,
+        # ]:
+        #     metric.reset()
+        if self.domain_metrics is not None:
+            self.domain_metrics.reset()
 
     def compute_all_metrics(self, generated_graphs: list, current_epoch, local_rank, fb, i):
         """Compare statistics of the generated data with statistics of the val/test set"""
-        # stat = (
-        #     self.dataset_infos.statistics["test"]
-        #     if self.test
-        #     else self.dataset_infos.statistics["val"]
-        # )
-
-        # # Number of nodes
-        # self.num_nodes_w1(number_nodes_distance(generated_graphs, stat.num_nodes))
-
-        # # Node types
-        # node_type_tv, node_tv_per_class = node_types_distance(
-        #     generated_graphs, stat.node_types, save_histogram=True
-        # )
-        # self.node_types_tv(node_type_tv)
-
-        # # Edge types
-        # edge_types_tv, edge_tv_per_class = bond_types_distance(
-        #     generated_graphs, stat.bond_types, save_histogram=True
-        # )
-        # self.edge_types_tv(edge_types_tv)
-
-        # # Components
-        # device = self.disconnected.device
-        # connected_comp = connected_components(generated_graphs).to(device)
-        # self.disconnected(connected_comp > 1)
-        # self.mean_components(connected_comp)
-        # self.max_components(connected_comp)
-
-        # key = "val" if not self.test else "test"
-        # to_log = {
-        #     f"{key}/NumNodesW1": self.num_nodes_w1.compute().item(),
-        #     f"{key}/NodeTypesTV": self.node_types_tv.compute().item(),
-        #     f"{key}/EdgeTypesTV": self.edge_types_tv.compute().item(),
-        #     f"{key}/Disconnected": self.disconnected.compute().item() * 100,
-        #     f"{key}/MeanComponents": self.mean_components.compute().item(),
-        #     f"{key}/MaxComponents": self.max_components.compute().item(),
-        # }
 
         to_log = {}
         if self.domain_metrics is not None:
@@ -135,14 +99,10 @@ class SamplingMetrics(nn.Module):
         to_log = {f'{k}_{fb}_{i}': to_log[k]for k in to_log}
         if wandb.run:
             wandb.log(to_log, commit=False)
-        # if local_rank == 0:
-        #     print(
-        #         f"Sampling metrics {[key: round(val, 5) for key, val in to_log.items()}"
-        #     )
+
         print(to_log)
 
         return to_log
-        # return to_log, edge_tv_per_class
 
 
 def number_nodes_distance(generated_graphs, dataset_counts):

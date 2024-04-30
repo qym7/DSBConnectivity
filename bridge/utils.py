@@ -25,13 +25,14 @@ def setup_wandb(cfg):
     kwargs = {
         "name": cfg.general.name,
         "project": f"sparse_{name}",
-        "config": config_dict,
         "settings": wandb.Settings(_disable_stats=True),
         "reinit": True,
         "mode": cfg.general.wandb,
     }
     wandb.init(**kwargs)
     wandb.save("*.txt")
+    wandb.config.update(cfg)
+
     return cfg
 
 

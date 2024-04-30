@@ -22,7 +22,6 @@ from .ema import EMAHelper
 from . import repeater
 from .config_getters import * # get_models, get_graph_models, get_optimizers, get_datasets, get_plotter, get_logger
 from .. import utils
-from ..data import CacheLoader
 from ..sde.langevin import Langevin
 from ..metrics.sampling_metrics import SamplingMetrics
 from ..analysis.visualization import Visualizer
@@ -30,6 +29,8 @@ from ..analysis.visualization import Visualizer
 from ..diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
 from ..diffusion.extra_features_molecular import ExtraMolecularFeatures
 
+from ..data import DBDSB_CacheLoader
+from ..sde.diffusion_bridge import DBDSB_VE, DBDSB_VP
 
 
 def setup_wandb(cfg):
@@ -97,15 +98,6 @@ class IPFBase(torch.nn.Module):
         self.test_sampling_metrics = SamplingMetrics(
             dataset_infos=self.datainfos, test=True, dataloaders=dataloaders
         )
-        if self.args.transfer:
-            self.tf_val_sampling_metrics = SamplingMetrics(
-                dataset_infos=self.tf_datainfos, test=False, dataloaders=dataloaders
-            )
-            self.tf_test_sampling_metrics = SamplingMetrics(
-                dataset_infos=self.tf_datainfos, test=True, dataloaders=dataloaders
-            )
-        else:
-            self.tf_val_sampling_metrics = self.tf_test_sampling_metrics = None
 
         # get models
         print('building models')
@@ -113,7 +105,7 @@ class IPFBase(torch.nn.Module):
         self.build_ema()
 
         # get optims
-        self.build_optimizers(n=0)
+        self.build_optimizers()
 
         # langevin
         if self.args.weight_distrib:
@@ -126,15 +118,21 @@ class IPFBase(torch.nn.Module):
 
         max_n_nodes = self.datainfos.max_n_nodes    
         print('creating Langevin')
-        self.langevin = Langevin(self.num_steps, max_n_nodes, gammas,
-                                 time_sampler, device=self.device,
-                                 mean_final=self.mean_final, var_final=self.var_final,
-                                 mean_match=self.args.mean_match, graph=self.graph,
-                                 extra_features=self.extra_features,
-                                 domain_features=self.domain_features,
-                                 tf_extra_features=self.tf_extra_features,
-                                 tf_domain_features=self.tf_domain_features,
-                                 thres=self.args.thres)
+        # self.langevin = Langevin(self.num_steps, max_n_nodes, gammas,
+        #                          time_sampler, device=self.device,
+        #                          mean_final=self.mean_final, var_final=self.var_final,
+        #                          mean_match=self.args.mean_match, graph=self.graph,
+        #                          extra_features=self.extra_features,
+        #                          domain_features=self.domain_features,
+        #                          tf_extra_features=self.tf_extra_features,
+        #                          tf_domain_features=self.tf_domain_features,
+        #                          thres=self.args.thres)
+        if self.args.sde == "ve":
+            self.langevin = DBDSB_VE(self.sigma, self.num_steps, self.timesteps, self.shape_x, self.shape_y, self.args.first_coupling, self.args.mean_match)
+        elif self.args.sde == "vp":
+            self.langevin = DBDSB_VP(self.sigma, self.num_steps, self.timesteps, self.shape_x, self.shape_y, self.args.first_coupling, self.args.mean_match)
+
+        
 
         # checkpoint
         date = str(datetime.datetime.now())[0:10]
@@ -229,11 +227,9 @@ class IPFBase(torch.nn.Module):
                     sample_net_b = sample_net_b.to(self.device)
                     self.ema_helpers['b'].register(sample_net_b)
 
-    def build_optimizers(self, n=0):
-        # lr = self.lr / (n+1)  # decay in learning rate
-        lr = self.lr
+    def build_optimizers(self):
         optimizer_f, optimizer_b = get_optimizers(
-            self.net['f'], self.net['b'], lr)
+            self.net['f'], self.net['b'], self.lr)
         optimizer_b = optimizer_b
         optimizer_f = optimizer_f
         self.optimizer = {'f': optimizer_f, 'b': optimizer_b}
@@ -325,6 +321,14 @@ class IPFBase(torch.nn.Module):
             E=torch.ones(2).to(self.device)*0.5,
             y=None
         )
+
+        # self.mean_final = PlaceHolder(
+        #     X=(self.datainfos.node_types).to(self.device),
+        #     E=(self.datainfos.edge_types).to(self.device),
+        #     # X=torch.ones_like(self.datainfos.node_types).to(self.device),
+        #     # E=torch.ones_like(self.datainfos.edge_types).to(self.device)*0.5,
+        #     y=None
+        # ).minus(self.decart_mean_final).scale(self.args.scale)
 
         self.mean_final = PlaceHolder(
             # X=(self.tf_datainfos.node_types).to(self.device),
@@ -480,13 +484,15 @@ class IPFBase(torch.nn.Module):
                 with torch.no_grad():
                     self.set_seed(seed=0 + self.accelerator.process_index)
                     if fb == 'f' or self.args.transfer:
-                        loader = self.save_init_dl if fb == 'f' else self.save_final_dl
-                        batch = next(loader)
+                        batch = next(self.save_init_dl)
                         batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
                         batch = batch.minus(self.decart_mean_final)
+                        # batch.E = batch.E[:,:,:,-1].unsqueeze(-1)
                         batch = batch.scale(self.args.scale)
                         n_nodes = node_mask.sum(-1)
+                        # batch.X = torch.zeros_like(batch.X, device=batch.X.device)
                         batch = batch.mask(node_mask)
+                        # import pdb; pdb.set_trace()
                     else:
                         batch_size = self.args.plot_npar
                         n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
@@ -551,20 +557,15 @@ class IPFBase(torch.nn.Module):
                                                                 num_chains_to_visualize=2,
                                                                 fb=fb
                 )
-
                 mean_val = chain.E[..., 0].mean(-1).mean(-1).mean(0).cpu().detach().numpy() - chain.E[..., 1].mean(-1).mean(-1).mean(0).cpu().detach().numpy()
                 np.save(f'{fb}_{n}_mean.npy', mean_val)
                 dataa = [[x, y] for (x, y) in zip(np.arange(chain.E.shape[1]), mean_val)]
-                if mean_val.max() > 100 or mean_val.min() < -100:
+                if mean_val.max() > 10 or mean_val.min() < -10:
                     import pdb; pdb.set_trace()
                 table = wandb.Table(data=dataa, columns=["steps", "mean"])
                 wandb.log({f'{fb}_{n}_mean_pred': wandb.plot.line(table, "steps", "mean", title=f'{fb}_{n}_mean_pred')})
 
-                # in this case, if fb=='f' and not transfer, then the metrics will become None
-                test_sampling_metrics = self.test_sampling_metrics if fb=='b' else self.tf_test_sampling_metrics
-                val_sampling_metrics = self.val_sampling_metrics if fb=='b' else self.tf_val_sampling_metrics
-
-                if test_sampling_metrics is not None:
+                if self.test_sampling_metrics is not None:
 
                     test_to_log = self.test_sampling_metrics.compute_all_metrics(
                         generated_list, current_epoch=0, local_rank=0, fb=fb, i=np.round(i/(self.num_iter+1),2)
@@ -579,9 +580,10 @@ class IPFBase(torch.nn.Module):
                     )
 
                     with open(res_path, 'w') as file:
+                        # Convert the dictionary to a JSON string and write it to the file
                         json.dump(test_to_log, file)
 
-                elif val_sampling_metrics is not None:
+                elif self.val_sampling_metrics is not None:
                     val_to_log = self.val_sampling_metrics.compute_all_metrics(
                         generated_list, current_epoch=0, local_rank=0, fb=fb, i=np.round(i/(self.num_iter+1),2)
                     )
@@ -594,8 +596,14 @@ class IPFBase(torch.nn.Module):
                     )
 
                     with open(res_path, 'w') as file:
+                        # Convert the dictionary to a JSON string and write it to the file
                         json.dump(val_to_log, file)
 
+                    # if wandb.run:
+                    #     val_to_log = {f"sampling/{k}_{fb}": val_to_log[k] for k in val_to_log.keys()}
+                    #     wandb.log(val_to_log, commit=True, step=n)
+
+                # self.plotter(batch, x_tot_plot, i, n, fb)
 
     def set_seed(self, seed=0):
         torch.manual_seed(seed)
@@ -613,6 +621,9 @@ class IPFSequential(IPFBase):
         super().__init__(args)
 
     def ipf_step(self, forward_or_backward, n):
+        if n == '3':
+            import pdb; pdb.set_trace()
+
         new_dl = self.new_cacheloader(forward_or_backward, n, self.args.ema)
 
         if not self.args.use_prev_net:
@@ -647,13 +658,20 @@ class IPFSequential(IPFBase):
                 gap = self.num_steps // num_log
 
             if wandb.run and (i % gap == 0):
+                # The above code is using the Weights & Biases library (wandb) in Python to log the
+                # value of a variable `n` with the key "num_ipf". The `commit=True` argument indicates
+                # that the logged data should be committed immediately. This can be useful for
+                # tracking and visualizing the value of `n` during the execution of a program.
+                # wandb.log({"num_ipf": n}, commit=True)
                 if forward_or_backward == 'f':
                     wandb.log({"forward_num_iter": n * self.num_iter + i + 1}, commit=True)
                 else:
                     wandb.log({"backward_num_iter": n * self.num_iter + i + 1}, commit=True)
                 wandb.log(
                     {
-                        f"train/loss_{forward_or_backward}_{n}": loss.detach().cpu().numpy().item()
+                        f"train/loss_{forward_or_backward}_{n}": loss.detach().cpu().numpy().item(),
+                        f"train/loss_edge_{forward_or_backward}_{n}": edge_loss.detach().cpu().numpy().item(),
+                        f"train/loss_node_{forward_or_backward}_{n}": node_loss.detach().cpu().numpy().item(),
                     },
                     commit=False,
                 )
@@ -671,6 +689,7 @@ class IPFSequential(IPFBase):
                 self.logger.log_metrics({'forward_or_backward': forward_or_backward,
                                          'loss': loss,
                                          'grad_norm': total_norm},
+                                        # step=i})
                                         step=i+self.num_iter*n)
 
             self.optimizer[forward_or_backward].step()
@@ -693,6 +712,8 @@ class IPFSequential(IPFBase):
     def compute_loss(self, pred, out):
         node_loss = self.args.model.lambda_train[0] * F.mse_loss(pred.X, out.X)
         edge_loss = self.args.model.lambda_train[1] * F.mse_loss(pred.E, out.E)
+        # print('loss',  pred.E[0,0,1].detach(), out.E[0,0,1].detach())
+        # print('loss',  pred.X[0,0].detach(), out.X[0,0].detach())
         loss = node_loss + edge_loss
         if pred.charge.numel() > 0:
             loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)
@@ -701,6 +722,13 @@ class IPFSequential(IPFBase):
 
     def train(self):
         print('Training...')
+        # INITIAL FORWARD PASS
+        # if self.accelerator.is_local_main_process:
+        #     init_sample = next(self.save_init_dl)  # under the form of pyg-data
+        #     init_sample, node_mask = utils.data_to_dense(init_sample, self.max_n_nodes)
+        #     x_tot, _, _ = self.langevin.record_init_langevin(init_sample, node_mask)
+        #     # TODO: add visualization here, but visualization might be mitigated to the validation part as well
+        #     torch.cuda.empty_cache()
 
         for n in range(self.checkpoint_it, self.n_ipf+1):
             print('IPF iteration: ' + str(n) + '/' + str(self.n_ipf))

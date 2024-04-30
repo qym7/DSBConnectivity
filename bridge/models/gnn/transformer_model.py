@@ -402,7 +402,6 @@ class GraphTransformer(nn.Module):
 
         final_X = X[..., : self.out_dim_X]
         final_charge = X[..., self.out_dim_X :]
-        # final_X = torch.zeros_like(final_X, device=final_X.device)
 
         return utils.PlaceHolder(
             X=final_X, charge=final_charge, E=E, y=y, node_mask=node_mask

@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from . import utils
+from .. import utils
 
 
 def grad_gauss(x, m, var):
