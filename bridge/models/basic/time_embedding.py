@@ -13,11 +13,13 @@ def get_timestep_embedding(timesteps, embedding_dim=128):
     """
     half_dim = embedding_dim // 2
     emb = math.log(10000) / (half_dim - 1)
-    emb = torch.exp(torch.arange(half_dim, dtype=torch.float, device=timesteps.device) * -emb)
+    emb = torch.exp(
+        torch.arange(half_dim, dtype=torch.float, device=timesteps.device) * -emb
+    )
 
     emb = timesteps.float() * emb.unsqueeze(0)
     emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=-1)
     if embedding_dim % 2 == 1:  # zero pad
-        emb = F.pad(emb, [0,1])
+        emb = F.pad(emb, [0, 1])
 
     return emb

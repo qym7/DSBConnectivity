@@ -1,8 +1,8 @@
 import torch
 import hydra
-import os,sys
+import os, sys
 
-sys.path.append('..')
+sys.path.append("..")
 
 
 from bridge.runners.ipf import IPFSequential
@@ -10,13 +10,14 @@ from bridge.runners.ipf import IPFSequential
 
 # SETTING PARAMETERS
 
+
 @hydra.main(config_path="./conf", config_name="config")
 def main(args):
 
-    print('Directory: ' + os.getcwd())
+    print("Directory: " + os.getcwd())
     ipf = IPFSequential(args)
     ipf.train()
 
 
-if __name__ == '__main__':
-    main()  
+if __name__ == "__main__":
+    main()

@@ -15,7 +15,6 @@ class DistributionNodes:
         else:
             prob = histogram
 
-
         self.max_n_nodes = prob.shape[0] - 1
         self.prob = prob / prob.sum()
         self.m = torch.distributions.Categorical(prob)

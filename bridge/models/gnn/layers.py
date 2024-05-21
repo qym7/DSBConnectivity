@@ -1,8 +1,7 @@
-import  math
+import math
 
 import torch
 import torch.nn as nn
-
 
 
 def timestep_embedding(timesteps, dim, max_period=10000):
@@ -16,7 +15,9 @@ def timestep_embedding(timesteps, dim, max_period=10000):
     """
     half = dim // 2
     freqs = torch.exp(
-        -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
+        -math.log(max_period)
+        * torch.arange(start=0, end=half, dtype=torch.float32)
+        / half
     ).to(device=timesteps.device)
     args = timesteps.float() * freqs[None]
     embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
@@ -40,7 +41,9 @@ class Xtoy(nn.Module):
         m = X.sum(dim=1) / torch.sum(x_mask, dim=1)
         mi = (X + 1e5 * float_imask).min(dim=1)[0]
         ma = (X - 1e5 * float_imask).max(dim=1)[0]
-        std = torch.sum(((X - m[:, None, :]) ** 2) * x_mask, dim=1) / torch.sum(x_mask, dim=1)
+        std = torch.sum(((X - m[:, None, :]) ** 2) * x_mask, dim=1) / torch.sum(
+            x_mask, dim=1
+        )
         z = torch.hstack((m, mi, ma, std))
         out = self.lin(z)
         return out

@@ -43,12 +43,7 @@ class MosesDataset(InMemoryDataset):
     test_url = "https://media.githubusercontent.com/media/molecularsets/moses/master/data/test_scaffolds.csv"
 
     def __init__(
-        self,
-        split,
-        root,
-        transform=None,
-        pre_transform=None,
-        pre_filter=None,
+        self, split, root, transform=None, pre_transform=None, pre_filter=None,
     ):
         self.split = split
         self.atom_encoder = atom_encoder
@@ -82,14 +77,14 @@ class MosesDataset(InMemoryDataset):
     @property
     def processed_file_names(self):
         return [
-                f"{self.split}.pt",
-                f"{self.split}_n.pickle",
-                f"{self.split}_node_types.npy",
-                f"{self.split}_bond_types.npy",
-                f"{self.split}_charge.npy",
-                f"{self.split}_valency.pickle",
-                f"{self.split}_smiles.pickle",
-            ]
+            f"{self.split}.pt",
+            f"{self.split}_n.pickle",
+            f"{self.split}_node_types.npy",
+            f"{self.split}_bond_types.npy",
+            f"{self.split}_charge.npy",
+            f"{self.split}_valency.pickle",
+            f"{self.split}_smiles.pickle",
+        ]
 
     def download(self):
         import rdkit  # noqa

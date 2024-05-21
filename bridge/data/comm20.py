@@ -1,4 +1,3 @@
-
 import os
 import pathlib
 import os.path as osp
@@ -56,9 +55,13 @@ class SpectreGraphDataset(InMemoryDataset):
         self.raw_data = torch.load(self.raw_paths[self.file_idx])
         self.max_n_nodes = np.max([d.shape[0] for d in self.raw_data])
         # add one dimension for number of channels
-        self.raw_data_to_be_masked = torch.zeros((len(self.raw_data), 1, self.max_n_nodes, self.max_n_nodes))
+        self.raw_data_to_be_masked = torch.zeros(
+            (len(self.raw_data), 1, self.max_n_nodes, self.max_n_nodes)
+        )
         for i in range(len(self.raw_data)):
-            self.raw_data_to_be_masked[i, 0, :self.raw_data[i].shape[0], :self.raw_data[i].shape[0]] = self.raw_data[i]
+            self.raw_data_to_be_masked[
+                i, 0, : self.raw_data[i].shape[0], : self.raw_data[i].shape[0]
+            ] = self.raw_data[i]
         self.num_nodes = self.data.n_nodes
         # import pdb; pdb.set_trace()
 
@@ -127,15 +130,18 @@ class SpectreGraphDataset(InMemoryDataset):
             raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/planar_64_200.pt"
         elif self.dataset_name == "comm20":
             raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/community_12_21_100.pt"
-        elif self.dataset_name == "ego":        
+        elif self.dataset_name == "ego":
             raw_url = "https://raw.githubusercontent.com/tufts-ml/graph-generation-EDGE/main/graphs/Ego.pkl"
         else:
             raise ValueError(f"Unknown dataset {self.dataset_name}")
         file_path = download_url(raw_url, self.raw_dir)
 
-        if self.dataset_name == 'ego':
-            networks = pkl.load(open(file_path, 'rb'))
-            adjs = [torch.Tensor(to_numpy_array(network)).fill_diagonal_(0) for network in networks]
+        if self.dataset_name == "ego":
+            networks = pkl.load(open(file_path, "rb"))
+            adjs = [
+                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
+                for network in networks
+            ]
         else:
             (
                 adjs,
@@ -147,12 +153,12 @@ class SpectreGraphDataset(InMemoryDataset):
                 same_sample,
                 n_max,
             ) = torch.load(file_path)
-            
+
         g_cpu = torch.Generator()
         g_cpu.manual_seed(1234)
         self.num_graphs = len(adjs)
 
-        if self.dataset_name == 'ego':
+        if self.dataset_name == "ego":
             test_len = int(round(self.num_graphs * 0.2))
             train_len = int(round(self.num_graphs * 0.8))
             val_len = int(round(self.num_graphs * 0.2))
@@ -207,7 +213,10 @@ class SpectreGraphDataset(InMemoryDataset):
             edge_attr[:, 1] = 1
             n_nodes = n * torch.ones(1, dtype=torch.long)
             data = torch_geometric.data.Data(
-                x=X.float(), edge_index=edge_index, edge_attr=edge_attr.float(), n_nodes=n_nodes
+                x=X.float(),
+                edge_index=edge_index,
+                edge_attr=edge_attr.float(),
+                n_nodes=n_nodes,
             )
 
             if self.pre_filter is not None and not self.pre_filter(data):
@@ -229,9 +238,9 @@ class SpectreGraphDataset(InMemoryDataset):
         return len(self.raw_data)
 
     def __getitem__(self, index):
-        '''
+        """
         return two items to be consistent with other interfaces
-        '''
+        """
         return self.raw_data_to_be_masked[index], self.num_nodes[index]
 
 

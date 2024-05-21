@@ -309,7 +309,9 @@ class QM9Infos(AbstractDatasetInfos):
         super().complete_infos(datamodule.statistics, self.atom_encoder)
 
         # dimensions settings
-        self.output_dims = PlaceHolder(X=self.num_node_types, charge=self.num_charge_types, E=5, y=0)
+        self.output_dims = PlaceHolder(
+            X=self.num_node_types, charge=self.num_charge_types, E=5, y=0
+        )
         if not self.use_charge:
             self.output_dims.charge = 0
 

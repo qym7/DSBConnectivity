@@ -135,14 +135,12 @@ class Visualizer:
         num_nodes: Tensor,
         local_rank: int,
         num_chains_to_visualize: int,
-        fb: str
+        fb: str,
     ):
-    # bs, n_steps, ...
+        # bs, n_steps, ...
         for i in range(num_chains_to_visualize):  # Iterate over the chains
             # path = os.path.join(chain_path, f"molecule_{batch_id + i}_{local_rank}")
-            cur_path = os.path.join(
-                path, f"{i}_graph"
-            )
+            cur_path = os.path.join(path, f"{i}_graph")
             if not os.path.exists(cur_path):
                 os.makedirs(cur_path)
 
@@ -150,14 +148,17 @@ class Visualizer:
             chain = PlaceHolder(
                 X=chains.X[i, :, : num_nodes[i]],
                 E=chains.E[i, :, : num_nodes[i], : num_nodes[i]],
-                charge=None, #chains.charge[:, i, : num_nodes[i]].long(),
+                charge=None,  # chains.charge[:, i, : num_nodes[i]].long(),
                 y=None,
             )
 
             # Iterate over the frames of each molecule
             for j in range(chain.X.shape[0]):
                 graph = PlaceHolder(
-                    X=chain.X[j], E=chain.E[j], charge=None, y=None, # chain.charge[j], y=None
+                    X=chain.X[j],
+                    E=chain.E[j],
+                    charge=None,
+                    y=None,  # chain.charge[j], y=None
                 )
                 if self.is_molecular:
                     graphs.append(
@@ -170,7 +171,7 @@ class Visualizer:
                     graphs.append(self.to_networkx(graph))
 
             # Find the coordinates of nodes in the final graph and align all the molecules
-            final_graph = graphs[-1] if fb=='b' else graphs[0]
+            final_graph = graphs[-1] if fb == "b" else graphs[0]
 
             if self.is_molecular:
                 final_mol = final_graph.rdkit_mol
@@ -192,9 +193,7 @@ class Visualizer:
 
             # Visualize and save
             save_paths = []
-            image_path = os.path.join(
-               cur_path, "images"
-            )
+            image_path = os.path.join(cur_path, "images")
             if not os.path.exists(image_path):
                 os.makedirs(image_path)
             for frame in range(len(graphs)):
@@ -219,9 +218,7 @@ class Visualizer:
 
             imgs = [imageio.v3.imread(fn) for fn in save_paths]
             cur_folder = path.split("/")[-1]
-            gif_path = os.path.join(
-                cur_path, f"{cur_folder}.gif"
-            )
+            gif_path = os.path.join(cur_path, f"{cur_folder}.gif")
             imgs.extend([imgs[-1]] * 10)
             imageio.mimsave(gif_path, imgs, subrectangles=True, duration=200)
             if wandb.run:
@@ -232,4 +229,3 @@ class Visualizer:
                 wandb.log(
                     {"chain": wandb.Video(gif_path, fps=8, format="gif")}, commit=True
                 )
-

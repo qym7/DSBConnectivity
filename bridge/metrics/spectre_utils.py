@@ -20,6 +20,7 @@ import numpy as np
 import networkx as nx
 import subprocess as sp
 import concurrent.futures
+
 # try:
 #     import graph_tool.all as gt
 # except ModuleNotFoundError:
@@ -42,7 +43,7 @@ from ..analysis.dist_helper import (
 from ..metrics.neural_metrics import (
     FIDEvaluation,
     MMDEvaluation,
-    load_feature_extractor
+    load_feature_extractor,
 )
 
 
@@ -207,7 +208,7 @@ def get_spectral_filter_worker(eigvec, eigval, filters, bound=1.4):
     for ge in ges:
         linop.append(eigvec @ np.diag(ge) @ eigvec.T)
     linop = np.array(linop)
-    norm_filt = np.sum(linop**2, axis=2)
+    norm_filt = np.sum(linop ** 2, axis=2)
     hist_range = [0, bound]
     hist = np.array(
         [np.histogram(x, range=hist_range, bins=100)[0] for x in norm_filt]
@@ -463,7 +464,7 @@ def orca(graph):
             "std",
         ]
     )
-    
+
     # output = sp.check_output([str(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../analysis/orca/orca")),"node","4",tmp_fname,"std",])
     output = output.decode("utf8").strip()
     idx = output.find(COUNT_START_STR) + len(COUNT_START_STR) + 2
@@ -476,7 +477,9 @@ def orca(graph):
             ]
         )
     except:
-        import pdb; pdb.set_trace()
+        import pdb
+
+        pdb.set_trace()
 
     try:
         os.remove(tmp_fname)
@@ -906,7 +909,9 @@ class SpectreSamplingMetrics(nn.Module):
             try:
                 data_list = batch.to_data_list()
             except:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
             for j, data in enumerate(data_list):
                 networkx_graphs.append(
                     to_networkx(
@@ -921,31 +926,37 @@ class SpectreSamplingMetrics(nn.Module):
 
     def neural_metrics(self, generated):
         # Neural metrics
-        gin_model = load_feature_extractor(device='cpu')  # take a gin-model with predefined params and random weights
+        gin_model = load_feature_extractor(
+            device="cpu"
+        )  # take a gin-model with predefined params and random weights
         fid_evaluator = FIDEvaluation(model=gin_model)
-        rbf_evaluator = MMDEvaluation(model=gin_model, kernel='rbf', sigma='range', multiplier='mean')
+        rbf_evaluator = MMDEvaluation(
+            model=gin_model, kernel="rbf", sigma="range", multiplier="mean"
+        )
         # pass the generated graphs and reference graphs to networkx
         generated_max_comp = []
         test_max_comp = []
         for g in generated:
-                # largest_cc = max(nx.connected_components(g), key=len)
-                # g = g.subgraph(largest_cc)
+            # largest_cc = max(nx.connected_components(g), key=len)
+            # g = g.subgraph(largest_cc)
             g = dgl.DGLGraph(g)
-            generated_max_comp.append(g)  
+            generated_max_comp.append(g)
         for g in self.test_graphs:
             # largest_cc = max(nx.connected_components(g), key=len)
             # g = g.subgraph(largest_cc)
             g = dgl.DGLGraph(g)
             test_max_comp.append(g)
 
-        (generated_dataset, reference_dataset), _ = fid_evaluator.get_activations(generated_max_comp, test_max_comp)
+        (generated_dataset, reference_dataset), _ = fid_evaluator.get_activations(
+            generated_max_comp, test_max_comp
+        )
         fid, _ = fid_evaluator.evaluate(
-                            generated_dataset=generated_dataset,
-                            reference_dataset=reference_dataset)
+            generated_dataset=generated_dataset, reference_dataset=reference_dataset
+        )
         rbf, _ = rbf_evaluator.evaluate(
-                            generated_dataset=generated_dataset,
-                            reference_dataset=reference_dataset)
-        
+            generated_dataset=generated_dataset, reference_dataset=reference_dataset
+        )
+
         return fid, rbf
 
     def forward(self, generated_graphs: list, current_epoch, val_counter):
@@ -975,12 +986,12 @@ class SpectreSamplingMetrics(nn.Module):
         if "neural" in self.metrics_list:
             print("Computing neural metrics including FID and RBF MMD")
             fid, rbf = self.neural_metrics(networkx_graphs)
-            to_log["fid"] = fid['fid']
-            to_log["rbf mmd"] = rbf['mmd_rbf']
+            to_log["fid"] = fid["fid"]
+            to_log["rbf mmd"] = rbf["mmd_rbf"]
 
             if wandb.run is not None:
-                    wandb.run.summary["fid"] = fid['fid']
-                    wandb.run.summary["rbf mmd"] = rbf['mmd_rbf']
+                wandb.run.summary["fid"] = fid["fid"]
+                wandb.run.summary["rbf mmd"] = rbf["mmd_rbf"]
 
         if "degree" in self.metrics_list:
             print("Computing degree stats..")
@@ -1101,7 +1112,14 @@ class PlanarSamplingMetrics(SpectreSamplingMetrics):
         super().__init__(
             dataloaders=dataloaders,
             compute_emd=False,
-            metrics_list=["degree", "clustering", "orbit", "spectre", "planar", "neural"],
+            metrics_list=[
+                "degree",
+                "clustering",
+                "orbit",
+                "spectre",
+                "planar",
+                "neural",
+            ],
         )
 
 

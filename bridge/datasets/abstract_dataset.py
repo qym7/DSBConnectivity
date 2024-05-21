@@ -21,22 +21,24 @@ class AbstractDataModule(LightningDataset):
         self.cfg = cfg
         self.input_dims = None
         self.output_dims = None
-        
+
         self.dataset_stat()
 
     def dataset_stat(self):
         dataset = self.train_dataset + self.val_dataset + self.test_dataset
-        
+
         nodes = []
         edges = []
         sparsity = []
-        
+
         for data in dataset:
             nodes.append(data.x.shape[0])
             edges.append(data.edge_attr.shape[0])
-            sparsity.append(data.edge_attr.shape[0] / (data.x.shape[0] * data.x.shape[0]))
-            
-        print('n graph', len(nodes))
+            sparsity.append(
+                data.edge_attr.shape[0] / (data.x.shape[0] * data.x.shape[0])
+            )
+
+        print("n graph", len(nodes))
         print("nodes: ", np.min(nodes), np.max(nodes))
         print("edges: ", np.min(edges), np.max(edges))
         print("sparsity: ", np.min(sparsity), np.max(sparsity))
@@ -128,12 +130,16 @@ class AbstractDatasetInfos:
         """
         one_hot_data = data.clone()
         one_hot_data.x = F.one_hot(data.x, num_classes=self.num_node_types).float()
-        one_hot_data.edge_attr = F.one_hot(data.edge_attr, num_classes=self.num_edge_types).float()
+        one_hot_data.edge_attr = F.one_hot(
+            data.edge_attr, num_classes=self.num_edge_types
+        ).float()
 
         if not self.use_charge:
             one_hot_data.charge = data.x.new_zeros((*data.x.shape[:-1], 0))
         else:
-            one_hot_data.charge = F.one_hot(data.charge + 1, num_classes=self.num_charge_types).float()
+            one_hot_data.charge = F.one_hot(
+                data.charge + 1, num_classes=self.num_charge_types
+            ).float()
 
         return one_hot_data
 
@@ -144,9 +150,7 @@ class AbstractDatasetInfos:
         if not self.use_charge:
             charge = charge.new_zeros((*charge.shape[:-1], 0))
         else:
-            charge = F.one_hot(
-                charge + 1, num_classes=self.num_charge_types
-            ).float()
+            charge = F.one_hot(charge + 1, num_classes=self.num_charge_types).float()
         return charge
 
     def complete_infos(self, statistics, node_types):
@@ -184,7 +188,7 @@ class AbstractDatasetInfos:
             batch=example_batch.batch,
             charge=example_batch.charge,
             y=example_batch.y,
-            n_nodes=data.n_nodes
+            n_nodes=data.n_nodes,
         )
         ex_dense.add_n_nodes(data.n_nodes)
 
@@ -207,16 +211,16 @@ class AbstractDatasetInfos:
         #     "charge_t": example_batch.charge,
         # }
 
-        # ex_extra_feat = extra_features(ex_dense)
-        # if type(ex_extra_feat) == tuple:
-        #     ex_extra_feat = ex_extra_feat[0]
-        # self.input_dims.X += ex_extra_feat.X.size(-1)
-        # self.input_dims.E += ex_extra_feat.E.size(-1)
-        # self.input_dims.y += ex_extra_feat.y.size(-1)
+        ex_extra_feat = extra_features(ex_dense)
+        if type(ex_extra_feat) == tuple:
+            ex_extra_feat = ex_extra_feat[0]
+        self.input_dims.X += ex_extra_feat.X.size(-1)
+        self.input_dims.E += ex_extra_feat.E.size(-1)
+        self.input_dims.y += ex_extra_feat.y.size(-1)
 
-        # mol_extra_feat = domain_features(ex_dense)
-        # if type(mol_extra_feat) == tuple:
-        #     mol_extra_feat = mol_extra_feat[0]
-        # self.input_dims.X += mol_extra_feat.X.size(-1)
-        # self.input_dims.E += mol_extra_feat.E.size(-1)
-        # self.input_dims.y += mol_extra_feat.y.size(-1)
+        mol_extra_feat = domain_features(ex_dense)
+        if type(mol_extra_feat) == tuple:
+            mol_extra_feat = mol_extra_feat[0]
+        self.input_dims.X += mol_extra_feat.X.size(-1)
+        self.input_dims.E += mol_extra_feat.E.size(-1)
+        self.input_dims.y += mol_extra_feat.y.size(-1)

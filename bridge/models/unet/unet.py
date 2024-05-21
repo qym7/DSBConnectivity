@@ -55,21 +55,22 @@ class UNetModel(nn.Module):
 
         if num_heads_upsample == -1:
             num_heads_upsample = num_heads
-        self.locals = [ in_channels,
-                        model_channels,
-                        out_channels,
-                        num_res_blocks,
-                        attention_resolutions,
-                        dropout,
-                        channel_mult,
-                        conv_resample,
-                        dims,
-                        num_classes,
-                        use_checkpoint,
-                        num_heads,
-                        num_heads_upsample,
-                        use_scale_shift_norm
-                    ]
+        self.locals = [
+            in_channels,
+            model_channels,
+            out_channels,
+            num_res_blocks,
+            attention_resolutions,
+            dropout,
+            channel_mult,
+            conv_resample,
+            dims,
+            num_classes,
+            use_checkpoint,
+            num_heads,
+            num_heads_upsample,
+            use_scale_shift_norm,
+        ]
         self.in_channels = in_channels
         self.model_channels = model_channels
         self.out_channels = out_channels
@@ -187,7 +188,6 @@ class UNetModel(nn.Module):
             zero_module(conv_nd(dims, model_channels, out_channels, 3, padding=1)),
         )
 
-
     def convert_to_fp16(self):
         """
         Convert the torso of the model to float16.
@@ -203,7 +203,6 @@ class UNetModel(nn.Module):
         self.input_blocks.apply(convert_module_to_f32)
         self.middle_block.apply(convert_module_to_f32)
         self.output_blocks.apply(convert_module_to_f32)
-
 
     def forward(self, x, timesteps, y=None, graph=False):
 
@@ -226,7 +225,7 @@ class UNetModel(nn.Module):
             assert y.shape == (x.shape[0],)
             emb = emb + self.label_emb(y)
 
-        h = x#.type(self.inner_dtype)
+        h = x  # .type(self.inner_dtype)
         for module in self.input_blocks:
             h = module(h, emb)
             hs.append(h)
@@ -239,7 +238,7 @@ class UNetModel(nn.Module):
         h = self.out(h)
 
         if self.graph or graph:
-            h = (h.permute(0, 1, 3, 2) + h)/2
+            h = (h.permute(0, 1, 3, 2) + h) / 2
 
         return h
 
@@ -261,7 +260,7 @@ class UNetModel(nn.Module):
             assert y.shape == (x.shape[0],)
             emb = emb + self.label_emb(y)
         result = dict(down=[], up=[])
-        h = x#.type(self.inner_dtype)
+        h = x  # .type(self.inner_dtype)
         for module in self.input_blocks:
             h = module(h, emb)
             hs.append(h)

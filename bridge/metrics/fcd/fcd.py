@@ -29,11 +29,15 @@ def load_ref_model(model_path: Optional[str] = None):
     """
 
     if model_path is None:
-        import pdb; pdb.set_trace()
-        cur_path = os. getcwd()
-        chemnet_model_filename = "../../../sparse_diffusion/metrics/fcd/ChemNet_v0.13_pretrained.pt"
+        import pdb
+
+        pdb.set_trace()
+        cur_path = os.getcwd()
+        chemnet_model_filename = (
+            "../../../sparse_diffusion/metrics/fcd/ChemNet_v0.13_pretrained.pt"
+        )
         path = os.path.join(cur_path, chemnet_model_filename)
-        model_bytes = pkgutil.get_data("fcd", )
+        model_bytes = pkgutil.get_data("fcd",)
 
         tmpdir = tempfile.TemporaryDirectory()
         model_path = os.path.join(tmpdir.name, chemnet_model_filename)

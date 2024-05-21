@@ -138,7 +138,7 @@ def sampled_condensed_indices_uniformly(
     # Most general case: graphs of varying sizes
     max_size = torch.max(max_condensed_value)
     # import pdb; pdb.set_trace()
-    if max_size > 10**7:
+    if max_size > 10 ** 7:
         print("[Warning]: sampling random edges might bew slow")
 
     randperm_full = torch.randperm(max_size, device=device)  # (max_condensed)

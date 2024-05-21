@@ -17,8 +17,10 @@ def assert_correctly_masked(variable, node_mask):
         variable * (1 - node_mask.long())
     ).detach().abs().max() < 1e-4, "Variables not masked properly."
 
+
 # (variable * (1 - node_mask.long())
 #     ).detach().abs().max()
+
 
 def sample_gaussian(size):
     x = torch.randn(size)
@@ -113,7 +115,7 @@ def gaussian_KL(q_mu, q_sigma):
         The KL distance, summed over all dimensions except the batch dim.
     """
     return sum_except_batch(
-        (torch.log(1 / q_sigma) + 0.5 * (q_sigma**2 + q_mu**2) - 0.5)
+        (torch.log(1 / q_sigma) + 0.5 * (q_sigma ** 2 + q_mu ** 2) - 0.5)
     )
 
 
@@ -298,7 +300,7 @@ def compute_posterior_distribution(M, M_t, Qt_M, Qsb_M, Qtb_M):
     denom = (denom * M_t).sum(dim=-1)  # (bs, N, d) * (bs, N, d) + sum = (bs, N)
 
     # mask out where denom is 0.
-    denom[denom == 0.] = 1
+    denom[denom == 0.0] = 1
 
     prob = product / denom.unsqueeze(-1)  # (bs, N, d)
 
@@ -490,8 +492,13 @@ def sample_sparse_discrete_feature_noise(limit_dist, node_mask):
     ptr = torch.hstack([torch.tensor([0]).to(device), ptr.cumsum(-1)]).long()
 
     return utils.SparsePlaceHolder(
-        node=node, edge_index=edge_index.long(), edge_attr=edge_attr, y=y, charge=charge,
-        batch=batch, ptr=ptr
+        node=node,
+        edge_index=edge_index.long(),
+        edge_attr=edge_attr,
+        y=y,
+        charge=charge,
+        batch=batch,
+        ptr=ptr,
     ).to_device(device)
 
 

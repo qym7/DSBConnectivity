@@ -114,14 +114,12 @@ class XEyTransformerLayer(nn.Module):
             # y = y - oy
         else:
             y = None
-            
+
         # # delete modules
         # X = X - oX
         # E = E - oE
 
-        return utils.PlaceHolder(
-            X=X, E=E, y=y, charge=None, node_mask=node_mask
-        ).mask()
+        return utils.PlaceHolder(X=X, E=E, y=y, charge=None, node_mask=node_mask).mask()
 
 
 class NodeEdgeBlock(nn.Module):
@@ -277,13 +275,14 @@ class GraphTransformer(nn.Module):
     ):
         super().__init__()
 
-        self.locals = [n_layers,
-                       input_dims,
-                       hidden_mlp_dims,
-                       hidden_dims,
-                       output_dims,
-                       dropout
-                    ]
+        self.locals = [
+            n_layers,
+            input_dims,
+            hidden_mlp_dims,
+            hidden_dims,
+            output_dims,
+            dropout,
+        ]
 
         # Layer architecture
         self.n_layers = n_layers
@@ -292,6 +291,7 @@ class GraphTransformer(nn.Module):
         self.out_dim_y = output_dims.y
         self.out_dim_charge = output_dims.charge
         self.hidden_mlp_dims = hidden_mlp_dims
+        self.hidden_dims = hidden_dims
         act_fn_in = nn.ReLU()
         act_fn_out = nn.ReLU()
 
@@ -313,8 +313,8 @@ class GraphTransformer(nn.Module):
             act_fn_in,
         )
         self.mlp_in_y = nn.Sequential(
-            # nn.Linear(input_dims.y, hidden_mlp_dims["y"]),
-            nn.Linear(hidden_mlp_dims["y"], hidden_mlp_dims["y"]),
+            nn.Linear(input_dims.y, hidden_mlp_dims["y"]),
+            # nn.Linear(hidden_mlp_dims["y"], hidden_mlp_dims["y"]),
             act_fn_in,
             nn.Linear(hidden_mlp_dims["y"], hidden_dims["dy"]),
             act_fn_in,
@@ -330,7 +330,7 @@ class GraphTransformer(nn.Module):
                     dim_ffX=hidden_dims["dim_ffX"],
                     dim_ffE=hidden_dims["dim_ffE"],
                     predicts_y=(layer_idx != n_layers - 1) or self.predicts_final_y,
-                    dropout=dropout
+                    dropout=dropout,
                 )
                 for layer_idx in range(n_layers)
             ]
@@ -369,13 +369,8 @@ class GraphTransformer(nn.Module):
         E_to_out = model_input.E[..., : self.out_dim_E]
         y_to_out = model_input.y[..., : self.out_dim_y]
 
-        # import pdb; pdb.set_trace()
-        time_emb = timestep_embedding(y, self.hidden_mlp_dims["y"])
-        # import pdb; pdb.set_trace()
-        # The code is using a multi-layer perceptron (MLP) to process the input `model_input.y` and
-        # assign the result to `time_emb`. The specific details of the MLP implementation are not
-        # shown in the provided code snippet.
-        # time_emb = self.mlp_in_y(time_emb)
+        time_emb = timestep_embedding(y[:, -1].unsqueeze(-1), self.hidden_dims["dy"])
+        new_y = self.mlp_in_y(model_input.y) + time_emb
         new_E = self.mlp_in_E(model_input.E)
         new_E = (new_E + new_E.transpose(1, 2)) / 2
 
@@ -383,7 +378,7 @@ class GraphTransformer(nn.Module):
             X=self.mlp_in_X(X),
             E=new_E,
             # y=self.mlp_in_y(model_input.y),
-            y=time_emb,
+            y=new_y,
             charge=None,
             node_mask=node_mask,
         ).mask()
@@ -407,9 +402,13 @@ class GraphTransformer(nn.Module):
 
         final_X = X[..., : self.out_dim_X]
         final_charge = X[..., self.out_dim_X :]
-        
+
         # import pdb; pdb.set_trace()
         # mask = utils.PlaceHolder(X=final_X, charge=final_charge, E=E, y=y, node_mask=node_mask).mask()
+
+        final_X = F.relu(final_X)
+        final_charge = F.relu(final_charge)
+        E = F.relu(E)
 
         return utils.PlaceHolder(
             X=final_X, charge=final_charge, E=E, y=y, node_mask=node_mask

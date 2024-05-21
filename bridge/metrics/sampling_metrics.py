@@ -10,14 +10,13 @@ from torch_geometric.utils import to_scipy_sparse_matrix
 import torch_geometric as pyg
 from torchmetrics import MeanMetric, MaxMetric, Metric, MeanAbsoluteError
 
-from ..utils import (
-    undirected_to_directed,
-)
+from ..utils import undirected_to_directed
 from ..metrics.metrics_utils import (
     counter_to_tensor,
     wasserstein1d,
     total_variation1d,
 )
+
 
 class SamplingMetrics(nn.Module):
     def __init__(self, dataset_infos, test, dataloaders=None):
@@ -52,7 +51,7 @@ class SamplingMetrics(nn.Module):
                 PlanarSamplingMetrics,
                 SBMSamplingMetrics,
                 ProteinSamplingMetrics,
-                EgoSamplingMetrics
+                EgoSamplingMetrics,
             )
 
             self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
@@ -84,7 +83,9 @@ class SamplingMetrics(nn.Module):
     #     if self.domain_metrics is not None:
     #         self.domain_metrics.reset()
 
-    def compute_all_metrics(self, generated_graphs: list, current_epoch, local_rank, fb, i):
+    def compute_all_metrics(
+        self, generated_graphs: list, current_epoch, local_rank, fb, i
+    ):
         """Compare statistics of the generated data with statistics of the val/test set"""
         # stat = (
         #     self.dataset_infos.statistics["test"]
@@ -131,7 +132,7 @@ class SamplingMetrics(nn.Module):
             )
             to_log.update(do_metrics)
 
-        to_log = {f'{k}_{fb}_{i}': to_log[k]for k in to_log}
+        to_log = {f"{k}_{fb}_{i}": to_log[k] for k in to_log}
         if wandb.run:
             wandb.log(to_log, commit=False)
         # if local_rank == 0:
@@ -168,9 +169,20 @@ def node_types_distance(generated_graphs, target, save_histogram=True):
 
     if save_histogram:
         if wandb.run:
-            data = [[k, l] for k, l in zip(target, generated_distribution/generated_distribution.sum())]
+            data = [
+                [k, l]
+                for k, l in zip(
+                    target, generated_distribution / generated_distribution.sum()
+                )
+            ]
             table = wandb.Table(data=data, columns=["target", "generate"])
-            wandb.log({'node distribution': wandb.plot.histogram(table, 'types', title="node distribution")})
+            wandb.log(
+                {
+                    "node distribution": wandb.plot.histogram(
+                        table, "types", title="node distribution"
+                    )
+                }
+            )
 
         np.save("generated_node_types.npy", generated_distribution.cpu().numpy())
 
@@ -197,9 +209,20 @@ def bond_types_distance(generated_graphs, target, save_histogram=True):
 
     if save_histogram:
         if wandb.run:
-            data = [[k, l] for k, l in zip(target, generated_distribution/generated_distribution.sum())]
+            data = [
+                [k, l]
+                for k, l in zip(
+                    target, generated_distribution / generated_distribution.sum()
+                )
+            ]
             table = wandb.Table(data=data, columns=["target", "generate"])
-            wandb.log({'edge distribution': wandb.plot.histogram(table, 'types', title="edge distribution")})
+            wandb.log(
+                {
+                    "edge distribution": wandb.plot.histogram(
+                        table, "types", title="edge distribution"
+                    )
+                }
+            )
 
         np.save("generated_bond_types.npy", generated_distribution.cpu().numpy())
 

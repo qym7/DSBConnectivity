@@ -30,6 +30,7 @@ from ..data.synthetic_graphs import (
     generate_planar_graphs,
 )
 
+
 class SyntheticGraphDataset(InMemoryDataset):
     def __init__(
         self,
@@ -44,7 +45,7 @@ class SyntheticGraphDataset(InMemoryDataset):
         self.dataset_name = dataset_name
         self.dataset_cfg = dataset_cfg
         # track the statistics of the dataset
-        root = '/'.join([root, dataset_name])
+        root = "/".join([root, dataset_name])
         #  str(dataset_cfg.min_num_communities,
         #  dataset_cfg.max_num_communities,
         #  dataset_cfg.min_community_size,
@@ -121,9 +122,12 @@ class SyntheticGraphDataset(InMemoryDataset):
                 max_community_size=self.dataset_cfg.max_community_size,
                 intra_prob=self.dataset_cfg.intra_prob,
                 inter_prob=self.dataset_cfg.inter_prob,
-                )
-            adjs = [torch.Tensor(to_numpy_array(network)).fill_diagonal_(0) for network in networks]
-            
+            )
+            adjs = [
+                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
+                for network in networks
+            ]
+
         g_cpu = torch.Generator()
         g_cpu.manual_seed(1234)
         self.num_graphs = len(adjs)
@@ -161,7 +165,6 @@ class SyntheticGraphDataset(InMemoryDataset):
         torch.save(val_data, self.raw_paths[1])
         torch.save(test_data, self.raw_paths[2])
 
-
     def process(self):
         raw_dataset = torch.load(os.path.join(self.raw_dir, "{}.pt".format(self.split)))
         data_list = []
@@ -173,7 +176,10 @@ class SyntheticGraphDataset(InMemoryDataset):
             edge_attr[:, 1] = 1
             n_nodes = n * torch.ones(1, dtype=torch.long)
             data = torch_geometric.data.Data(
-                x=X.float(), edge_index=edge_index, edge_attr=edge_attr.float(), n_nodes=n_nodes
+                x=X.float(),
+                edge_index=edge_index,
+                edge_attr=edge_attr.float(),
+                n_nodes=n_nodes,
             )
 
             if self.pre_filter is not None and not self.pre_filter(data):

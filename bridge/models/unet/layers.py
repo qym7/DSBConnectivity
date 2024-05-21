@@ -1,4 +1,3 @@
-
 import math
 from abc import abstractmethod
 import torch as th

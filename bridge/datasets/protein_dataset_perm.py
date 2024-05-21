@@ -31,18 +31,14 @@ from ..metrics.metrics_utils import (
 
 
 class ProteinDataset(InMemoryDataset):
-    '''
+    """
     Implementation based on https://github.com/KarolisMart/SPECTRE/blob/main/data.py
-    '''
+    """
+
     def __init__(
-        self,
-        split,
-        root,
-        transform=None,
-        pre_transform=None,
-        pre_filter=None,
+        self, split, root, transform=None, pre_transform=None, pre_filter=None,
     ):
-        self.dataset_name = 'protein'
+        self.dataset_name = "protein"
         root = root
 
         self.split = split
@@ -118,19 +114,26 @@ class ProteinDataset(InMemoryDataset):
         Download raw files.
         """
         raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/DD"
-        for name in ['DD_A.txt', 'DD_graph_indicator.txt', 'DD_graph_labels.txt', 'DD_node_labels.txt']:
-            download_url(f'{raw_url}/{name}', self.raw_dir)
+        for name in [
+            "DD_A.txt",
+            "DD_graph_indicator.txt",
+            "DD_graph_labels.txt",
+            "DD_node_labels.txt",
+        ]:
+            download_url(f"{raw_url}/{name}", self.raw_dir)
 
         # read
-        path = os.path.join(self.root, 'raw')
-        data_graph_indicator = np.loadtxt(os.path.join(path, 'DD_graph_indicator.txt'), delimiter=',').astype(int)
+        path = os.path.join(self.root, "raw")
+        data_graph_indicator = np.loadtxt(
+            os.path.join(path, "DD_graph_indicator.txt"), delimiter=","
+        ).astype(int)
 
         # split data
         g_cpu = torch.Generator()
         g_cpu.manual_seed(0)
-        
-        min_num_nodes=100
-        max_num_nodes=500
+
+        min_num_nodes = 100
+        max_num_nodes = 500
         available_graphs = []
         for idx in np.arange(data_graph_indicator.max()):
             node_idx = data_graph_indicator == idx
@@ -156,11 +159,36 @@ class ProteinDataset(InMemoryDataset):
         torch.save(test_indices, self.raw_paths[2])
 
     def process(self):
-        indices = torch.load(os.path.join(self.raw_dir, "{}_indices.pt".format(self.split)))
-        data_adj = torch.Tensor(np.loadtxt(os.path.join(self.raw_dir, 'DD_A.txt'), delimiter=',')).long() - 1
-        data_node_label = torch.Tensor(np.loadtxt(os.path.join(self.raw_dir, 'DD_node_labels.txt'), delimiter=',')).long() - 1
-        data_graph_indicator = torch.Tensor(np.loadtxt(os.path.join(self.raw_dir, 'DD_graph_indicator.txt'), delimiter=',')).long()
-        data_graph_types = torch.Tensor(np.loadtxt(os.path.join(self.raw_dir, 'DD_graph_labels.txt'), delimiter=',')).long() - 1
+        indices = torch.load(
+            os.path.join(self.raw_dir, "{}_indices.pt".format(self.split))
+        )
+        data_adj = (
+            torch.Tensor(
+                np.loadtxt(os.path.join(self.raw_dir, "DD_A.txt"), delimiter=",")
+            ).long()
+            - 1
+        )
+        data_node_label = (
+            torch.Tensor(
+                np.loadtxt(
+                    os.path.join(self.raw_dir, "DD_node_labels.txt"), delimiter=","
+                )
+            ).long()
+            - 1
+        )
+        data_graph_indicator = torch.Tensor(
+            np.loadtxt(
+                os.path.join(self.raw_dir, "DD_graph_indicator.txt"), delimiter=","
+            )
+        ).long()
+        data_graph_types = (
+            torch.Tensor(
+                np.loadtxt(
+                    os.path.join(self.raw_dir, "DD_graph_labels.txt"), delimiter=","
+                )
+            ).long()
+            - 1
+        )
         data_list = []
         perm_data_list = []
 
@@ -239,25 +267,15 @@ class ProteinDataModule(AbstractDataModule):
         self.dataset_name = self.cfg.dataset.name
         self.datadir = cfg.dataset.datadir
         base_path = pathlib.Path(get_original_cwd()).parents[0]
-        root_path = os.path.join(base_path, 'data/DD')
+        root_path = os.path.join(base_path, "data/DD")
         transform = RemoveYTransform()
 
         datasets = {
             "train": ProteinDataset(
-                root=root_path,
-                transform=transform,
-                split="train",
+                root=root_path, transform=transform, split="train",
             ),
-            "val": ProteinDataset(
-                root=root_path,
-                transform=transform,
-                split="val",
-            ),
-            "test": ProteinDataset(
-                root=root_path,
-                transform=transform,
-                split="test",
-            ),
+            "val": ProteinDataset(root=root_path, transform=transform, split="val",),
+            "test": ProteinDataset(root=root_path, transform=transform, split="test",),
         }
 
         self.statistics = {
@@ -289,9 +307,9 @@ class ProteinInfos(AbstractDatasetInfos):
             X=len(self.node_types), E=len(self.bond_types), y=0, charge=0
         )
         self.statistics = {
-            'train': datamodule.statistics['train'],
-            'val': datamodule.statistics['val'],
-            'test': datamodule.statistics['test']
+            "train": datamodule.statistics["train"],
+            "val": datamodule.statistics["val"],
+            "test": datamodule.statistics["test"],
         }
 
     def to_one_hot(self, data):
@@ -301,6 +319,8 @@ class ProteinInfos(AbstractDatasetInfos):
         """
         data.charge = data.x.new_zeros((*data.x.shape[:-1], 0))
         data.x = F.one_hot(data.x, num_classes=self.num_node_types).float()
-        data.edge_attr = F.one_hot(data.edge_attr, num_classes=self.num_edge_types).float()
+        data.edge_attr = F.one_hot(
+            data.edge_attr, num_classes=self.num_edge_types
+        ).float()
 
         return data

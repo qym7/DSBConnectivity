@@ -111,15 +111,18 @@ class SpectreGraphDataset(InMemoryDataset):
             raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/planar_64_200.pt"
         elif self.dataset_name == "comm20":
             raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/community_12_21_100.pt"
-        elif self.dataset_name == "ego":        
+        elif self.dataset_name == "ego":
             raw_url = "https://raw.githubusercontent.com/tufts-ml/graph-generation-EDGE/main/graphs/Ego.pkl"
         else:
             raise ValueError(f"Unknown dataset {self.dataset_name}")
         file_path = download_url(raw_url, self.raw_dir)
 
-        if self.dataset_name == 'ego':
-            networks = pkl.load(open(file_path, 'rb'))
-            adjs = [torch.Tensor(to_numpy_array(network)).fill_diagonal_(0) for network in networks]
+        if self.dataset_name == "ego":
+            networks = pkl.load(open(file_path, "rb"))
+            adjs = [
+                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
+                for network in networks
+            ]
         else:
             (
                 adjs,
@@ -131,12 +134,12 @@ class SpectreGraphDataset(InMemoryDataset):
                 same_sample,
                 n_max,
             ) = torch.load(file_path)
-            
+
         g_cpu = torch.Generator()
         g_cpu.manual_seed(1234)
         self.num_graphs = len(adjs)
 
-        if self.dataset_name == 'ego':
+        if self.dataset_name == "ego":
             test_len = int(round(self.num_graphs * 0.2))
             train_len = int(round(self.num_graphs * 0.8))
             val_len = int(round(self.num_graphs * 0.2))
@@ -164,7 +167,10 @@ class SpectreGraphDataset(InMemoryDataset):
 
         for i, adj in enumerate(adjs):
             # permute randomly nodes as for molecular datasets
-            adj = adjs[0][:4, :4]  # TODO: this line and the package of COMM20 are to deleted
+            # adj = adjs[0][
+            #     :4, :4
+            # ]  # TODO: this line and the package of COMM20 are to deleted
+            adj = adjs[0]
             random_order = torch.randperm(adj.shape[-1])
             adj = adj[random_order, :]
             adj = adj[:, random_order]
@@ -180,7 +186,6 @@ class SpectreGraphDataset(InMemoryDataset):
         torch.save(val_data, self.raw_paths[1])
         torch.save(test_data, self.raw_paths[2])
 
-
     def process(self):
         raw_dataset = torch.load(os.path.join(self.raw_dir, "{}.pt".format(self.split)))
         data_list = []
@@ -192,7 +197,10 @@ class SpectreGraphDataset(InMemoryDataset):
             edge_attr[:, 1] = 1
             n_nodes = n * torch.ones(1, dtype=torch.long)
             data = torch_geometric.data.Data(
-                x=X.float(), edge_index=edge_index, edge_attr=edge_attr.float(), n_nodes=n_nodes
+                x=X.float(),
+                edge_index=edge_index,
+                edge_attr=edge_attr.float(),
+                n_nodes=n_nodes,
             )
 
             if self.pre_filter is not None and not self.pre_filter(data):
@@ -270,9 +278,9 @@ class SpectreDatasetInfos(AbstractDatasetInfos):
             X=len(self.node_types), E=len(self.bond_types), y=0, charge=0
         )
         self.statistics = {
-            'train': datamodule.statistics['train'],
-            'val': datamodule.statistics['val'],
-            'test': datamodule.statistics['test']
+            "train": datamodule.statistics["train"],
+            "val": datamodule.statistics["val"],
+            "test": datamodule.statistics["test"],
         }
 
     def to_one_hot(self, data):
@@ -282,7 +290,7 @@ class SpectreDatasetInfos(AbstractDatasetInfos):
         """
         data.charge = data.x.new_zeros((*data.x.shape[:-1], 0))
         if data.y is None:
-            data.y = data.x.new_zeros((data.batch.max().item()+1, 0))
+            data.y = data.x.new_zeros((data.batch.max().item() + 1, 0))
 
         return data
 

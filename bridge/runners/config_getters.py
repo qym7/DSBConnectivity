@@ -12,26 +12,30 @@ from ..utils import *
 
 from .logger import CSVLogger, NeptuneLogger, Logger
 from ..models import *
-from ..models.gnn.transformer_model import  GraphTransformer
+from ..models.gnn.transformer_model import GraphTransformer
 from ..data.two_dim import two_dim_ds
 from ..data.stackedmnist import Stacked_MNIST
 from ..data.emnist import EMNIST
-from ..data.celeba  import CelebA
+from ..data.celeba import CelebA
+
 # from ..data.comm20 import SpectreGraphDataset
 # from ..data.synthetic_dataset import SyntheticGraphDataset
 from .plotters import TwoDPlotter, ImPlotter
 
 cmp = lambda x: transforms.Compose([*x])
 
+
 def get_plotter(runner, args):
     dataset_tag = getattr(args, DATASET)
     if dataset_tag == DATASET_2D:
         return TwoDPlotter(num_steps=runner.num_steps, gammas=runner.langevin.gammas)
     else:
-        return ImPlotter(plot_level = args.plot_level)
+        return ImPlotter(plot_level=args.plot_level)
+
 
 # Model
-#--------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+
 
 def get_graph_models(args, dataset_infos):
     # kwargs = {
@@ -44,32 +48,53 @@ def get_graph_models(args, dataset_infos):
     #     "dropout": args.model.dropout
     #     }
     kwargs = {
-            'input_dims': dataset_infos.input_dims,
-            'n_layers': args.model.n_layers,
-            'hidden_mlp_dims': args.model.hidden_mlp_dims,
-            'hidden_dims': args.model.hidden_dims,
-            'output_dims': dataset_infos.output_dims,
-            'dropout': args.model.dropout,
+        "input_dims": dataset_infos.input_dims,
+        "n_layers": args.model.n_layers,
+        "hidden_mlp_dims": args.model.hidden_mlp_dims,
+        "hidden_dims": args.model.hidden_dims,
+        "output_dims": dataset_infos.output_dims,
+        "dropout": args.model.dropout,
     }
 
-    net_f, net_b =  GraphTransformer(**kwargs), GraphTransformer(**kwargs)   
+    net_f, net_b = GraphTransformer(**kwargs), GraphTransformer(**kwargs)
 
     return net_f, net_b
 
+
 # Dataset
-#--------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 def get_both_datamodules(cfg):
     dataset_config = cfg["dataset"]
     pl.seed_everything(cfg.seed)
     # get datamodules for the initial and transfer dataset
-    train_metrics, domain_features, datamodule, datainfos = get_datamodules(dataset_config)
+    train_metrics, domain_features, datamodule, datainfos = get_datamodules(
+        dataset_config
+    )
     if cfg.transfer:
-        tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = get_datamodules(dataset_config)
+        (
+            tf_train_metrics,
+            tf_domain_features,
+            tf_datamodule,
+            tf_datainfos,
+        ) = get_datamodules(dataset_config)
     else:
-        tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = None, None, None, None
+        tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = (
+            None,
+            None,
+            None,
+            None,
+        )
 
-    return train_metrics, domain_features,datamodule, datainfos, \
-        tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos
+    return (
+        train_metrics,
+        domain_features,
+        datamodule,
+        datainfos,
+        tf_train_metrics,
+        tf_domain_features,
+        tf_datamodule,
+        tf_datainfos,
+    )
 
 
 def get_datamodules(cfg):
@@ -80,7 +105,7 @@ def get_datamodules(cfg):
 
     # step 1: get datamodules according to dataset name
 
-    print('creating datasets')
+    print("creating datasets")
     if cfg["name"] in ["sbm", "comm20", "planar", "ego"]:
         from ..datasets.spectre_dataset_pyg import (
             SBMDataModule,
@@ -104,7 +129,7 @@ def get_datamodules(cfg):
         domain_features = DummyExtraFeatures()
         dataloaders = datamodule.dataloaders
 
-    elif cfg["name"] == 'protein':
+    elif cfg["name"] == "protein":
         from datasets import protein_dataset
 
         datamodule = protein_dataset.ProteinDataModule(cfg)
@@ -112,7 +137,7 @@ def get_datamodules(cfg):
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
 
-    elif cfg["name"] == 'point_cloud':
+    elif cfg["name"] == "point_cloud":
         from datasets import point_cloud_dataset
 
         datamodule = point_cloud_dataset.PointCloudDataModule(cfg)
@@ -185,7 +210,7 @@ def get_datamodules(cfg):
 #         attention_ds = []
 #         for res in args.model.attention_resolutions.split(","):
 #             attention_ds.append(image_size // int(res))
-        
+
 #         kwargs = {
 #                     "in_channels": args.data.channels,
 #                     "model_channels": args.model.num_channels,
@@ -202,29 +227,33 @@ def get_datamodules(cfg):
 #                     "graph": args.graph,
 #                 }
 
-#         net_f, net_b = UNetModel(**kwargs), UNetModel(**kwargs)   
-       
+#         net_f, net_b = UNetModel(**kwargs), UNetModel(**kwargs)
+
 #     return net_f, net_b
 
 
 # Optimizer
-#--------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 def get_optimizers(net_f, net_b, lr):
     # return torch.optim.Adam(net_f.parameters(), lr=lr), torch.optim.Adam(net_b.parameters(), lr=lr)
-    return torch.optim.Adam(net_f.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12), torch.optim.Adam(net_b.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12)
+    return (
+        torch.optim.Adam(net_f.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
+        torch.optim.Adam(net_b.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
+    )
+
 
 # Dataset
-#--------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 
-DATASET = 'Dataset'
-DATASET_TRANSFER = 'Dataset_transfer'
-DATASET_2D = '2d'
-DATASET_CELEBA = 'celeba'
-DATASET_STACKEDMNIST = 'stackedmnist'
-DATASET_EMNIST = 'emnist'
-DATASET_COMM20 = 'comm20'
-DATASET_SBM1 = 'sbm1'
-DATASET_SBM2 = 'sbm2'
+DATASET = "Dataset"
+DATASET_TRANSFER = "Dataset_transfer"
+DATASET_2D = "2d"
+DATASET_CELEBA = "celeba"
+DATASET_STACKEDMNIST = "stackedmnist"
+DATASET_EMNIST = "emnist"
+DATASET_COMM20 = "comm20"
+DATASET_SBM1 = "sbm1"
+DATASET_SBM2 = "sbm2"
 
 # def get_datasets(args, split='train'):
 #     dataset_tag = getattr(args, DATASET)
@@ -232,7 +261,7 @@ DATASET_SBM2 = 'sbm2'
 #         dataset_transfer_tag = getattr(args, DATASET_TRANSFER)
 #     else:
 #         dataset_transfer_tag = None
-    
+
 #     # INITIAL (DATA) DATASET
 #     if dataset_tag == DATASET_COMM20:
 #         base_path = pathlib.Path(get_original_cwd()).parents[0]
@@ -326,10 +355,10 @@ DATASET_SBM2 = 'sbm2'
 #     if dataset_tag ==  DATASET_STACKEDMNIST:
 #         root = os.path.join(args.data_dir, 'mnist')
 #         saved_file = os.path.join(root, "data.pt")
-#         load = os.path.exists(saved_file) 
+#         load = os.path.exists(saved_file)
 #         load = args.load
-#         init_ds = Stacked_MNIST(root, load=load, source_root=root, 
-#                                 train=True, num_channels = args.data.channels, 
+#         init_ds = Stacked_MNIST(root, load=load, source_root=root,
+#                                 train=True, num_channels = args.data.channels,
 #                                 imageSize=args.data.image_size,
 #                                 device=args.device)
 
@@ -395,19 +424,20 @@ DATASET_SBM2 = 'sbm2'
 
 
 # Logger
-#--------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 
-LOGGER = 'LOGGER'
-LOGGER_PARAMS = 'LOGGER_PARAMS'
+LOGGER = "LOGGER"
+LOGGER_PARAMS = "LOGGER_PARAMS"
 
-CSV_TAG = 'CSV'
-NOLOG_TAG = 'NONE'
+CSV_TAG = "CSV"
+NOLOG_TAG = "NONE"
+
 
 def get_logger(args, name):
     logger_tag = getattr(args, LOGGER)
 
     if logger_tag == CSV_TAG:
-        kwargs = {'directory': args.CSV_log_dir, 'name': name}
+        kwargs = {"directory": args.CSV_log_dir, "name": name}
         return CSVLogger(**kwargs)
 
     if logger_tag == NOLOG_TAG:

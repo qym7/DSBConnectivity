@@ -63,6 +63,7 @@ def compare_hash(output_file: str, correct_hash: str) -> bool:
 
     return True
 
+
 class RemoveYTransform:
     def __call__(self, data):
         data.y = torch.zeros((1, 0), dtype=torch.float)
@@ -76,12 +77,7 @@ class GuacamolDataset(InMemoryDataset):
     all_url = "https://figshare.com/ndownloader/files/13612745"
 
     def __init__(
-        self,
-        split,
-        root,
-        transform=None,
-        pre_transform=None,
-        pre_filter=None,
+        self, split, root, transform=None, pre_transform=None, pre_filter=None,
     ):
         self.split = split
         self.atom_encoder = atom_encoder
@@ -115,14 +111,14 @@ class GuacamolDataset(InMemoryDataset):
     @property
     def processed_file_names(self):
         return [
-                f"{self.split}.pt",
-                f"{self.split}_n.pickle",
-                f"{self.split}_node_types.npy",
-                f"{self.split}_bond_types.npy",
-                f"{self.split}_charge.npy",
-                f"{self.split}_valency.pickle",
-                f"{self.split}_smiles.pickle",
-            ]
+            f"{self.split}.pt",
+            f"{self.split}_n.pickle",
+            f"{self.split}_node_types.npy",
+            f"{self.split}_bond_types.npy",
+            f"{self.split}_charge.npy",
+            f"{self.split}_valency.pickle",
+            f"{self.split}_smiles.pickle",
+        ]
 
     def download(self):
         train_path = download_url(self.train_url, self.raw_dir)
@@ -236,7 +232,9 @@ class GuacamolInfos(AbstractDatasetInfos):
         super().complete_infos(datamodule.statistics, self.atom_encoder)
 
         # dimensions, input_dims is calculated later
-        self.output_dims = PlaceHolder(X=self.num_node_types, charge=self.num_charge_types, E=5, y=0)
+        self.output_dims = PlaceHolder(
+            X=self.num_node_types, charge=self.num_charge_types, E=5, y=0
+        )
 
         # dataset specific settings
         self.valencies = [4, 3, 2, 1, 3, 1, 1, 1, 3, 2, 2, 4]

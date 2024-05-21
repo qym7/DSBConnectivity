@@ -28,7 +28,11 @@ class TrainLossDiscrete(nn.Module):
         loss_E = self.edge_loss(pred.edge_attr, true_data.edge_attr, weight)
         # loss_y = self.y_loss(pred.y, true_data.y) if pred.y.numel() > 0 else 0.0  # for protein, pred.y is not empty, but only used as an input information as 't'
         loss_y = 0.0
-        loss_charge = self.charge_loss(pred.charge, true_data.charge) if pred.charge.numel() > 0 else 0.0
+        loss_charge = (
+            self.charge_loss(pred.charge, true_data.charge)
+            if pred.charge.numel() > 0
+            else 0.0
+        )
 
         if log:
             to_log = {
@@ -41,8 +45,7 @@ class TrainLossDiscrete(nn.Module):
                 else -1,
                 # "train_loss/y_CE": loss_y if pred.y.numel() > 0 else -1,
                 "train_loss/y_CE": -1,
-                "train_loss/charge_CE": loss_charge if pred.charge.numel() > 0
-                else -1,
+                "train_loss/charge_CE": loss_charge if pred.charge.numel() > 0 else -1,
             }
             if wandb.run:
                 wandb.log(to_log, commit=True)

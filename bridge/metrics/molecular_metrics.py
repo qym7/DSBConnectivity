@@ -8,6 +8,7 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import DataStructs
 from rdkit.Chem import MACCSkeys
 from rdkit.Chem.Scaffolds import MurckoScaffold
+
 # from moses.metrics.metrics import get_all_metrics
 import wandb
 import numpy as np
@@ -36,6 +37,7 @@ from ..metrics.metrics_utils import (
 
 def canonicalize_smiles(smiles):
     return [Chem.MolToSmiles(Chem.MolFromSmiles(smi)) for smi in smiles]
+
 
 class TrainMolecularMetricsDiscrete(nn.Module):
     def __init__(self, dataset_infos):
@@ -73,9 +75,9 @@ class TrainMolecularMetricsDiscrete(nn.Module):
         if log:
             to_log = {}
             for key, val in self.train_atom_metrics.compute().items():
-                to_log['train/' + key] = val.item()
+                to_log["train/" + key] = val.item()
             for key, val in self.train_bond_metrics.compute().items():
-                to_log['train/' + key] = val.item()
+                to_log["train/" + key] = val.item()
             if wandb.run:
                 wandb.log(to_log, commit=False)
 
@@ -135,13 +137,13 @@ class SamplingMolecularMetrics(nn.Module):
                     error_message[-1] += 1
                 except Chem.rdchem.AtomValenceException:
                     error_message[1] += 1
-                    all_smiles.append('error')
+                    all_smiles.append("error")
                 except Chem.rdchem.KekulizeException:
                     error_message[2] += 1
-                    all_smiles.append('error')
+                    all_smiles.append("error")
                 except Chem.rdchem.AtomKekulizeException or ValueError:
                     error_message[3] += 1
-                    all_smiles.append('error')
+                    all_smiles.append("error")
         print(
             f"Error messages: AtomValence {error_message[1]}, Kekulize {error_message[2]}, other {error_message[3]}, "
             f" -- No error {error_message[-1]}"
@@ -162,7 +164,7 @@ class SamplingMolecularMetrics(nn.Module):
         self.valid_mols.extend(valid)
 
         # FCD
-        FCD_eval = FCD(device='cuda:0', n_jobs=8)
+        FCD_eval = FCD(device="cuda:0", n_jobs=8)
         # test_smiles = [for i in test_smiles]
         test_smiles_no_h = []
         total_count = 0
@@ -183,7 +185,7 @@ class SamplingMolecularMetrics(nn.Module):
                 molRemoveAllHs = Chem.RemoveAllHs(mol)
                 test_smiles_no_h.append(Chem.MolToSmiles(molRemoveAllHs))
 
-        print('among {} test smiles, {} are valid'.format(total_count, valid_count))
+        print("among {} test smiles, {} are valid".format(total_count, valid_count))
         # import pdb; pdb.set_trace()
         # fcd = FCD_eval(test_smiles_no_h, test_smiles_no_h)
         fcd = FCD_eval(test_smiles_no_h, valid)
@@ -281,13 +283,16 @@ class SamplingMolecularMetrics(nn.Module):
         textfile.close()
 
         # save in csv for moses evaluation
-        df = pd.DataFrame({
-            'SMILES': all_generated_smiles,
-            'SPLIT': ['generated'] * len(all_generated_smiles)
-        })
+        df = pd.DataFrame(
+            {
+                "SMILES": all_generated_smiles,
+                "SPLIT": ["generated"] * len(all_generated_smiles),
+            }
+        )
 
         # Define the CSV file name
         from datetime import datetime
+
         time_str = datetime.now().strftime("%M%S")
         csv_filename_pandas = f"smiles_data_{time_str}.csv"
         # Save the DataFrame to a CSV file
@@ -492,7 +497,9 @@ class CEPerClass(Metric):
             preds: Predictions from model   (bs, n, d) or (bs, n, n, d)
             target: Ground truth values     (bs, n, d) or (bs, n, n, d)
         """
-        target_one_hot = torch.nn.functional.one_hot(target.long(), num_classes=preds.shape[-1]).float()
+        target_one_hot = torch.nn.functional.one_hot(
+            target.long(), num_classes=preds.shape[-1]
+        ).float()
         mask = (target_one_hot != 0.0).any(dim=-1)
 
         prob = self.softmax(preds)[..., self.class_id]
@@ -854,6 +861,7 @@ class SparseMolecule:
                     )
                 except:
                     import pdb
+
                     pdb.set_trace()
 
         try:

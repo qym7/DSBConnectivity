@@ -16,7 +16,6 @@ import torch
 import torch.nn.functional as F
 
 
-
 def setup_wandb(cfg):
     config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     name = cfg.dataset.name
@@ -52,10 +51,25 @@ def create_folders(args):
 
 
 def data_to_dense(graph_data, max_n_nodes):
-    return to_dense(graph_data.x, graph_data.edge_index, graph_data.edge_attr, graph_data.batch, max_num_nodes=max_n_nodes)
+    return to_dense(
+        graph_data.x,
+        graph_data.edge_index,
+        graph_data.edge_attr,
+        graph_data.batch,
+        max_num_nodes=max_n_nodes,
+    )
 
 
-def to_dense(x, edge_index, edge_attr, batch, max_num_nodes=None, charge=None, y=None, n_nodes=None):
+def to_dense(
+    x,
+    edge_index,
+    edge_attr,
+    batch,
+    max_num_nodes=None,
+    charge=None,
+    y=None,
+    n_nodes=None,
+):
     batch = batch.to(torch.int64)
     X, node_mask = to_dense_node(x=x, batch=batch, max_num_nodes=max_num_nodes)
     if max_num_nodes is None:
@@ -64,17 +78,21 @@ def to_dense(x, edge_index, edge_attr, batch, max_num_nodes=None, charge=None, y
 
     if charge is not None:
         if charge.numel() > 0:
-            charge, _ = to_dense_node(x=charge, batch=batch, max_num_nodes=max_num_nodes)
+            charge, _ = to_dense_node(
+                x=charge, batch=batch, max_num_nodes=max_num_nodes
+            )
 
-    graph_data = PlaceHolder(X=X, E=E, y=y, charge=charge, n_nodes=n_nodes, node_mask=node_mask)
+    graph_data = PlaceHolder(
+        X=X, E=E, y=y, charge=charge, n_nodes=n_nodes, node_mask=node_mask
+    )
 
     return graph_data, node_mask
 
 
 def symmetize_edge_matrix(matrix):
-    '''
+    """
     matrix: bs, n, n, de
-    '''
+    """
     upper_triangular_mask = torch.zeros_like(matrix)
     indices = torch.triu_indices(row=matrix.size(1), col=matrix.size(2), offset=1)
     upper_triangular_mask[:, indices[0], indices[1], :] = 1
@@ -231,7 +249,9 @@ def encode_no_edge(E):
 
 
 class PlaceHolder:
-    def __init__(self, X, E, y, charge=None, t_int=None, t=None, node_mask=None, n_nodes=None):
+    def __init__(
+        self, X, E, y, charge=None, t_int=None, t=None, node_mask=None, n_nodes=None
+    ):
         self.X = X
         self.charge = charge
         self.E = E
@@ -249,7 +269,9 @@ class PlaceHolder:
         if self.n_nodes is not None and self.node_mask is None:
             bs = len(n_nodes)
             arange = (
-                torch.arange(self.X.shape[-2], device=self.X.device).unsqueeze(0).expand(bs, -1)
+                torch.arange(self.X.shape[-2], device=self.X.device)
+                .unsqueeze(0)
+                .expand(bs, -1)
             )
             self.node_mask = arange < n_nodes.unsqueeze(1)
 
@@ -258,7 +280,9 @@ class PlaceHolder:
         if self.n_nodes is not None and self.node_mask is None:
             bs = len(n_nodes)
             arange = (
-                torch.arange(self.X.shape[-2], device=self.X.device).unsqueeze(0).expand(bs, -1)
+                torch.arange(self.X.shape[-2], device=self.X.device)
+                .unsqueeze(0)
+                .expand(bs, -1)
             )
             self.node_mask = arange < n_nodes.unsqueeze(1)
 
@@ -321,12 +345,53 @@ class PlaceHolder:
         de = self.E.shape[-1]
         d_data = self.discretize()
         d_data.X = F.one_hot(d_data.X, dx)
-        d_data.charge = F.one_hot(d_data.charge, dc) if d_data.charge is not None else None
+        d_data.charge = (
+            F.one_hot(d_data.charge, dc) if d_data.charge is not None else None
+        )
         d_data.E = F.one_hot(d_data.E, de)
 
         d_data.mask()
 
         return d_data
+
+    def sample(self, onehot=False, node_mask=None):
+        bs, n, _ = self.X.shape
+        probX = self.X
+        probE = self.E
+
+        # Noise X
+        # The masked rows should define probability distributions as well
+        probX[~node_mask] = 1 / probX.shape[-1]
+
+        # Flatten the probability tensor to sample with multinomial
+        probX = probX.reshape(bs * n, -1)  # (bs * n, dx_out)
+
+        # Sample X
+        X_t = probX.multinomial(1, replacement=True)  # (bs * n, 1)
+        # X_t = Categorical(probs=probX).sample()  # (bs * n, 1)
+        X_t = X_t.reshape(bs, n)  # (bs, n)
+
+        # Noise E
+        # The masked rows should define probability distributions as well
+        inverse_edge_mask = ~(node_mask.unsqueeze(1) * node_mask.unsqueeze(2))
+        diag_mask = torch.eye(n).unsqueeze(0).expand(bs, -1, -1)
+
+        probE[inverse_edge_mask] = 1 / probE.shape[-1]
+        probE[diag_mask.bool()] = 1 / probE.shape[-1]
+
+        probE = probE.reshape(bs * n * n, -1)  # (bs * n * n, de_out)
+
+        # Sample E
+        E_t = probE.multinomial(1, replacement=True).reshape(bs, n, n)  # (bs, n, n)
+        # E_t = Categorical(probs=probE).sample().reshape(bs, n, n)  # (bs, n, n)
+        E_t = torch.triu(E_t, diagonal=1)
+        E_t = E_t + torch.transpose(E_t, 1, 2)
+
+        if onehot:
+            X_t = F.one_hot(X_t, self.X.shape[-1])
+            E_t = F.one_hot(E_t, self.E.shape[-1])
+
+        return PlaceHolder(X=X_t, E=E_t, y=torch.zeros(bs, 0).type_as(X_t), node_mask=node_mask)
 
     def place(self, graph_data, k):
         if (self.X is not None) and (graph_data.X is not None):
@@ -335,13 +400,12 @@ class PlaceHolder:
             self.E[:, k] = graph_data.E
         if (self.charge is not None) and (graph_data.charge is not None):
             self.charge[:, k] = graph_data.charge
-        if (self.y is not None) and (graph_data.y is not None) and (self.y.numel()>0):
+        if (self.y is not None) and (graph_data.y is not None) and (self.y.numel() > 0):
             self.y[:, k] = graph_data.y
         return self
 
-
     def get_data(self, k, dim=0):
-        if dim==0:
+        if dim == 0:
             return PlaceHolder(
                 X=self.X[k] if self.X is not None else None,
                 E=self.E[k] if self.E is not None else None,
@@ -349,7 +413,7 @@ class PlaceHolder:
                 node_mask=self.node_mask,
                 # charge=self.charge[k] if self.charge is not None else None,
             )
-        if dim==1:
+        if dim == 1:
             return PlaceHolder(
                 X=self.X[:, k] if self.X is not None else None,
                 E=self.E[:, k] if self.E is not None else None,
@@ -364,7 +428,6 @@ class PlaceHolder:
         self.E = self.E.to(x.device) if self.E is not None else None
         self.y = self.y.to(x.device) if self.y is not None else None
         return self
-    
 
     def to_device(self, device: str):
         self.X = self.X.to(device) if self.X is not None else None
@@ -382,23 +445,31 @@ class PlaceHolder:
 
     def randn_like(self):
         new_data = PlaceHolder(
-            X=torch.randn_like(self.X).to(self.X.device) if self.X is not None else None,
-            E=torch.randn_like(self.E).to(self.E.device) if self.E is not None else None,
-            y=torch.randn_like(self.y).to(self.y.device) if self.y is not None else None,
-            charge=torch.randn_like(self.charge).to(self.charge.device) if self.charge is not None else None,
+            X=torch.randn_like(self.X).to(self.X.device)
+            if self.X is not None
+            else None,
+            E=torch.randn_like(self.E).to(self.E.device)
+            if self.E is not None
+            else None,
+            y=torch.randn_like(self.y).to(self.y.device)
+            if self.y is not None
+            else None,
+            charge=torch.randn_like(self.charge).to(self.charge.device)
+            if self.charge is not None
+            else None,
         )
         new_data.E = symmetize_edge_matrix(new_data.E)
         new_data.mask(self.node_mask)
 
         return new_data
-    
+
     def normalize(self):
         return PlaceHolder(
-                X = self.X / (self.X.abs().sum(-1).unsqueeze(-1)+1e-6),
-                E = self.E / (self.E.abs().sum(-1).unsqueeze(-1)+1e-6),
-                y=self.y,
-                charge=self.charge,
-                node_mask=self.node_mask
+            X=self.X / (self.X.abs().sum(-1).unsqueeze(-1) + 1e-6),
+            E=self.E / (self.E.abs().sum(-1).unsqueeze(-1) + 1e-6),
+            y=self.y,
+            charge=self.charge,
+            node_mask=self.node_mask,
         )
 
     def type_as(self, x: torch.Tensor):
@@ -441,7 +512,9 @@ class PlaceHolder:
         try:
             assert torch.allclose(self.E, torch.transpose(self.E, 1, 2))
         except:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
 
         if self.node_mask is None:
             self.node_mask = node_mask
@@ -481,7 +554,6 @@ class PlaceHolder:
     def collapse(self, collapse_charge=None, node_mask=None):
         copy = self.copy()
         copy.X = torch.argmax(self.X, dim=-1)
-        # copy.charge = collapse_charge.to(self.charge.device)[torch.argmax(self.charge, dim=-1)]
         copy.E = torch.argmax(self.E, dim=-1)
         if node_mask is None:
             node_mask = self.node_mask
@@ -489,7 +561,6 @@ class PlaceHolder:
         e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1, 1
         e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n, 1
         copy.X[node_mask == 0] = -1
-        # copy.charge[self.node_mask == 0] = 1000
         copy.E[(e_mask1 * e_mask2).squeeze(-1) == 0] = -1
         return copy
 
@@ -570,13 +641,9 @@ class SparsePlaceHolder:
         return self
 
 
-def delete_repeated_twice_edges(edge_index, edge_attr):    
-    min_edge_index, min_edge_attr = coalesce(
-            edge_index, edge_attr, reduce="min"
-        )
-    max_edge_index, max_edge_attr = coalesce(
-            edge_index, edge_attr, reduce="max"
-        )
+def delete_repeated_twice_edges(edge_index, edge_attr):
+    min_edge_index, min_edge_attr = coalesce(edge_index, edge_attr, reduce="min")
+    max_edge_index, max_edge_attr = coalesce(edge_index, edge_attr, reduce="max")
     rand_pos = torch.randint(0, 2, (len(edge_attr),))
     max_edge_attr[rand_pos] = min_edge_attr[rand_pos]
 
@@ -605,33 +672,32 @@ def undirected_to_directed(edge_index, edge_attr=None):
     else:
         return edge_index[:, top_index]
 
+
 def mask_node(node, node_mask):
     x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
     return node * x_mask
 
+
 def get_masks(n_nodes, max_n_nodes, bs, device):
-    arange = (
-        torch.arange(max_n_nodes, device=device).unsqueeze(0).expand(bs, -1)
-    )
+    arange = torch.arange(max_n_nodes, device=device).unsqueeze(0).expand(bs, -1)
     bs = len(n_nodes)
     node_mask = arange < n_nodes.unsqueeze(1)
-    x_mask = node_mask          # bs, n
-    e_mask1 = x_mask.unsqueeze(2)             # bs, n, 1
-    e_mask2 = x_mask.unsqueeze(1)             # bs, 1, n
+    x_mask = node_mask  # bs, n
+    e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1
+    e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n
     diag_mask = torch.ones(max_n_nodes, max_n_nodes) - torch.eye(max_n_nodes)
     diag_mask = diag_mask.unsqueeze(0)
     diag_mask = diag_mask.expand(bs, -1, -1).to(device)
-    edge_mask = e_mask1 * e_mask2 * diag_mask                # bs, n, n
-    
+    edge_mask = e_mask1 * e_mask2 * diag_mask  # bs, n, n
+
     return node_mask, edge_mask
 
+
 def get_node_mask(n_nodes, max_n_nodes, bs, device):
-    arange = (
-        torch.arange(max_n_nodes, device=device).unsqueeze(0).expand(bs, -1)
-    )
+    arange = torch.arange(max_n_nodes, device=device).unsqueeze(0).expand(bs, -1)
     bs = len(n_nodes)
     node_mask = arange < n_nodes.unsqueeze(1)
-    
+
     return node_mask
 
 
@@ -854,7 +920,6 @@ def ptr_to_node_mask(ptr, batch, n_node):
     return node_mask
 
 
-
 class SparseChainPlaceHolder:
     def __init__(self, keep_chain):
         # node_list/edge_index_list/edge_attr_list is a list of length (keep_chain)
@@ -908,6 +973,7 @@ def concat_sparse_graphs(graphs):
 
     return graph
 
+
 def split_samples(samples, num_split):
     y = samples.y
     node = samples.node
@@ -917,14 +983,14 @@ def split_samples(samples, num_split):
     ptr = samples.ptr
     batch = samples.batch
     edge_batch = batch[edge_index[0]]
-    
+
     num_sample = batch.max().item() + 1
     samples_lst = []
-    
+
     for i in range(num_split):
         start_idx = int(num_sample * i / num_split)
-        end_idx = int(num_sample * (i+1) / num_split)
-    
+        end_idx = int(num_sample * (i + 1) / num_split)
+
         node_mask = torch.logical_and(batch < end_idx, batch >= start_idx)
         cur_node = node[node_mask]
         cur_charge = charge[node_mask]
@@ -938,10 +1004,15 @@ def split_samples(samples, num_split):
         cur_ptr = ptr[start_idx:end_idx] - ptr[start_idx]
         cur_y = y[start_idx:end_idx]
 
-        cur_samples =  SparsePlaceHolder(
-            node=cur_node, edge_index=cur_edge_index, edge_attr=cur_edge_attr,
-            y=cur_y, ptr=cur_ptr, batch=cur_batch, charge=cur_charge
-            )
+        cur_samples = SparsePlaceHolder(
+            node=cur_node,
+            edge_index=cur_edge_index,
+            edge_attr=cur_edge_attr,
+            y=cur_y,
+            ptr=cur_ptr,
+            batch=cur_batch,
+            charge=cur_charge,
+        )
 
         samples_lst.append(cur_samples)
 

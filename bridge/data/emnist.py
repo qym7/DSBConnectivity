@@ -11,8 +11,16 @@ from torchvision.utils import save_image
 
 
 class EMNIST(Dataset):
-    def __init__(self, root="./dataset", load=True, source_root=None, imageSize=28,
-                 train=True, num_channels=3, device='cpu'):  # load=True means loading the dataset from existed files.
+    def __init__(
+        self,
+        root="./dataset",
+        load=True,
+        source_root=None,
+        imageSize=28,
+        train=True,
+        num_channels=3,
+        device="cpu",
+    ):  # load=True means loading the dataset from existed files.
         super(EMNIST, self).__init__()
         self.data = torch.load(os.path.join(root, "data.pt"))
         self.targets = torch.load(os.path.join(root, "targets.pt"))

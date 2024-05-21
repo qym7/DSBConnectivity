@@ -104,7 +104,9 @@ class Visualizer:
         if num_graphs_to_visualize > 0:
             print(f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}")
 
-        import pdb; pdb.set_trace()
+        import pdb
+
+        pdb.set_trace()
         graph_list = graphs.split()
         for i in range(num_graphs_to_visualize):
             file_path = os.path.join(path, "graph_{}.png".format(i))
@@ -130,14 +132,12 @@ class Visualizer:
         chains: PlaceHolder,
         num_nodes: Tensor,
         local_rank: int,
-        num_chains_to_visualize: int
+        num_chains_to_visualize: int,
     ):
-    # bs, n_steps, ...
+        # bs, n_steps, ...
         for i in range(num_chains_to_visualize):  # Iterate over the chains
             # path = os.path.join(chain_path, f"molecule_{batch_id + i}_{local_rank}")
-            cur_path = os.path.join(
-                path, f"{i}_graph"
-            )
+            cur_path = os.path.join(path, f"{i}_graph")
             if not os.path.exists(cur_path):
                 os.makedirs(cur_path)
 
@@ -145,16 +145,21 @@ class Visualizer:
             chain = PlaceHolder(
                 X=chains.X[i, :, : num_nodes[i]].long(),
                 E=chains.E[i, :, : num_nodes[i], : num_nodes[i]].long(),
-                charge=None, #chains.charge[:, i, : num_nodes[i]].long(),
+                charge=None,  # chains.charge[:, i, : num_nodes[i]].long(),
                 y=None,
             )
 
             # Iterate over the frames of each molecule
             for j in range(chain.X.shape[0]):
                 graph = PlaceHolder(
-                    X=chain.X[j], E=chain.E[j], charge=None, y=None, # chain.charge[j], y=None
+                    X=chain.X[j],
+                    E=chain.E[j],
+                    charge=None,
+                    y=None,  # chain.charge[j], y=None
                 )
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
                 if self.is_molecular:
                     graphs.append(
                         Molecule(
@@ -187,9 +192,7 @@ class Visualizer:
 
             # Visualize and save
             save_paths = []
-            image_path = os.path.join(
-               cur_path, "images"
-            )
+            image_path = os.path.join(cur_path, "images")
             if not os.path.exists(image_path):
                 os.makedirs(image_path)
             for frame in range(len(graphs)):
@@ -214,9 +217,7 @@ class Visualizer:
 
             imgs = [imageio.v3.imread(fn) for fn in save_paths]
             cur_folder = path.split("/")[-1]
-            gif_path = os.path.join(
-                cur_path, f"{cur_folder}.gif"
-            )
+            gif_path = os.path.join(cur_path, f"{cur_folder}.gif")
             imgs.extend([imgs[-1]] * 10)
             imageio.mimsave(gif_path, imgs, subrectangles=True, duration=200)
             if wandb.run:
@@ -227,4 +228,3 @@ class Visualizer:
                 wandb.log(
                     {"chain": wandb.Video(gif_path, fps=8, format="gif")}, commit=True
                 )
-

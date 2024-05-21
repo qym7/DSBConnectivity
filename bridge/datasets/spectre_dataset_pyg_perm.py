@@ -123,15 +123,18 @@ class SpectreGraphDataset(InMemoryDataset):
             raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/planar_64_200.pt"
         elif self.dataset_name == "comm20":
             raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/community_12_21_100.pt"
-        elif self.dataset_name == "ego":        
+        elif self.dataset_name == "ego":
             raw_url = "https://raw.githubusercontent.com/tufts-ml/graph-generation-EDGE/main/graphs/Ego.pkl"
         else:
             raise ValueError(f"Unknown dataset {self.dataset_name}")
         file_path = download_url(raw_url, self.raw_dir)
 
-        if self.dataset_name == 'ego':
-            networks = pkl.load(open(file_path, 'rb'))
-            adjs = [torch.Tensor(to_numpy_array(network)).fill_diagonal_(0) for network in networks]
+        if self.dataset_name == "ego":
+            networks = pkl.load(open(file_path, "rb"))
+            adjs = [
+                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
+                for network in networks
+            ]
         else:
             (
                 adjs,
@@ -143,12 +146,12 @@ class SpectreGraphDataset(InMemoryDataset):
                 same_sample,
                 n_max,
             ) = torch.load(file_path)
-            
+
         g_cpu = torch.Generator()
         g_cpu.manual_seed(0)
         self.num_graphs = len(adjs)
 
-        if self.dataset_name == 'ego':
+        if self.dataset_name == "ego":
             test_len = int(round(self.num_graphs * 0.2))
             train_len = int(round(self.num_graphs * 0.8))
             val_len = int(round(self.num_graphs * 0.2))
@@ -200,7 +203,10 @@ class SpectreGraphDataset(InMemoryDataset):
         edge_attr[:, 1] = 1
         n_nodes = n * torch.ones(1, dtype=torch.long)
         data = torch_geometric.data.Data(
-            x=X.float(), edge_index=edge_index, edge_attr=edge_attr.float(), n_nodes=n_nodes
+            x=X.float(),
+            edge_index=edge_index,
+            edge_attr=edge_attr.float(),
+            n_nodes=n_nodes,
         )
 
         if self.pre_filter is not None and not self.pre_filter(data):
@@ -228,7 +234,7 @@ class SpectreGraphDataset(InMemoryDataset):
         save_pickle(num_nodes, self.processed_paths[1])
         np.save(self.processed_paths[2], node_types)
         np.save(self.processed_paths[3], bond_types)
-        
+
         num_nodes = node_counts(perm_data_list)
         node_types = atom_type_counts(perm_data_list, num_classes=1)
         bond_types = edge_counts(perm_data_list, num_bond_types=2)
@@ -297,9 +303,9 @@ class SpectreDatasetInfos(AbstractDatasetInfos):
             X=len(self.node_types), E=len(self.bond_types), y=0, charge=0
         )
         self.statistics = {
-            'train': datamodule.statistics['train'],
-            'val': datamodule.statistics['val'],
-            'test': datamodule.statistics['test']
+            "train": datamodule.statistics["train"],
+            "val": datamodule.statistics["val"],
+            "test": datamodule.statistics["test"],
         }
 
     def to_one_hot(self, data):
@@ -309,7 +315,7 @@ class SpectreDatasetInfos(AbstractDatasetInfos):
         """
         data.charge = data.x.new_zeros((*data.x.shape[:-1], 0))
         if data.y is None:
-            data.y = data.x.new_zeros((data.batch.max().item()+1, 0))
+            data.y = data.x.new_zeros((data.batch.max().item() + 1, 0))
 
         return data
 
