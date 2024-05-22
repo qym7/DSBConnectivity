@@ -24,28 +24,27 @@ class SamplingMetrics(nn.Module):
         self.dataset_infos = dataset_infos
         self.test = test
 
-        # self.disconnected = MeanMetric()
-        # self.mean_components = MeanMetric()
-        # self.max_components = MaxMetric()
-        # self.num_nodes_w1 = MeanMetric()
-        # self.node_types_tv = MeanMetric()
-        # self.edge_types_tv = MeanMetric()
+        self.disconnected = MeanMetric()
+        self.mean_components = MeanMetric()
+        self.max_components = MaxMetric()
+        self.num_nodes_w1 = MeanMetric()
+        self.node_types_tv = MeanMetric()
+        self.edge_types_tv = MeanMetric()
 
-        # self.domain_metrics = None
-        # if dataset_infos.is_molecular:
-        #     from ..metrics.molecular_metrics import (
-        #         SamplingMolecularMetrics,
-        #     )
+        self.domain_metrics = None
+        if dataset_infos.is_molecular:
+            from ..metrics.molecular_metrics import (
+                SamplingMolecularMetrics,
+            )
 
-        #     self.domain_metrics = SamplingMolecularMetrics(
-        #         dataset_infos.train_smiles,
-        #         dataset_infos.test_smiles if test else dataset_infos.val_smiles,
-        #         dataset_infos,
-        #         test
-        #     )
+            self.domain_metrics = SamplingMolecularMetrics(
+                dataset_infos.train_smiles,
+                dataset_infos.test_smiles if test else dataset_infos.val_smiles,
+                dataset_infos,
+                test
+            )
 
-        # elif dataset_infos.spectre:
-        if True:
+        elif dataset_infos.spectre:
             from ..metrics.spectre_utils import (
                 Comm20SamplingMetrics,
                 PlanarSamplingMetrics,
@@ -54,34 +53,36 @@ class SamplingMetrics(nn.Module):
                 EgoSamplingMetrics,
             )
 
-            self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
-            # if dataset_infos.dataset_name == "comm20":
-            #     self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
-            # elif dataset_infos.dataset_name == "planar":
-            #     self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
-            # elif dataset_infos.dataset_name == "sbm":
-            #     self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
-            # elif dataset_infos.dataset_name == "protein":
-            #     self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders)
-            # elif dataset_infos.dataset_name == "ego":
-            #     self.domain_metrics = EgoSamplingMetrics(dataloaders=dataloaders)
-            # else:
-            #     raise ValueError(
-            #         "Dataset {} not implemented".format(dataset_infos.dataset_name)
-            #     )
+            # self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
+            if dataset_infos.dataset_name == "comm20":
+                self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "planar":
+                self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "sbm":
+                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "sbm_syn":
+                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "protein":
+                self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "ego":
+                self.domain_metrics = EgoSamplingMetrics(dataloaders=dataloaders)
+            else:
+                raise ValueError(
+                    "Dataset {} not implemented".format(dataset_infos.dataset_name)
+                )
 
-    # def reset(self):
-    #     for metric in [
-    #         self.mean_components,
-    #         self.max_components,
-    #         self.disconnected,
-    #         self.num_nodes_w1,
-    #         self.node_types_tv,
-    #         self.edge_types_tv,
-    #     ]:
-    #         metric.reset()
-    #     if self.domain_metrics is not None:
-    #         self.domain_metrics.reset()
+    def reset(self):
+        for metric in [
+            self.mean_components,
+            self.max_components,
+            self.disconnected,
+            self.num_nodes_w1,
+            self.node_types_tv,
+            self.edge_types_tv,
+        ]:
+            metric.reset()
+        if self.domain_metrics is not None:
+            self.domain_metrics.reset()
 
     def compute_all_metrics(
         self, generated_graphs: list, current_epoch, local_rank, fb, i
@@ -115,35 +116,29 @@ class SamplingMetrics(nn.Module):
         # self.mean_components(connected_comp)
         # self.max_components(connected_comp)
 
-        # key = "val" if not self.test else "test"
-        # to_log = {
-        #     f"{key}/NumNodesW1": self.num_nodes_w1.compute().item(),
-        #     f"{key}/NodeTypesTV": self.node_types_tv.compute().item(),
-        #     f"{key}/EdgeTypesTV": self.edge_types_tv.compute().item(),
-        #     f"{key}/Disconnected": self.disconnected.compute().item() * 100,
-        #     f"{key}/MeanComponents": self.mean_components.compute().item(),
-        #     f"{key}/MaxComponents": self.max_components.compute().item(),
-        # }
+        key = f"val_{fb}" if not self.test else f"val_{fb}"
+        to_log = {
+            f"{key}/NumNodesW1": self.num_nodes_w1.compute().item(),
+            f"{key}/NodeTypesTV": self.node_types_tv.compute().item(),
+            f"{key}/EdgeTypesTV": self.edge_types_tv.compute().item(),
+            f"{key}/Disconnected": self.disconnected.compute().item() * 100,
+            f"{key}/MeanComponents": self.mean_components.compute().item(),
+            f"{key}/MaxComponents": self.max_components.compute().item(),
+        }
 
-        to_log = {}
         if self.domain_metrics is not None:
+            domain_key = f"domain_val_{fb}" if not self.test else f"val_{fb}"
             do_metrics = self.domain_metrics.forward(
-                generated_graphs, current_epoch, local_rank
+                generated_graphs, current_epoch, local_rank, test=self.test
             )
+            do_metrics = {f"{domain_key}/{k}": do_metrics[k] for k in do_metrics}
             to_log.update(do_metrics)
 
-        to_log = {f"{k}_{fb}_{i}": to_log[k] for k in to_log}
         if wandb.run:
             wandb.log(to_log, commit=False)
-        # if local_rank == 0:
-        #     print(
-        #         f"Sampling metrics {[key: round(val, 5) for key, val in to_log.items()}"
-        #     )
         print(to_log)
 
         return to_log
-        # return to_log, edge_tv_per_class
-
 
 def number_nodes_distance(generated_graphs, dataset_counts):
     max_number_nodes = max(dataset_counts.keys())

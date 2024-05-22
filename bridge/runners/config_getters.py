@@ -64,19 +64,20 @@ def get_graph_models(args, dataset_infos):
 # Dataset
 # --------------------------------------------------------------------------------
 def get_both_datamodules(cfg):
-    dataset_config = cfg["dataset"]
     pl.seed_everything(cfg.seed)
     # get datamodules for the initial and transfer dataset
+    dataset_config = cfg["dataset"]
     train_metrics, domain_features, datamodule, datainfos = get_datamodules(
         dataset_config
     )
     if cfg.transfer:
+        tf_dataset_config = cfg["dataset_transfer"]
         (
             tf_train_metrics,
             tf_domain_features,
             tf_datamodule,
             tf_datainfos,
-        ) = get_datamodules(dataset_config)
+        ) = get_datamodules(tf_dataset_config)
     else:
         tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = (
             None,
@@ -106,9 +107,10 @@ def get_datamodules(cfg):
     # step 1: get datamodules according to dataset name
 
     print("creating datasets")
-    if cfg["name"] in ["sbm", "comm20", "planar", "ego"]:
+    if cfg["name"] in ["sbm", "sbm_syn", "comm20", "planar", "ego"]:
         from ..datasets.spectre_dataset_pyg import (
             SBMDataModule,
+            SBMSynDataModule,
             Comm20DataModule,
             EgoDataModule,
             PlanarDataModule,
@@ -117,6 +119,8 @@ def get_datamodules(cfg):
 
         if cfg["name"] == "sbm":
             datamodule = SBMDataModule(cfg)
+        if cfg["name"] == "sbm_syn":
+            datamodule = SBMSynDataModule(cfg)
         elif cfg["name"] == "comm20":
             datamodule = Comm20DataModule(cfg)
         elif cfg["name"] == "ego":
@@ -173,63 +177,9 @@ def get_datamodules(cfg):
 
         train_metrics = TrainMolecularMetricsDiscrete(dataset_infos)
     else:
-        raise NotImplementedError("Unknown dataset {}".format(cfg["dataset"]))
+        raise NotImplementedError("Unknown dataset {}".format(cfg["name"]))
 
     return train_metrics, domain_features, datamodule, dataset_infos
-
-
-# MODEL = 'Model'
-# BASIC_MODEL = 'Basic'
-# UNET_MODEL = 'UNET'
-
-
-# def get_models(args):
-#     model_tag = getattr(args, MODEL)
-
-#     if model_tag == BASIC_MODEL:
-#         net_f, net_b = ScoreNetwork(), ScoreNetwork()
-
-#     if model_tag == UNET_MODEL:
-#         image_size=args.data.image_size
-
-#         if image_size == 256:
-#             channel_mult = (1, 1, 2, 2, 4, 4)
-#         elif image_size == 64:
-#             channel_mult = (1, 2, 3, 4)
-#         elif image_size == 32:
-#             channel_mult = (1, 2, 2, 2)
-#         elif image_size == 28:
-#             channel_mult = (1, 2, 2)
-#         elif image_size == 20:  # comm20
-#             channel_mult = (1, 1, 2)
-#         elif image_size == 100:  # synthetic sbm graphs
-#             channel_mult = (1, 2, 2, 2)
-#         else:
-#             raise ValueError(f"unsupported image size: {image_size}")
-
-#         attention_ds = []
-#         for res in args.model.attention_resolutions.split(","):
-#             attention_ds.append(image_size // int(res))
-
-#         kwargs = {
-#                     "in_channels": args.data.channels,
-#                     "model_channels": args.model.num_channels,
-#                     "out_channels": args.data.channels,
-#                     "num_res_blocks": args.model.num_res_blocks,
-#                     "attention_resolutions": tuple(attention_ds),
-#                     "dropout": args.model.dropout,
-#                     "channel_mult": channel_mult,
-#                     "num_classes": None,
-#                     "use_checkpoint": args.model.use_checkpoint,
-#                     "num_heads": args.model.num_heads,
-#                     "num_heads_upsample": args.model.num_heads_upsample,
-#                     "use_scale_shift_norm": args.model.use_scale_shift_norm,
-#                     "graph": args.graph,
-#                 }
-
-#         net_f, net_b = UNetModel(**kwargs), UNetModel(**kwargs)
-
-#     return net_f, net_b
 
 
 # Optimizer

@@ -44,18 +44,11 @@ class Visualizer:
             adj = adj.argmax(-1)
         assert len(adj.shape) == 2
 
-        # if adj.max() > 1:
-        #     import pdb; pdb.set_trace()
-        # print('adj', adj[0])
-        # print('E', graph.E[0, :4])
 
         rows, cols = np.where(adj >= 1)
         edges = zip(rows.tolist(), cols.tolist())
         for edge in edges:
-            # print(edge, adj[0])
             edge_type = adj[edge[0], edge[1]]
-            # if edge_type > 100:
-            #     import pdb; pdb.set_trace()
             nx_graph.add_edge(
                 edge[0], edge[1], color=float(edge_type), weight=3 * edge_type
             )
@@ -98,10 +91,12 @@ class Visualizer:
         atom_decoder,
         num_graphs_to_visualize: int,
         log="graph",
+        fb="b",
     ):
         # define path to save figures
         if not os.path.exists(path):
             os.makedirs(path)
+        log = f"{log}_{fb}"
 
         # visualize the final molecules
         num_graphs = graphs.X.shape[0]
@@ -136,6 +131,7 @@ class Visualizer:
         local_rank: int,
         num_chains_to_visualize: int,
         fb: str,
+        transfer=False,
     ):
         # bs, n_steps, ...
         for i in range(num_chains_to_visualize):  # Iterate over the chains
@@ -167,11 +163,14 @@ class Visualizer:
                         )
                     )
                 else:
-                    # print(graph.E[0,0,:2])
                     graphs.append(self.to_networkx(graph))
 
             # Find the coordinates of nodes in the final graph and align all the molecules
-            final_graph = graphs[-1] if fb == "b" else graphs[0]
+            # The direction is changed for the cacheloader visualization before
+            # final_graph = graphs[-1] if fb == "b" else graphs[0]
+            # first_graph = graphs[0] if fb == "b" else graphs[-1]
+            final_graph = graphs[-1]
+            first_graph = graphs[0]
 
             if self.is_molecular:
                 final_mol = final_graph.rdkit_mol
@@ -190,6 +189,7 @@ class Visualizer:
                         conf.SetAtomPosition(l, Point3D(x, y, z))
             else:
                 final_pos = nx.spring_layout(final_graph, seed=0)
+                first_pos = nx.spring_layout(first_graph, seed=0)
 
             # Visualize and save
             save_paths = []
@@ -206,8 +206,13 @@ class Visualizer:
                         legend=f"Frame {frame}",
                     )
                 else:
+                    if transfer:
+                        t = frame / len(graphs)
+                        pos = {key: final_pos[key] * t + first_pos[key] * (1 - t) for key in final_pos.keys()}
+                    else:
+                        pos = final_pos
                     self.visualize_non_molecule(
-                        graph=graphs[frame], pos=final_pos, path=file_name
+                        graph=graphs[frame], pos=pos, path=file_name
                     )
                 save_paths.append(file_name)
             print(
@@ -223,9 +228,9 @@ class Visualizer:
             imageio.mimsave(gif_path, imgs, subrectangles=True, duration=200)
             if wandb.run:
                 wandb.log(
-                    {"chain": [wandb.Video(gif_path, caption=gif_path, format="gif")]}
+                    {f"chain_{fb}": [wandb.Video(gif_path, caption=gif_path, format="gif")]}
                 )
                 print(f"Saving {gif_path} to wandb")
                 wandb.log(
-                    {"chain": wandb.Video(gif_path, fps=8, format="gif")}, commit=True
+                    {f"chain_{fb}": wandb.Video(gif_path, fps=8, format="gif")}, commit=True
                 )

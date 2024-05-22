@@ -406,9 +406,17 @@ class GraphTransformer(nn.Module):
         # import pdb; pdb.set_trace()
         # mask = utils.PlaceHolder(X=final_X, charge=final_charge, E=E, y=y, node_mask=node_mask).mask()
 
-        final_X = F.relu(final_X)
-        final_charge = F.relu(final_charge)
-        E = F.relu(E)
+        # final_X = F.relu(final_X)
+        # final_charge = F.relu(final_charge)
+        # E = F.relu(E)
+
+        # final_X = torch.square(final_X)
+        # final_charge = torch.square(final_charge)
+        # E = torch.square(E)
+
+        final_X = torch.exp(final_X)
+        final_charge = torch.exp(final_charge)
+        E = torch.exp(E)
 
         return utils.PlaceHolder(
             X=final_X, charge=final_charge, E=E, y=y, node_mask=node_mask

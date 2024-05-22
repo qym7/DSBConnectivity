@@ -528,10 +528,15 @@ class PlaceHolder:
         for i in range(batch_size):
             n = torch.sum(self.node_mask[i], dim=0)
             x = self.X[i, :n]
-            # c = self.charge[i, :n]
             e = self.E[i, :n, :n]
+            if self.y.numel() == 0:
+                y = self.y
+            elif self.y is None:
+                y = None
+            else:
+                y = self.y[i]
             graph_list.append(
-                PlaceHolder(X=x, charge=None, E=e, y=self.y[i], node_mask=None)
+                PlaceHolder(X=x, charge=None, E=e, y=y, node_mask=None)
             )
         return graph_list
 

@@ -1,9 +1,15 @@
-import torch
+
 import hydra
 import os, sys
 
 sys.path.append("..")
 
+try:
+    import graph_tool.all as gt
+except ModuleNotFoundError:
+    print("Graph tool could not be loaded")
+
+import torch
 
 from bridge.runners.ipf import IPFSequential
 
@@ -16,7 +22,10 @@ def main(args):
 
     print("Directory: " + os.getcwd())
     ipf = IPFSequential(args)
-    ipf.train()
+    if not args.test:
+        ipf.train()
+    else:
+        ipf.test()
 
 
 if __name__ == "__main__":

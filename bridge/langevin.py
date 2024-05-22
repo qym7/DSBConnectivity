@@ -9,17 +9,24 @@ from tqdm import tqdm
 from . import utils
 
 
-def get_noise(x_k, node_mask):
+def get_noise(limit_dist, x_k, node_mask):
     batch_size = x_k.X.shape[0]
     n_nodes = x_k.n_nodes
     max_n_nodes = x_k.X.shape[1]
-    node_types = x_k.X.shape[-1]
-    edge_types = x_k.E.shape[-1]
     device = x_k.X.device
+
     batch = utils.PlaceHolder(
-        X=torch.ones(batch_size, max_n_nodes, node_types).to(device) / node_types,
-        E=torch.ones(batch_size, max_n_nodes, max_n_nodes, edge_types).to(device)
-        / edge_types,
+        X=limit_dist.X.repeat(
+            batch_size,
+            max_n_nodes,
+            1
+            ).to(device),
+        E=limit_dist.E.repeat(
+            batch_size,
+            max_n_nodes,
+            max_n_nodes,
+            1
+            ).to(device),
         y=None,
         charge=None,
         n_nodes=n_nodes,
@@ -56,10 +63,8 @@ class Langevin(torch.nn.Module):
         max_n_nodes,
         gammas,
         time_sampler,
+        limit_dist=None,
         device=None,
-        mean_final=torch.tensor([0.0, 0.0]),
-        var_final=torch.tensor([0.5, 0.5]),
-        mean_match=True,
         graph=False,
         extra_features=None,
         domain_features=None,
@@ -67,14 +72,12 @@ class Langevin(torch.nn.Module):
         tf_domain_features=None,
     ):
         super().__init__()
-
-        self.mean_match = mean_match
-        self.mean_final = mean_final
-        self.var_final = var_final
-        self.std_final = utils.PlaceHolder(
-            X=torch.sqrt(self.var_final.X), E=torch.sqrt(self.var_final.E), y=None
-        )
+        # self.std_final = utils.PlaceHolder(
+        #     X=torch.sqrt(self.var_final.X), E=torch.sqrt(self.var_final.E), y=None
+        # )
         self.graph = graph
+        self.limit_dist = limit_dist
+
         # extra fetaures
         self.extra_features = extra_features
         self.domain_features = domain_features
@@ -84,7 +87,7 @@ class Langevin(torch.nn.Module):
         self.num_steps = num_steps  # num diffusion steps
         self.max_n_nodes = max_n_nodes  # max_n_nodes of object to diffuse
         self.gammas = gammas.float()  # schedule
-        self.gammas = self.gammas / (self.gammas.sum())
+
         if device is not None:
             self.device = device
         else:
@@ -115,7 +118,8 @@ class Langevin(torch.nn.Module):
             y=None,
         )
 
-        steps_expanded = self.time.reshape((1, self.num_steps, 1)).repeat(
+
+        times_expanded = self.time.reshape((1, self.num_steps, 1)).repeat(
             (bs, 1, 1)
         )
         gammas_expanded = self.gammas.reshape((1, self.num_steps, 1)).repeat(
@@ -123,7 +127,7 @@ class Langevin(torch.nn.Module):
         )
 
         x_k = x.copy()
-        noise = get_noise(x_k, x.node_mask)
+        noise = get_noise(self.limit_dist, x_k, x.node_mask)
         for k in range(self.num_steps):
             out = out.place(x_k, k)
             gamma = self.gammas[k]
@@ -131,7 +135,7 @@ class Langevin(torch.nn.Module):
             x_k = x_k.sample(onehot=True, node_mask=node_mask)
             x_tot = x_tot.place(x_k, k)
 
-        return x_tot, out, gammas_expanded, steps_expanded
+        return x_tot, out, gammas_expanded, times_expanded
 
     def record_langevin_seq(
         self, net, init_samples, node_mask, t_batch=None, ipf_it=0, sample=False
@@ -155,28 +159,40 @@ class Langevin(torch.nn.Module):
             y=None,
             node_mask=node_mask,
         )
-        steps_expanded = self.time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+        times_expanded = self.time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
         gammas_expanded = self.gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
 
         x = init_samples.copy()
-        for k in tqdm(range(self.num_steps)):
+        # for k in tqdm(range(self.num_steps)):
+        for k in range(self.num_steps):
             out = out.place(x, k)
-            t = steps_expanded[:, k, :]
-            gamma = self.gammas[k]
-            ratio = self.forward_graph(net, x, t)
+            t = times_expanded[:, k, :]
+            gamma = gammas_expanded[:, k, :]
+            with torch.no_grad():
+                pred = self.forward_graph(net, x, t)
+
+            # dp = r * dt
+            pred.X = pred.X * gamma[:, None, :]
+            pred.E = pred.E * gamma[:, None, None, :]
 
             # change the value for the diagonal
-            ratio.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
-            ratio.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
-            ratio.X.scatter_(-1, x.X.argmax(-1)[:, :, None], (1.0 - ratio.X.sum(dim=-1, keepdim=True)).clamp(min=0.0))
-            ratio.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], (1.0 - ratio.E.sum(dim=-1, keepdim=True)).clamp(min=0.0))
+            # print(k, t[0])
+            # print(pred.E[0,0,1])
+            pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
+            pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
+            # print(pred.E[0,0,1])
+            pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], (1.0 - pred.X.sum(dim=-1, keepdim=True)).clamp(min=0.0))
+            pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], (1.0 - pred.E.sum(dim=-1, keepdim=True)).clamp(min=0.0))
+            # print(pred.E[0,0,1],x.E.argmax(-1)[0,0,1])
+            # The normalization should be automatic here
+            # Added to be consistent the the training process
+            pred.X = (pred.X / pred.X.sum(-1, keepdim=True)).float()
+            pred.E = (pred.E / pred.E.sum(-1, keepdim=True)).float()
 
-            # compute the new distribution with the predicted rate matrix
-            x = x.add(ratio.scale(gamma))
-            x = x.mask().sample(onehot=True, node_mask=node_mask)
+            x = pred.sample(onehot=True, node_mask=node_mask).mask()
             x_tot = x_tot.place(x, k)
 
-        return x_tot, out, gammas_expanded, steps_expanded
+        return x_tot, out, gammas_expanded, times_expanded
 
     def forward_graph(self, net, z_t, t):
         # step 1: calculate extra features

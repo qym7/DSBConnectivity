@@ -231,7 +231,7 @@ class SamplingMolecularMetrics(nn.Module):
 
         return all_smiles, dic
 
-    def forward(self, generated_graphs: list, current_epoch, local_rank):
+    def forward(self, generated_graphs: list, current_epoch, local_rank, test):
         molecules = []
         num_graphs = max(generated_graphs.batch) + 1
 

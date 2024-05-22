@@ -19,6 +19,7 @@ class CacheLoader(Dataset):
         n,
         batch_size,
         device="cpu",
+        limit_dist=None,
         dataloader_f=None,
         transfer=False,
         graph=False,
@@ -35,15 +36,10 @@ class CacheLoader(Dataset):
         self.graph = graph
         self.nodes_dist = nodes_dist
         self.device = device
-        # self.mean = mean
-        # self.std = std
-        # self.decart_mean_final = utils.PlaceHolder(
-        #     X=torch.ones(1).to(self.device),
-        #     E=torch.ones(2).to(self.device) * 0.5,
-        #     y=None,
-        # )
         self.visualization_tools = visualization_tools
         self.visualize = visualize
+
+        self.limit_dist = limit_dist
 
         self.data = utils.PlaceHolder(
             X=torch.Tensor(
@@ -63,7 +59,7 @@ class CacheLoader(Dataset):
             ).to(self.device),
             y=None,
         )
-        self.steps_data = torch.zeros((num_batches, batch_size * self.num_steps, 1)).to(
+        self.times_data = torch.zeros((num_batches, batch_size * self.num_steps, 1)).to(
             device
         )  # .cpu() # steps
         self.gammas_data = torch.zeros((num_batches, batch_size * self.num_steps, 1)).to(
@@ -87,34 +83,36 @@ class CacheLoader(Dataset):
                     )
                     node_mask = arange < n_nodes.unsqueeze(1)
                     batch = utils.PlaceHolder(
-                        X=torch.ones(
-                            batch_size, self.max_n_nodes, len(dataset_infos.node_types)
-                        ).to(self.device)
-                        / len(dataset_infos.node_types),
-                        E=torch.ones(
+                        X=self.limit_dist.X.repeat(
+                            batch_size,
+                            self.max_n_nodes,
+                            1
+                            ).to(self.device),
+                        E=self.limit_dist.E.repeat(
                             batch_size,
                             self.max_n_nodes,
                             self.max_n_nodes,
-                            len(dataset_infos.edge_types),
-                        ).to(self.device)
-                        / len(dataset_infos.edge_types),
+                            1
+                            ).to(self.device),
                         y=None,
                         charge=None,
                         n_nodes=n_nodes,
                     )
+                    batch = batch.sample(onehot=True, node_mask=node_mask)
 
                 batch.mask(node_mask)
 
                 if (n == 1) & (fb == "b"):
-                    x, out, gammas_expanded, steps_expanded = langevin.record_init_langevin(
+                    x, out, gammas_expanded, times_expanded = langevin.record_init_langevin(
                         batch, node_mask
                     )
                 else:
-                    x, out, gammas_expanded, steps_expanded = langevin.record_langevin_seq(
+                    x, out, gammas_expanded, times_expanded = langevin.record_langevin_seq(
                         sample_net, batch, node_mask=batch.node_mask, ipf_it=n
                     )
 
                 if b == 0 and self.visualize:
+                # if b == 0:
                     self.visualize = False
                     print("Visualizing chains...")
                     current_path = os.getcwd()
@@ -147,8 +145,8 @@ class CacheLoader(Dataset):
                 self.data.E[b] = batch_E
 
                 # store steps
-                flat_steps = steps_expanded.flatten(start_dim=0, end_dim=1)
-                self.steps_data[b] = flat_steps
+                flat_times = times_expanded.flatten(start_dim=0, end_dim=1)
+                self.times_data[b] = flat_times
 
                 # store gammas
                 flat_gammas = gammas_expanded.flatten(start_dim=0, end_dim=1)
@@ -165,13 +163,13 @@ class CacheLoader(Dataset):
             charge=None,
         )
 
-        self.steps_data = self.steps_data.flatten(start_dim=0, end_dim=1)
+        self.times_data = self.times_data.flatten(start_dim=0, end_dim=1)
         self.gammas_data = self.gammas_data.flatten(start_dim=0, end_dim=1)
         self.n_nodes = self.n_nodes.flatten()
 
     def __getitem__(self, index):
         item = self.data.get_data(index, dim=0)  # X -> (2, max_n_node, dx)
-        steps = self.steps_data[index]
+        times = self.times_data[index]
         gammas = self.gammas_data[index]
         n_nodes = self.n_nodes[index]
         x = item.get_data(0, dim=0)  # X -> (max_n_node, dx)
@@ -193,7 +191,7 @@ class CacheLoader(Dataset):
         x = (x.X, x.E, x.y, x.charge, n_nodes)
         out = (out.X, out.E, out.y, out.charge, n_nodes)
 
-        return x, out, gammas, steps
+        return x, out, gammas, times
 
     def __len__(self):
         return self.data.X.shape[0]

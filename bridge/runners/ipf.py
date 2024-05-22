@@ -64,15 +64,16 @@ class IPFBase(torch.nn.Module):
         self.lr = self.args.lr
         self.graph = self.args.graph
 
-        n = self.num_steps // 2
-        if self.args.gamma_space == "linspace":
-            gamma_half = np.linspace(self.args.gamma_min, args.gamma_max, n)
-        elif self.args.gamma_space == "geomspace":
-            gamma_half = np.geomspace(self.args.gamma_min, self.args.gamma_max, n)
-        gammas = np.concatenate([gamma_half, np.flip(gamma_half)])
-        gammas = torch.tensor(gammas).to(self.device)
-        self.T = torch.sum(gammas)  # T is more dynamic
-        # import pdb; pdb.set_trace()
+        # n = self.num_steps // 2
+        # if self.args.gamma_space == "linspace":
+        #     gamma_half = np.linspace(self.args.gamma_min, args.gamma_max, n)
+        # elif self.args.gamma_space == "geomspace":
+        #     gamma_half = np.geomspace(self.args.gamma_min, self.args.gamma_max, n)
+        # gammas = np.concatenate([gamma_half, np.flip(gamma_half)])
+        # gammas = torch.tensor(gammas).to(self.device)
+        gammas = torch.ones(self.num_steps).to(self.device)
+        gammas = gammas / torch.sum(gammas)
+        self.T = torch.sum(gammas)  # T is one in our setting
         self.current_epoch = 0  # TODO: this need to be changed learning
 
         # get loggers
@@ -82,14 +83,14 @@ class IPFBase(torch.nn.Module):
         # get data
         print("creating dataloaders")
         # dataloaders = self.build_dataloaders()
-        dataloaders = self.build_datamodules()
+        dataloaders, tf_dataloaders = self.build_datamodules()
         self.max_n_nodes = self.datainfos.max_n_nodes
         self.visualization_tools = Visualizer(
             dataset_infos=self.datainfos
         )
 
         # create metrics for graph dataset
-        print("creating metrics for graph dataset")
+        print('creating metrics for graph dataset')
         # create the training/test/val dataloader
         self.val_sampling_metrics = SamplingMetrics(
             dataset_infos=self.datainfos, test=False, dataloaders=dataloaders
@@ -97,12 +98,13 @@ class IPFBase(torch.nn.Module):
         self.test_sampling_metrics = SamplingMetrics(
             dataset_infos=self.datainfos, test=True, dataloaders=dataloaders
         )
+
         if self.args.transfer:
             self.tf_val_sampling_metrics = SamplingMetrics(
-                dataset_infos=self.tf_datainfos, test=False, dataloaders=dataloaders
+                dataset_infos=self.tf_datainfos, test=False, dataloaders=tf_dataloaders
             )
             self.tf_test_sampling_metrics = SamplingMetrics(
-                dataset_infos=self.tf_datainfos, test=True, dataloaders=dataloaders
+                dataset_infos=self.tf_datainfos, test=True, dataloaders=tf_dataloaders
             )
         else:
             self.tf_val_sampling_metrics = self.tf_test_sampling_metrics = None
@@ -125,15 +127,31 @@ class IPFBase(torch.nn.Module):
 
         max_n_nodes = self.datainfos.max_n_nodes
         print("creating Langevin")
+        if self.args.limit_dist == 'marginal':
+            self.limit_dist = utils.PlaceHolder(
+                X=self.datainfos.node_types,
+                E=self.datainfos.edge_types,
+                y=None
+            )
+        elif self.args.limit_dist == 'marginal_tf':
+            self.limit_dist = utils.PlaceHolder(
+                X=self.tf_datainfos.node_types,
+                E=self.tf_datainfos.edge_types,
+                y=None
+            )
+        else:
+            self.limit_dist = utils.PlaceHolder(
+                X=torch.ones_like(self.datainfos.node_types)/len(self.datainfos.node_types),
+                E=torch.ones_like(self.datainfos.edge_types)/len(self.datainfos.edge_types),
+                y=None
+            )
         self.langevin = Langevin(
             self.num_steps,
             max_n_nodes,
             gammas,
             time_sampler,
+            limit_dist=self.limit_dist,
             device=self.device,
-            mean_final=self.mean_final,
-            var_final=self.var_final,
-            mean_match=self.args.mean_match,
             graph=self.graph,
             extra_features=self.extra_features,
             domain_features=self.domain_features,
@@ -339,35 +357,6 @@ class IPFBase(torch.nn.Module):
 
         # get final stats
         init_ds = self.datamodule.inner
-
-        self.decart_mean_final = PlaceHolder(
-            X=torch.ones(1).to(self.device),
-            E=torch.ones(2).to(self.device) * 0.5,
-            y=None,
-        )
-
-        self.mean_final = (
-            PlaceHolder(
-                # X=(self.tf_datainfos.node_types).to(self.device),
-                # E=(self.tf_datainfos.edge_types).to(self.device),
-                X=torch.ones_like(self.datainfos.node_types).to(self.device),
-                E=torch.ones_like(self.datainfos.edge_types).to(self.device) * 0.5,
-                y=None,
-            )
-        )
-
-        self.var_final = PlaceHolder(
-            X=torch.ones(self.datainfos.num_node_types, device=self.device) * 1,
-            E=torch.ones(self.datainfos.num_edge_types, device=self.device) * 1,
-            y=None,
-        )
-
-        self.std_final = PlaceHolder(
-            X=torch.sqrt(self.var_final.X), E=torch.sqrt(self.var_final.E), y=None
-        )
-
-        # get dataloaders from datamodules
-        # what is the difference between save_init—dl and cache_init_dl?
         self.save_init_dl = pygloader.DataLoader(
             init_ds, batch_size=self.args.plot_npar, shuffle=True
         )  # , **self.kwargs)
@@ -379,6 +368,25 @@ class IPFBase(torch.nn.Module):
         )
         self.cache_init_dl = repeater(self.cache_init_dl)
         self.save_init_dl = repeater(self.save_init_dl)
+
+        # get all type of dataloader (currently only for the initial dataset)
+        print("creating the train dataloader")
+        init_train_dl = pygloader.DataLoader(
+            init_ds, batch_size=self.args.plot_npar, shuffle=False
+        )
+        print("creating the val dataloader")
+        init_val_ds = self.datamodule.dataloaders["val"].dataset
+        init_test_dl = pygloader.DataLoader(
+            init_val_ds, batch_size=self.args.plot_npar, shuffle=False
+        )
+        print("creating the test dataloader")
+        # init_test_ds, _, _, _ = get_datasets(self.args, split='test')
+        init_test_ds = self.datamodule.dataloaders["test"].dataset
+        init_val_dl = pygloader.DataLoader(
+            init_test_ds, batch_size=self.args.plot_npar, shuffle=False
+        )
+
+        init_loaders = {"train": init_train_dl, "val": init_val_dl, "test": init_test_dl}
 
         if self.args.transfer:
             final_ds = self.tf_datamodule.inner
@@ -393,28 +401,29 @@ class IPFBase(torch.nn.Module):
             )
             self.cache_final_dl = repeater(self.cache_final_dl)
             self.save_final_dl = repeater(self.save_final_dl)
+
+            # get all type of dataloader (currently only for the initial dataset)
+            print("creating the train dataloader")
+            final_train_dl = pygloader.DataLoader(
+                final_ds, batch_size=self.args.plot_npar, shuffle=False
+            )
+            print("creating the val dataloader")
+            final_val_ds = self.tf_datamodule.dataloaders["val"].dataset
+            final_val_dl = pygloader.DataLoader(
+                final_val_ds, batch_size=self.args.plot_npar, shuffle=False
+            )
+            print("creating the test dataloader")
+            final_test_ds = self.tf_datamodule.dataloaders["test"].dataset
+            final_test_dl = pygloader.DataLoader(
+                final_test_ds, batch_size=self.args.plot_npar, shuffle=False
+            )
+            final_loaders = {"train": final_train_dl, "val": final_val_dl, "test": final_test_dl}
         else:
             self.cache_final_dl = None
             self.save_final = None
+            final_loaders = None
 
-        # get all type of dataloader (currently only for the initial dataset)
-        init_train_dl = pygloader.DataLoader(
-            init_ds, batch_size=self.args.plot_npar, shuffle=False
-        )
-        print("creating the val dataloader")
-        # init_val_ds, _, _, _ = get_datasets(self.args, split='val')
-        init_val_ds = self.datamodule.dataloaders["val"].dataset
-        init_test_dl = pygloader.DataLoader(
-            init_val_ds, batch_size=self.args.plot_npar, shuffle=False
-        )
-        print("creating the test dataloader")
-        # init_test_ds, _, _, _ = get_datasets(self.args, split='test')
-        init_test_ds = self.datamodule.dataloaders["test"].dataset
-        init_val_dl = pygloader.DataLoader(
-            init_test_ds, batch_size=self.args.plot_npar, shuffle=False
-        )
-
-        return {"train": init_train_dl, "val": init_val_dl, "test": init_test_dl}
+        return init_loaders, final_loaders
 
     def new_cacheloader(self, forward_or_backward, n, use_ema=True):
 
@@ -435,6 +444,7 @@ class IPFBase(torch.nn.Module):
                 self.args.num_cache_batches,
                 self.langevin,
                 n,
+                limit_dist=self.limit_dist,
                 batch_size=self.args.cache_npar,
                 device=self.device,
                 dataloader_f=self.cache_final_dl,
@@ -443,7 +453,6 @@ class IPFBase(torch.nn.Module):
                 nodes_dist=self.nodes_dist,
                 dataset_infos=self.datainfos,
                 visualization_tools=self.visualization_tools,
-                visualize=self.args.visualize_loader,
             )
         else:  # forward
             sample_net = self.accelerator.prepare(sample_net)
@@ -454,6 +463,7 @@ class IPFBase(torch.nn.Module):
                 self.args.num_cache_batches,
                 self.langevin,
                 n,
+                limit_dist=self.limit_dist,
                 batch_size=self.args.cache_npar,
                 device=self.device,
                 dataloader_f=self.cache_final_dl,
@@ -462,7 +472,6 @@ class IPFBase(torch.nn.Module):
                 nodes_dist=self.nodes_dist,
                 dataset_infos=self.datainfos,
                 visualization_tools=self.visualization_tools,
-                visualize=self.args.visualize_loader,
             )
 
         new_dl = pygloader.DataLoader(new_dl, batch_size=self.batch_size, shuffle=True)
@@ -472,194 +481,229 @@ class IPFBase(torch.nn.Module):
 
         return new_dl
 
+    def generate_graphs(self, fb, sample_net, n, test=False):
+        if not test:
+            samples_to_generate = self.args.samples_to_generate
+            chains_to_save = self.args.chains_to_save
+        else:
+            samples_to_generate = self.args.final_samples_to_generate
+            chains_to_save = self.args.final_chains_to_save
+
+        samples = []
+        batches = []
+        all_n_nodes = []
+        i = 0
+
+        while samples_to_generate > 0:
+            if fb == "f" or self.args.transfer:
+                loader = self.save_init_dl if fb == "f" else self.save_final_dl
+                batch = next(loader)
+                batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
+                n_nodes = node_mask.sum(-1)
+            else:
+                batch_size = self.args.plot_npar
+                n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
+                arange = (
+                    torch.arange(self.max_n_nodes, device=self.device)
+                    .unsqueeze(0)
+                    .expand(batch_size, -1)
+                )
+                node_mask = arange < n_nodes.unsqueeze(1)
+                batch = utils.PlaceHolder(
+                    X=self.limit_dist.X.repeat(
+                        batch_size,
+                        self.max_n_nodes,
+                        1
+                        ).to(self.device),
+                    E=self.limit_dist.E.repeat(
+                        batch_size,
+                        self.max_n_nodes,
+                        self.max_n_nodes,
+                        1
+                        ).to(self.device),
+                    y=None,
+                    charge=None,
+                    n_nodes=n_nodes,
+                )
+                batch = batch.sample(onehot=True, node_mask=node_mask)
+
+            batch.mask(node_mask)
+            x_tot, _, _, _ = self.langevin.record_langevin_seq(
+                sample_net,
+                batch,
+                node_mask=node_mask,
+                ipf_it=n,
+                sample=True
+            )
+
+            samples.append(x_tot.get_data(-1, dim=1).collapse())
+            batches.append(batch)
+            all_n_nodes.append(n_nodes)
+            chains = utils.PlaceHolder(
+                X=x_tot.X[:chains_to_save],
+                E=x_tot.E[:chains_to_save],
+                charge=None,
+                y=None,
+            )
+
+            samples_to_generate -= len(n_nodes)
+            i += 1
+            
+        # merge things together
+        samples = utils.PlaceHolder(
+            X=torch.cat([s.X for s in samples], dim=0)[:samples_to_generate],
+            E=torch.cat([s.E for s in samples], dim=0)[:samples_to_generate],
+            charge=None,
+            y=None,
+        )
+        batches = utils.PlaceHolder(
+            X=torch.cat([b.X for b in batches], dim=0)[:samples_to_generate],
+            E=torch.cat([b.E for b in batches], dim=0)[:samples_to_generate],
+            charge=None,
+            y=None,
+        )
+        all_n_nodes = torch.cat(all_n_nodes, dim=0)[:samples_to_generate]
+
+        return batch, samples, chains, all_n_nodes
+
+
     def save_step(self, i, n, fb):
         """
         Step for sampling and for saving
         """
+        if not self.args.test:
+            samples_to_save = self.args.samples_to_save
+            chains_to_save = self.args.chains_to_save
+        else:
+            samples_to_save = self.args.final_samples_to_save
+            chains_to_save = self.args.final_chains_to_save
+
         if self.accelerator.is_local_main_process:
-            # save checkpoint
-            if ((i % self.stride == 0) or (i == self.num_iter)) and (
-                i > 0
-            ):  #  or (i % self.stride == 1))
+            # if not self.args.test:
+            if self.args.ema:
+                sample_net = self.ema_helpers[fb].ema_copy(self.net[fb])  # TODO: this may pose a problem for test
+            else:
+                sample_net = self.net[fb]
+            # else:
+            #     net_f, net_b = get_graph_models(self.args, self.datainfos)
+            #     net_f.load_state_dict(torch.load(self.args.checkpoint_f))
+            #     net_b.load_state_dict(torch.load(self.args.checkpoint_b))
+            #     sample_net = net_f if fb == "f" else net_b
 
-                if self.args.ema:
-                    sample_net = self.ema_helpers[fb].ema_copy(self.net[fb])
-                else:
-                    sample_net = self.net[fb]
+            name_net = "net" + "_" + fb + "_" + str(n) + "_" + str(i) + ".ckpt"
+            name_net_ckpt = "./checkpoints/" + name_net
 
-                name_net = "net" + "_" + fb + "_" + str(n) + "_" + str(i) + ".ckpt"
+            if self.args.dataparallel:
+                torch.save(self.net[fb].module.state_dict(), name_net_ckpt)
+            else:
+                torch.save(self.net[fb].state_dict(), name_net_ckpt)
+
+            if self.args.ema:
+                name_net = (
+                    "sample_net" + "_" + fb + "_" + str(n) + "_" + str(i) + ".ckpt"
+                )
                 name_net_ckpt = "./checkpoints/" + name_net
-
                 if self.args.dataparallel:
-                    torch.save(self.net[fb].module.state_dict(), name_net_ckpt)
+                    torch.save(sample_net.module.state_dict(), name_net_ckpt)
                 else:
-                    torch.save(self.net[fb].state_dict(), name_net_ckpt)
+                    torch.save(sample_net.state_dict(), name_net_ckpt)
 
-                if self.args.ema:
-                    name_net = (
-                        "sample_net" + "_" + fb + "_" + str(n) + "_" + str(i) + ".ckpt"
-                    )
-                    name_net_ckpt = "./checkpoints/" + name_net
-                    if self.args.dataparallel:
-                        torch.save(sample_net.module.state_dict(), name_net_ckpt)
-                    else:
-                        torch.save(sample_net.state_dict(), name_net_ckpt)
+            # generation
+            self.set_seed(seed=0 + self.accelerator.process_index)
+            batch, samples, chains, n_nodes = self.generate_graphs(fb, sample_net, n, test=self.args.test)
 
-            # get val and test results
-            if ((i % (2 * self.stride) == 0) or (i == self.num_iter)) and (i > 0):
-                with torch.no_grad():
-                    self.set_seed(seed=0 + self.accelerator.process_index)
-                    if fb == "f" or self.args.transfer:
-                        loader = self.save_init_dl if fb == "f" else self.save_final_dl
-                        batch = next(loader)
-                        batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
-                        n_nodes = node_mask.sum(-1)
-                    else:
-                        batch_size = self.args.plot_npar
-                        n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
-                        arange = (
-                            torch.arange(self.max_n_nodes, device=self.device)
-                            .unsqueeze(0)
-                            .expand(batch_size, -1)
-                        )
-                        node_mask = arange < n_nodes.unsqueeze(1)
-                        batch = utils.PlaceHolder(
-                            X=torch.ones(
-                                batch_size,
-                                self.max_n_nodes,
-                                len(self.datainfos.node_types),
-                            ).to(self.device)
-                            / len(self.datainfos.node_types),
-                            E=torch.ones(
-                                batch_size,
-                                self.max_n_nodes,
-                                self.max_n_nodes,
-                                len(self.datainfos.edge_types),
-                            ).to(self.device)
-                            / len(self.datainfos.edge_types),
-                            y=None,
-                            charge=None,
-                            n_nodes=n_nodes,
-                        )
+            to_plot = utils.PlaceHolder(
+                X=samples.X,
+                E=samples.E,
+                charge=None,
+                y=None,
+                n_nodes=n_nodes,
+            )
+            X = to_plot.X
+            E = to_plot.E
+            generated_list = []
+            for l in range(X.shape[0]):
+                cur_n = n_nodes[l]
+                atom_types = X[l, :cur_n].cpu()
+                edge_types = E[l, :cur_n, :cur_n].cpu()
+                generated_list.append([atom_types, edge_types])
 
-                    batch.mask(node_mask)
-                    x_tot, out, _, steps_expanded = self.langevin.record_langevin_seq(
-                        sample_net,
-                        batch,
-                        node_mask=node_mask,
-                        ipf_it=n,
-                        sample=True
-                    )
+            print("visualizing graphs...")
+            current_path = os.getcwd()
+            result_path = os.path.join(
+                current_path, f"im/step{str(i)}_iter{str(n)}_{fb}/",
+            )
 
-                to_plot = x_tot.get_data(-1, dim=1).collapse()
+            self.visualization_tools.visualize(
+                result_path,
+                to_plot,
+                atom_decoder=None,
+                num_graphs_to_visualize=to_plot.X.shape[0],
+                fb=fb,
+            )
 
-                n_nodes = to_plot.node_mask.sum(-1)
-                X = to_plot.X
-                E = to_plot.E
-                generated_list = []
-                for l in range(X.shape[0]):
-                    cur_n = n_nodes[l]
-                    atom_types = X[l, :cur_n].cpu()
-                    edge_types = E[l, :cur_n, :cur_n].cpu()
-                    generated_list.append([atom_types, edge_types])
+            print("Visualizing chains...")
 
-                print("visualizing graphs...")
-                current_path = os.getcwd()
-                result_path = os.path.join(
-                    current_path, f"im/step{str(i)}_iter{str(n)}_{fb}/",
-                )
+            result_path = os.path.join(
+                current_path, f"predict_chains_{fb}/ipf{n}_step{i}"
+            )
 
-                self.visualization_tools.visualize(
-                    result_path,
-                    to_plot,
-                    atom_decoder=None,
-                    num_graphs_to_visualize=to_plot.X.shape[0],
-                )
+            chains.X = torch.concatenate((batch.X.unsqueeze(1)[:chains_to_save], chains.X), dim=1)
+            chains.E = torch.concatenate((batch.E.unsqueeze(1)[:chains_to_save], chains.E), dim=1)
+            _ = self.visualization_tools.visualize_chains(
+                result_path,
+                chains=chains,
+                num_nodes=n_nodes,
+                local_rank=0,
+                num_chains_to_visualize=len(chains.X),
+                fb=fb,
+                transfer=self.args.transfer,
+            )
 
-                print("Visualizing chains...")
+            # in this case, if fb=='f' and not transfer, then the metrics will become None
+            test_sampling_metrics = (
+                self.test_sampling_metrics
+                if fb == "b"
+                else self.tf_test_sampling_metrics
+            )
+            val_sampling_metrics = (
+                self.val_sampling_metrics
+                if fb == "b"
+                else self.tf_val_sampling_metrics
+            )
 
-                result_path = os.path.join(
-                    current_path, f"predict_chains_{fb}/ipf{n}_step{i}"
-                )
-
-                chain = x_tot.copy()
-                chain.X = torch.concatenate((batch.X.unsqueeze(1), chain.X), dim=1)
-                chain.E = torch.concatenate((batch.E.unsqueeze(1), chain.E), dim=1)
-                _ = self.visualization_tools.visualize_chains(
-                    result_path,
-                    chains=chain,
-                    num_nodes=n_nodes,
+            if test_sampling_metrics is not None:
+                test_to_log = self.test_sampling_metrics.compute_all_metrics(
+                    generated_list,
+                    current_epoch=0,
                     local_rank=0,
-                    num_chains_to_visualize=2,
                     fb=fb,
+                    i=np.round(i / (self.num_iter + 1), 2),
                 )
 
-                mean_val = (
-                    chain.E[..., 0].mean(-1).mean(-1).mean(0).cpu().detach().numpy()
-                    - chain.E[..., 1].mean(-1).mean(-1).mean(0).cpu().detach().numpy()
+                # save results for testing
+                print("saving results for testing")
+                current_path = os.getcwd()
+                res_path = os.path.join(current_path, f"test_{fb}_{n}.json",)
+
+                with open(res_path, "w") as file:
+                    json.dump(test_to_log, file)
+
+            elif val_sampling_metrics is not None:
+                val_to_log = self.val_sampling_metrics.compute_all_metrics(
+                    generated_list,
+                    current_epoch=0,
+                    local_rank=0,
+                    fb=fb,
+                    i=np.round(i / (self.num_iter + 1), 2),
                 )
-                np.save(f"{fb}_{n}_mean.npy", mean_val)
-                dataa = [
-                    [x, y] for (x, y) in zip(np.arange(chain.E.shape[1]), mean_val)
-                ]
-                if mean_val.max() > 100 or mean_val.min() < -100:
-                    import pdb
+                # save results for testing
+                print("saving results for testing")
+                current_path = os.getcwd()
+                res_path = os.path.join(current_path, f"val_{fb}_{n}.json",)
 
-                    pdb.set_trace()
-                table = wandb.Table(data=dataa, columns=["steps", "mean"])
-                wandb.log(
-                    {
-                        f"{fb}_{n}_mean_pred": wandb.plot.line(
-                            table, "steps", "mean", title=f"{fb}_{n}_mean_pred"
-                        )
-                    }
-                )
-
-                # in this case, if fb=='f' and not transfer, then the metrics will become None
-                test_sampling_metrics = (
-                    self.test_sampling_metrics
-                    if fb == "b"
-                    else self.tf_test_sampling_metrics
-                )
-                val_sampling_metrics = (
-                    self.val_sampling_metrics
-                    if fb == "b"
-                    else self.tf_val_sampling_metrics
-                )
-
-                if test_sampling_metrics is not None:
-
-                    test_to_log = self.test_sampling_metrics.compute_all_metrics(
-                        generated_list,
-                        current_epoch=0,
-                        local_rank=0,
-                        fb=fb,
-                        i=np.round(i / (self.num_iter + 1), 2),
-                    )
-
-                    # save results for testing
-                    print("saving results for testing")
-                    current_path = os.getcwd()
-                    res_path = os.path.join(current_path, f"test_{fb}_{n}.json",)
-
-                    with open(res_path, "w") as file:
-                        json.dump(test_to_log, file)
-
-                elif val_sampling_metrics is not None:
-                    val_to_log = self.val_sampling_metrics.compute_all_metrics(
-                        generated_list,
-                        current_epoch=0,
-                        local_rank=0,
-                        fb=fb,
-                        i=np.round(i / (self.num_iter + 1), 2),
-                    )
-                    # save results for testing
-                    print("saving results for testing")
-                    current_path = os.getcwd()
-                    res_path = os.path.join(current_path, f"val_{fb}_{n}.json",)
-
-                    with open(res_path, "w") as file:
-                        json.dump(val_to_log, file)
+                with open(res_path, "w") as file:
+                    json.dump(val_to_log, file)
 
     def set_seed(self, seed=0):
         torch.manual_seed(seed)
@@ -685,28 +729,27 @@ class IPFSequential(IPFBase):
         self.build_optimizers()
         self.accelerate(forward_or_backward)
 
-        cur_num_iter = self.num_iter + 1
-
-        for i in tqdm(range(cur_num_iter)):
+        for i in tqdm(range(self.num_iter)):
             """
             training step
             """
             self.set_seed(seed=n * self.num_iter + i)
-            x, out, gammas_expanded, steps_expanded = next(new_dl)
+            x, out, gammas_expanded, times_expanded = next(new_dl)
             x = PlaceHolder(X=x[0], E=x[1], y=x[2], charge=x[3], n_nodes=x[4])
             out = PlaceHolder(X=out[0], E=out[1], y=out[2], charge=out[3])
 
-            eval_steps = self.T - steps_expanded
+            eval_steps = self.T - times_expanded
             pred = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
 
+            # dp = r * dt
+            pred.X = pred.X * gammas_expanded[:, None, :]
+            pred.E = pred.E * gammas_expanded[:, None, None, :]
+            # change the value for the diagonal
             pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
             pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
             pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], (1.0 - pred.X.sum(dim=-1, keepdim=True)).clamp(min=0.0))
             pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], (1.0 - pred.E.sum(dim=-1, keepdim=True)).clamp(min=0.0))
-
-            pred.X = pred.X * gammas_expanded[:, None, :]
-            pred.E = pred.E * gammas_expanded[:, None, None, :]
-            pred = x.add(pred)
+            # normalization
             pred.X = pred.X / pred.X.sum(-1, keepdim=True)
             pred.E = pred.E / pred.E.sum(-1, keepdim=True)
 
@@ -720,45 +763,15 @@ class IPFSequential(IPFBase):
                 gap = self.num_steps // num_log
 
             if wandb.run and (i % gap == 0):
-                # if forward_or_backward == "f":
-                #     wandb.log(
-                #         {"forward_num_iter": n * self.num_iter + i + 1}, commit=True
-                #     )
-                # else:
-                #     wandb.log(
-                #         {"backward_num_iter": n * self.num_iter + i + 1}, commit=True
-                #     )
                 wandb.log(
                     {
-                        f"train/loss_{forward_or_backward}_{n}": loss.detach()
-                        .cpu()
-                        .numpy()
-                        .item()
+                        f"train/loss_{forward_or_backward}": loss.detach().cpu().numpy().item()
                     },
-                    step=i,
-                    commit=False,
+                    # step=(n//2) * self.num_iter + i,
+                    # commit=True
                 )
 
             self.accelerator.backward(loss)
-
-            if self.grad_clipping:
-                clipping_param = self.args.grad_clip
-                total_norm = torch.nn.utils.clip_grad_norm_(
-                    self.net[forward_or_backward].parameters(), clipping_param
-                )
-            else:
-                total_norm = 0.0
-
-            if (i % self.stride_log == 0) and (i > 0):
-                self.logger.log_metrics(
-                    {
-                        "forward_or_backward": forward_or_backward,
-                        "loss": loss,
-                        "grad_norm": total_norm,
-                    },
-                    step=i + self.num_iter * n,
-                )
-
             self.optimizer[forward_or_backward].step()
             self.optimizer[forward_or_backward].zero_grad()
             if self.args.ema:
@@ -766,7 +779,8 @@ class IPFSequential(IPFBase):
                     self.net[forward_or_backward]
                 )
 
-            self.save_step(i, n, forward_or_backward)
+            if i == self.num_iter - 1:
+                self.save_step(i, n, forward_or_backward)
 
             if (i % self.args.cache_refresh_stride == 0) and (i > 0):
                 new_dl = None
@@ -779,7 +793,6 @@ class IPFSequential(IPFBase):
     def compute_loss(self, pred, out):
         bce_loss = torch.nn.BCELoss()
         # Calculate the losses
-        # print(pred.E[0,0,1], out.E[0,0,1])
         node_loss = self.args.model.lambda_train[0] * bce_loss(pred.X, out.X)
         edge_loss = self.args.model.lambda_train[1] * bce_loss(pred.E, out.E)
         # # CE
@@ -802,6 +815,12 @@ class IPFSequential(IPFBase):
             else:
                 self.ipf_step("b", n)
                 self.ipf_step("f", n)
+
+    def test(self):
+        print("Testing...")
+
+        self.save_step(0, 0, "f")
+        self.save_step(0, 0, "b")
 
     def forward_graph(self, net, z_t, t):
         # step 1: calculate extra features

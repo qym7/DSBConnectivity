@@ -23,6 +23,21 @@ paths:
   experiments_dir_name: experiments
 wandb: 'online'             # online | offline | disabled
 
+
+
+# settings
+seed: 1234
+limit_dist: marginal            # uniform | marginal | marginal_tf
+
+# settings for evaluations
+final_model_samples_to_generate: 100
+final_model_samples_to_save: 30
+final_model_chains_to_save: 20
+samples_to_generate: 32
+samples_to_save: 10
+chains_to_save: 5
+test: False
+
 # checkpoint
 checkpoint_run: False
 checkpoint_it: 13
@@ -31,6 +46,3 @@ sample_checkpoint_f: ""
 sample_checkpoint_b: ""
 checkpoint_f: ""
 checkpoint_b: ""
-
-# settings
-seed: 1234
