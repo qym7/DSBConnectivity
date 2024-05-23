@@ -548,7 +548,7 @@ class IPFBase(torch.nn.Module):
 
             samples_to_generate -= len(n_nodes)
             i += 1
-            
+
         # merge things together
         samples = utils.PlaceHolder(
             X=torch.cat([s.X for s in samples], dim=0)[:samples_to_generate],
@@ -566,16 +566,13 @@ class IPFBase(torch.nn.Module):
 
         return batch, samples, chains, all_n_nodes
 
-
     def save_step(self, i, n, fb):
         """
         Step for sampling and for saving
         """
         if not self.args.test:
-            samples_to_save = self.args.samples_to_save
             chains_to_save = self.args.chains_to_save
         else:
-            samples_to_save = self.args.final_samples_to_save
             chains_to_save = self.args.final_chains_to_save
 
         if self.accelerator.is_local_main_process:
@@ -584,11 +581,6 @@ class IPFBase(torch.nn.Module):
                 sample_net = self.ema_helpers[fb].ema_copy(self.net[fb])  # TODO: this may pose a problem for test
             else:
                 sample_net = self.net[fb]
-            # else:
-            #     net_f, net_b = get_graph_models(self.args, self.datainfos)
-            #     net_f.load_state_dict(torch.load(self.args.checkpoint_f))
-            #     net_b.load_state_dict(torch.load(self.args.checkpoint_b))
-            #     sample_net = net_f if fb == "f" else net_b
 
             name_net = "net" + "_" + fb + "_" + str(n) + "_" + str(i) + ".ckpt"
             name_net_ckpt = "./checkpoints/" + name_net
@@ -812,6 +804,7 @@ class IPFSequential(IPFBase):
             # BACKWARD OPTIMISATION
             if (self.checkpoint_pass == "f") and (n == self.checkpoint_it):
                 self.ipf_step("f", n)
+                self.ipf_step("b", n)
             else:
                 self.ipf_step("b", n)
                 self.ipf_step("f", n)

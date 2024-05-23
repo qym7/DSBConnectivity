@@ -102,36 +102,14 @@ class CacheLoader(Dataset):
 
                 batch.mask(node_mask)
 
-                if (n == 1) & (fb == "b"):
+                # if (n == 1) & (fb == "b"):
+                if n == 1:
                     x, out, gammas_expanded, times_expanded = langevin.record_init_langevin(
                         batch, node_mask
                     )
                 else:
                     x, out, gammas_expanded, times_expanded = langevin.record_langevin_seq(
                         sample_net, batch, node_mask=batch.node_mask, ipf_it=n
-                    )
-
-                if b == 0 and self.visualize:
-                # if b == 0:
-                    self.visualize = False
-                    print("Visualizing chains...")
-                    current_path = os.getcwd()
-                    reverse_fb = "f" if fb == "b" else "b"
-                    result_path = os.path.join(
-                        current_path,
-                        f"cache_chains_{reverse_fb}/" f"ipf{n}/" f"molecule",
-                    )
-
-                    chain = x.copy()
-                    chain.X = torch.concatenate((batch.X.unsqueeze(1), chain.X), dim=1)
-                    chain.E = torch.concatenate((batch.E.unsqueeze(1), chain.E), dim=1)
-                    _ = self.visualization_tools.visualize_chains(
-                        result_path,
-                        chains=chain,
-                        num_nodes=n_nodes,
-                        local_rank=0,
-                        num_chains_to_visualize=4,
-                        fb=reverse_fb,
                     )
 
                 batch_X = torch.cat(
