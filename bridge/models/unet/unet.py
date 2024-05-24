@@ -205,7 +205,6 @@ class UNetModel(nn.Module):
         self.output_blocks.apply(convert_module_to_f32)
 
     def forward(self, x, timesteps, y=None, graph=False):
-
         """
         Apply the model to an input batch.
         :param x: an [N x C x ...] Tensor of inputs.

@@ -41,7 +41,7 @@ class SamplingMetrics(nn.Module):
                 dataset_infos.train_smiles,
                 dataset_infos.test_smiles if test else dataset_infos.val_smiles,
                 dataset_infos,
-                test
+                test,
             )
 
         elif dataset_infos.spectre:
@@ -116,7 +116,7 @@ class SamplingMetrics(nn.Module):
         # self.mean_components(connected_comp)
         # self.max_components(connected_comp)
 
-        key = f"val_{fb}" if not self.test else f"val_{fb}"
+        key = f"val_{fb}" if not self.test else f"test_{fb}"
         to_log = {
             f"{key}/NumNodesW1": self.num_nodes_w1.compute().item(),
             f"{key}/NodeTypesTV": self.node_types_tv.compute().item(),
@@ -127,7 +127,7 @@ class SamplingMetrics(nn.Module):
         }
 
         if self.domain_metrics is not None:
-            domain_key = f"domain_val_{fb}" if not self.test else f"val_{fb}"
+            domain_key = f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
             do_metrics = self.domain_metrics.forward(
                 generated_graphs, current_epoch, local_rank, test=self.test
             )
@@ -139,6 +139,7 @@ class SamplingMetrics(nn.Module):
         print(to_log)
 
         return to_log
+
 
 def number_nodes_distance(generated_graphs, dataset_counts):
     max_number_nodes = max(dataset_counts.keys())

@@ -119,9 +119,9 @@ class SpectreGraphDataset(InMemoryDataset):
             raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/planar_64_200.pt"
         elif self.dataset_name == "comm20":
             raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/community_12_21_100.pt"
-        elif self.dataset_name == "ego":        
+        elif self.dataset_name == "ego":
             raw_url = "https://raw.githubusercontent.com/tufts-ml/graph-generation-EDGE/main/graphs/Ego.pkl"
-        elif self.dataset_name == 'sbm_syn':
+        elif self.dataset_name == "sbm_syn":
             networks = generate_sbm_graphs_fixed_size(
                 num_graphs=self.cfg.num_graphs,
                 num_nodes=self.cfg.num_nodes,
@@ -131,17 +131,23 @@ class SpectreGraphDataset(InMemoryDataset):
                 max_community_size=self.cfg.max_community_size,
                 intra_prob=self.cfg.intra_prob,
                 inter_prob=self.cfg.inter_prob,
-                )
-            adjs = [torch.Tensor(to_numpy_array(network)).fill_diagonal_(0) for network in networks]
+            )
+            adjs = [
+                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
+                for network in networks
+            ]
         else:
             raise ValueError(f"Unknown dataset {self.dataset_name}")
-        if 'syn' not in self.dataset_name:
+        if "syn" not in self.dataset_name:
             file_path = download_url(raw_url, self.raw_dir)
 
-        if self.dataset_name == 'ego':
-            networks = pkl.load(open(file_path, 'rb'))
-            adjs = [torch.Tensor(to_numpy_array(network)).fill_diagonal_(0) for network in networks]
-        elif self.dataset_name == 'sbm_syn':
+        if self.dataset_name == "ego":
+            networks = pkl.load(open(file_path, "rb"))
+            adjs = [
+                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
+                for network in networks
+            ]
+        elif self.dataset_name == "sbm_syn":
             pass
         else:
             (
@@ -154,12 +160,12 @@ class SpectreGraphDataset(InMemoryDataset):
                 same_sample,
                 n_max,
             ) = torch.load(file_path)
-            
+
         g_cpu = torch.Generator()
         g_cpu.manual_seed(1234)
         self.num_graphs = len(adjs)
 
-        if self.dataset_name == 'ego':
+        if self.dataset_name == "ego":
             test_len = int(round(self.num_graphs * 0.2))
             train_len = int(round(self.num_graphs * 0.8))
             val_len = int(round(self.num_graphs * 0.2))
@@ -202,7 +208,6 @@ class SpectreGraphDataset(InMemoryDataset):
         torch.save(val_data, self.raw_paths[1])
         torch.save(test_data, self.raw_paths[2])
 
-
     def process(self):
         raw_dataset = torch.load(os.path.join(self.raw_dir, "{}.pt".format(self.split)))
         data_list = []
@@ -214,7 +219,10 @@ class SpectreGraphDataset(InMemoryDataset):
             edge_attr[:, 1] = 1
             n_nodes = n * torch.ones(1, dtype=torch.long)
             data = torch_geometric.data.Data(
-                x=X.float(), edge_index=edge_index, edge_attr=edge_attr.float(), n_nodes=n_nodes
+                x=X.float(),
+                edge_index=edge_index,
+                edge_attr=edge_attr.float(),
+                n_nodes=n_nodes,
             )
 
             if self.pre_filter is not None and not self.pre_filter(data):
@@ -248,21 +256,21 @@ class SpectreGraphDataModule(AbstractDataModule):
                 pre_transform=pre_transform,
                 split="train",
                 root=root_path,
-                cfg=cfg
+                cfg=cfg,
             ),
             "val": SpectreGraphDataset(
                 dataset_name=self.cfg.name,
                 pre_transform=pre_transform,
                 split="val",
                 root=root_path,
-                cfg=cfg
+                cfg=cfg,
             ),
             "test": SpectreGraphDataset(
                 dataset_name=self.cfg.name,
                 pre_transform=pre_transform,
                 split="test",
                 root=root_path,
-                cfg=cfg
+                cfg=cfg,
             ),
         }
 
@@ -295,9 +303,9 @@ class SpectreDatasetInfos(AbstractDatasetInfos):
             X=len(self.node_types), E=len(self.bond_types), y=0, charge=0
         )
         self.statistics = {
-            'train': datamodule.statistics['train'],
-            'val': datamodule.statistics['val'],
-            'test': datamodule.statistics['test']
+            "train": datamodule.statistics["train"],
+            "val": datamodule.statistics["val"],
+            "test": datamodule.statistics["test"],
         }
 
     def to_one_hot(self, data):
@@ -307,7 +315,7 @@ class SpectreDatasetInfos(AbstractDatasetInfos):
         """
         data.charge = data.x.new_zeros((*data.x.shape[:-1], 0))
         if data.y is None:
-            data.y = data.x.new_zeros((data.batch.max().item()+1, 0))
+            data.y = data.x.new_zeros((data.batch.max().item() + 1, 0))
 
         return data
 
@@ -321,9 +329,11 @@ class SBMDataModule(SpectreGraphDataModule):
     def __init__(self, cfg):
         super().__init__(cfg)
 
+
 class SBMSynDataModule(SpectreGraphDataModule):
     def __init__(self, cfg):
         super().__init__(cfg)
+
 
 class PlanarDataModule(SpectreGraphDataModule):
     def __init__(self, cfg):

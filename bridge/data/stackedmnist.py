@@ -59,7 +59,7 @@ class Stacked_MNIST(Dataset):
                 zip(dataloader_R, dataloader_G, dataloader_B)
             ):
                 x = torch.cat([xR, xG, xB][-self.num_channels :], dim=1)
-                y = (100 * yR + 10 * yG + yB) % 10 ** self.num_channels
+                y = (100 * yR + 10 * yG + yB) % 10**self.num_channels
                 self.data = torch.cat((self.data, x), dim=0)
                 self.targets = torch.cat((self.targets, y), dim=0)
 

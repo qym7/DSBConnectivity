@@ -18,13 +18,13 @@ class DummyExtraFeatures:
 
 
 def batch_trace(X):
-    """ Expect a matrix of shape B N N, returns the trace in shape B."""
+    """Expect a matrix of shape B N N, returns the trace in shape B."""
     diag = torch.diagonal(X, dim1=-2, dim2=-1)
     return diag.sum(dim=-1)
 
 
 def batch_diagonal(X):
-    """ Extracts the diagonal from the last two dims of a tensor. """
+    """Extracts the diagonal from the last two dims of a tensor."""
     return torch.diagonal(X, dim1=-2, dim2=-1)
 
 
@@ -114,7 +114,7 @@ class PositionalEncoding:
 
 
 class EigenFeatures:
-    """  Some code is taken from : https://github.com/Saro00/DGN/blob/master/models/pytorch/eigen_agg.py. """
+    """Some code is taken from : https://github.com/Saro00/DGN/blob/master/models/pytorch/eigen_agg.py."""
 
     def __init__(self, num_eigenvectors, num_eigenvalues):
         self.num_eigenvectors = num_eigenvectors
@@ -332,7 +332,7 @@ class AdjacencyFeatures:
         return kcyclesx, y_feat, edge_feats
 
     def calculate_kpowers(self, adj):
-        """ adj: bs, n, n"""
+        """adj: bs, n, n"""
         shape = (self.max_degree, *adj.shape)
         adj = adj.float()
         self.k = torch.zeros(shape, device=adj.device, dtype=torch.float)
@@ -382,7 +382,7 @@ class AdjacencyFeatures:
 
     def k6_cycle(self):
         term_1_t = batch_trace(self.k6)
-        term_2_t = batch_trace(self.k3 ** 2)
+        term_2_t = batch_trace(self.k3**2)
         term3_t = torch.sum(self.k1 * self.k2.pow(2), dim=[-2, -1])
         d_t4 = batch_diagonal(self.k2)
         a_4_t = batch_diagonal(self.k4)
@@ -414,9 +414,9 @@ class AdjacencyFeatures:
         return path_features
 
     def local_neighbors(self, num_nodes):
-        """ Adamic-Adar index for each pair of nodes.
-            this function captures the local neighborhood information, commonly used in social network analysis
-            [i, j], sum of 1/log(degree(u)), u is a common neighbor of i and j.
+        """Adamic-Adar index for each pair of nodes.
+        this function captures the local neighborhood information, commonly used in social network analysis
+        [i, j], sum of 1/log(degree(u)), u is a common neighbor of i and j.
         """
         normed_adj = self.k1 / self.k1.sum(-1).unsqueeze(
             1

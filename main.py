@@ -1,4 +1,3 @@
-
 import hydra
 import os, sys
 
@@ -19,7 +18,6 @@ from bridge.runners.ipf import IPFSequential
 
 @hydra.main(config_path="./conf", config_name="config")
 def main(args):
-
     print("Directory: " + os.getcwd())
     ipf = IPFSequential(args)
     if not args.test:

@@ -115,7 +115,7 @@ def gaussian_KL(q_mu, q_sigma):
         The KL distance, summed over all dimensions except the batch dim.
     """
     return sum_except_batch(
-        (torch.log(1 / q_sigma) + 0.5 * (q_sigma ** 2 + q_mu ** 2) - 0.5)
+        (torch.log(1 / q_sigma) + 0.5 * (q_sigma**2 + q_mu**2) - 0.5)
     )
 
 

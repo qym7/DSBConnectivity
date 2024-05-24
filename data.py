@@ -19,7 +19,6 @@ from bridge.data.celeba import CelebA
 
 
 def main():
-
     args = parser.parse_args()
 
     if args.data == "mnist":

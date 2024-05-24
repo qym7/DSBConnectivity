@@ -49,7 +49,7 @@ class ConvEncoder(torch.nn.Module):
         self.conv1 = torch.nn.Conv2d(
             in_channels, out_channels, kernel_size, padding=padding, stride=stride
         )
-        self.linear1 = torch.nn.Linear(self.out_dim ** 2 * out_channels, hidden_size)
+        self.linear1 = torch.nn.Linear(self.out_dim**2 * out_channels, hidden_size)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -71,7 +71,6 @@ class ConvDecoder(torch.nn.Module):
         out_channels=3,
         stride=1,
     ):
-
         super().__init__()
         self.in_dim = in_dim
         self.num_pixels = num_pixels

@@ -391,7 +391,9 @@ class PlaceHolder:
             X_t = F.one_hot(X_t, self.X.shape[-1])
             E_t = F.one_hot(E_t, self.E.shape[-1])
 
-        return PlaceHolder(X=X_t, E=E_t, y=torch.zeros(bs, 0).type_as(X_t), node_mask=node_mask)
+        return PlaceHolder(
+            X=X_t, E=E_t, y=torch.zeros(bs, 0).type_as(X_t), node_mask=node_mask
+        )
 
     def place(self, graph_data, k):
         if (self.X is not None) and (graph_data.X is not None):
@@ -535,9 +537,7 @@ class PlaceHolder:
                 y = None
             else:
                 y = self.y[i]
-            graph_list.append(
-                PlaceHolder(X=x, charge=None, E=e, y=y, node_mask=None)
-            )
+            graph_list.append(PlaceHolder(X=x, charge=None, E=e, y=y, node_mask=None))
         return graph_list
 
     def collapse(self, collapse_charge=None, node_mask=None):

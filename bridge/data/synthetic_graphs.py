@@ -68,6 +68,7 @@ def generate_sbm_graphs(
 
     return graphs
 
+
 def generate_sbm_graphs_fixed_size(
     num_graphs,
     num_nodes,
@@ -92,14 +93,16 @@ def generate_sbm_graphs_fixed_size(
         nodes_left = num_nodes - community_sizes.sum()
         max_num_nodes_to_add = max_community_size - min_community_size
         for i in range(num_communities):
-            nodes_to_add_i = min(np.random.choice(max_num_nodes_to_add+1, 1), nodes_left)
-            community_sizes[i] = (community_sizes[i] + nodes_to_add_i)
+            nodes_to_add_i = min(
+                np.random.choice(max_num_nodes_to_add + 1, 1), nodes_left
+            )
+            community_sizes[i] = community_sizes[i] + nodes_to_add_i
             nodes_left = nodes_left - nodes_to_add_i
 
         if community_sizes.sum() != num_nodes:
             continue
 
-        print('created', len(graphs), 'graphs', num_communities, community_sizes)
+        print("created", len(graphs), "graphs", num_communities, community_sizes)
 
         community_sizes = community_sizes.astype(int)
 

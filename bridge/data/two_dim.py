@@ -8,7 +8,6 @@ from torch.utils.data import TensorDataset
 
 
 def data_distrib(npar, data):
-
     if data == "mixture":
         init_sample = torch.randn(npar, 2)
         p = init_sample.shape[0] // 2

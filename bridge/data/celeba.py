@@ -123,7 +123,7 @@ class CelebA(VisionDataset):
     def download(self):
         import zipfile
 
-        for (file_id, filename) in self.file_list:
+        for file_id, filename in self.file_list:
             fp = os.path.join(self.root, self.base_folder, filename)
             if not os.path.exists(fp):
                 download_file_from_google_drive(

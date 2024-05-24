@@ -82,15 +82,12 @@ class IPFBase(torch.nn.Module):
 
         # get data
         print("creating dataloaders")
-        # dataloaders = self.build_dataloaders()
         dataloaders, tf_dataloaders = self.build_datamodules()
         self.max_n_nodes = self.datainfos.max_n_nodes
-        self.visualization_tools = Visualizer(
-            dataset_infos=self.datainfos
-        )
+        self.visualization_tools = Visualizer(dataset_infos=self.datainfos)
 
         # create metrics for graph dataset
-        print('creating metrics for graph dataset')
+        print("creating metrics for graph dataset")
         # create the training/test/val dataloader
         self.val_sampling_metrics = SamplingMetrics(
             dataset_infos=self.datainfos, test=False, dataloaders=dataloaders
@@ -127,23 +124,21 @@ class IPFBase(torch.nn.Module):
 
         max_n_nodes = self.datainfos.max_n_nodes
         print("creating Langevin")
-        if self.args.limit_dist == 'marginal':
+        if self.args.limit_dist == "marginal":
             self.limit_dist = utils.PlaceHolder(
-                X=self.datainfos.node_types,
-                E=self.datainfos.edge_types,
-                y=None
+                X=self.datainfos.node_types, E=self.datainfos.edge_types, y=None
             )
-        elif self.args.limit_dist == 'marginal_tf':
+        elif self.args.limit_dist == "marginal_tf":
             self.limit_dist = utils.PlaceHolder(
-                X=self.tf_datainfos.node_types,
-                E=self.tf_datainfos.edge_types,
-                y=None
+                X=self.tf_datainfos.node_types, E=self.tf_datainfos.edge_types, y=None
             )
         else:
             self.limit_dist = utils.PlaceHolder(
-                X=torch.ones_like(self.datainfos.node_types)/len(self.datainfos.node_types),
-                E=torch.ones_like(self.datainfos.edge_types)/len(self.datainfos.edge_types),
-                y=None
+                X=torch.ones_like(self.datainfos.node_types)
+                / len(self.datainfos.node_types),
+                E=torch.ones_like(self.datainfos.edge_types)
+                / len(self.datainfos.edge_types),
+                y=None,
             )
         self.langevin = Langevin(
             self.num_steps,
@@ -156,7 +151,7 @@ class IPFBase(torch.nn.Module):
             extra_features=self.extra_features,
             domain_features=self.domain_features,
             tf_extra_features=self.tf_extra_features,
-            tf_domain_features=self.tf_domain_features
+            tf_domain_features=self.tf_domain_features,
         )
 
         # checkpoint
@@ -380,13 +375,16 @@ class IPFBase(torch.nn.Module):
             init_val_ds, batch_size=self.args.plot_npar, shuffle=False
         )
         print("creating the test dataloader")
-        # init_test_ds, _, _, _ = get_datasets(self.args, split='test')
         init_test_ds = self.datamodule.dataloaders["test"].dataset
         init_val_dl = pygloader.DataLoader(
             init_test_ds, batch_size=self.args.plot_npar, shuffle=False
         )
 
-        init_loaders = {"train": init_train_dl, "val": init_val_dl, "test": init_test_dl}
+        init_loaders = {
+            "train": init_train_dl,
+            "val": init_val_dl,
+            "test": init_test_dl,
+        }
 
         if self.args.transfer:
             final_ds = self.tf_datamodule.inner
@@ -417,7 +415,11 @@ class IPFBase(torch.nn.Module):
             final_test_dl = pygloader.DataLoader(
                 final_test_ds, batch_size=self.args.plot_npar, shuffle=False
             )
-            final_loaders = {"train": final_train_dl, "val": final_val_dl, "test": final_test_dl}
+            final_loaders = {
+                "train": final_train_dl,
+                "val": final_val_dl,
+                "test": final_test_dl,
+            }
         else:
             self.cache_final_dl = None
             self.save_final = None
@@ -426,7 +428,6 @@ class IPFBase(torch.nn.Module):
         return init_loaders, final_loaders
 
     def new_cacheloader(self, forward_or_backward, n, use_ema=True):
-
         sample_direction = "f" if forward_or_backward == "b" else "b"
         if use_ema:
             sample_net = self.ema_helpers[sample_direction].ema_copy(
@@ -510,17 +511,12 @@ class IPFBase(torch.nn.Module):
                 )
                 node_mask = arange < n_nodes.unsqueeze(1)
                 batch = utils.PlaceHolder(
-                    X=self.limit_dist.X.repeat(
-                        batch_size,
-                        self.max_n_nodes,
-                        1
-                        ).to(self.device),
+                    X=self.limit_dist.X.repeat(batch_size, self.max_n_nodes, 1).to(
+                        self.device
+                    ),
                     E=self.limit_dist.E.repeat(
-                        batch_size,
-                        self.max_n_nodes,
-                        self.max_n_nodes,
-                        1
-                        ).to(self.device),
+                        batch_size, self.max_n_nodes, self.max_n_nodes, 1
+                    ).to(self.device),
                     y=None,
                     charge=None,
                     n_nodes=n_nodes,
@@ -529,11 +525,7 @@ class IPFBase(torch.nn.Module):
 
             batch.mask(node_mask)
             x_tot, _, _, _ = self.langevin.record_langevin_seq(
-                sample_net,
-                batch,
-                node_mask=node_mask,
-                ipf_it=n,
-                sample=True
+                sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True
             )
 
             samples.append(x_tot.get_data(-1, dim=1).collapse())
@@ -578,7 +570,9 @@ class IPFBase(torch.nn.Module):
         if self.accelerator.is_local_main_process:
             # if not self.args.test:
             if self.args.ema:
-                sample_net = self.ema_helpers[fb].ema_copy(self.net[fb])  # TODO: this may pose a problem for test
+                sample_net = self.ema_helpers[fb].ema_copy(
+                    self.net[fb]
+                )  # TODO: this may pose a problem for test
             else:
                 sample_net = self.net[fb]
 
@@ -602,7 +596,9 @@ class IPFBase(torch.nn.Module):
 
             # generation
             self.set_seed(seed=0 + self.accelerator.process_index)
-            batch, samples, chains, n_nodes = self.generate_graphs(fb, sample_net, n, test=self.args.test)
+            batch, samples, chains, n_nodes = self.generate_graphs(
+                fb, sample_net, n, test=self.args.test
+            )
 
             to_plot = utils.PlaceHolder(
                 X=samples.X,
@@ -623,7 +619,8 @@ class IPFBase(torch.nn.Module):
             print("visualizing graphs...")
             current_path = os.getcwd()
             result_path = os.path.join(
-                current_path, f"im/step{str(i)}_iter{str(n)}_{fb}/",
+                current_path,
+                f"im/step{str(i)}_iter{str(n)}_{fb}/",
             )
 
             self.visualization_tools.visualize(
@@ -640,8 +637,12 @@ class IPFBase(torch.nn.Module):
                 current_path, f"predict_chains_{fb}/ipf{n}_step{i}"
             )
 
-            chains.X = torch.concatenate((batch.X.unsqueeze(1)[:chains_to_save], chains.X), dim=1)
-            chains.E = torch.concatenate((batch.E.unsqueeze(1)[:chains_to_save], chains.E), dim=1)
+            chains.X = torch.concatenate(
+                (batch.X.unsqueeze(1)[:chains_to_save], chains.X), dim=1
+            )
+            chains.E = torch.concatenate(
+                (batch.E.unsqueeze(1)[:chains_to_save], chains.E), dim=1
+            )
             _ = self.visualization_tools.visualize_chains(
                 result_path,
                 chains=chains,
@@ -659,9 +660,7 @@ class IPFBase(torch.nn.Module):
                 else self.tf_test_sampling_metrics
             )
             val_sampling_metrics = (
-                self.val_sampling_metrics
-                if fb == "b"
-                else self.tf_val_sampling_metrics
+                self.val_sampling_metrics if fb == "b" else self.tf_val_sampling_metrics
             )
 
             if test_sampling_metrics is not None:
@@ -676,7 +675,10 @@ class IPFBase(torch.nn.Module):
                 # save results for testing
                 print("saving results for testing")
                 current_path = os.getcwd()
-                res_path = os.path.join(current_path, f"test_{fb}_{n}.json",)
+                res_path = os.path.join(
+                    current_path,
+                    f"test_{fb}_{n}.json",
+                )
 
                 with open(res_path, "w") as file:
                     json.dump(test_to_log, file)
@@ -692,7 +694,10 @@ class IPFBase(torch.nn.Module):
                 # save results for testing
                 print("saving results for testing")
                 current_path = os.getcwd()
-                res_path = os.path.join(current_path, f"val_{fb}_{n}.json",)
+                res_path = os.path.join(
+                    current_path,
+                    f"val_{fb}_{n}.json",
+                )
 
                 with open(res_path, "w") as file:
                     json.dump(val_to_log, file)
@@ -739,8 +744,16 @@ class IPFSequential(IPFBase):
             # change the value for the diagonal
             pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
             pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
-            pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], (1.0 - pred.X.sum(dim=-1, keepdim=True)).clamp(min=0.0))
-            pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], (1.0 - pred.E.sum(dim=-1, keepdim=True)).clamp(min=0.0))
+            pred.X.scatter_(
+                -1,
+                x.X.argmax(-1)[:, :, None],
+                (1.0 - pred.X.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+            )
+            pred.E.scatter_(
+                -1,
+                x.E.argmax(-1)[:, :, :, None],
+                (1.0 - pred.E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+            )
             # normalization
             pred.X = pred.X / pred.X.sum(-1, keepdim=True)
             pred.E = pred.E / pred.E.sum(-1, keepdim=True)
@@ -757,7 +770,10 @@ class IPFSequential(IPFBase):
             if wandb.run and (i % gap == 0):
                 wandb.log(
                     {
-                        f"train/loss_{forward_or_backward}": loss.detach().cpu().numpy().item()
+                        f"train/loss_{forward_or_backward}": loss.detach()
+                        .cpu()
+                        .numpy()
+                        .item()
                     },
                     # step=(n//2) * self.num_iter + i,
                     # commit=True
@@ -796,25 +812,6 @@ class IPFSequential(IPFBase):
 
         return node_loss, edge_loss, loss
 
-    def train(self):
-        print("Training...")
-
-        for n in range(self.checkpoint_it, self.n_ipf + 1):
-            print("IPF iteration: " + str(n) + "/" + str(self.n_ipf))
-            # BACKWARD OPTIMISATION
-            if (self.checkpoint_pass == "f") and (n == self.checkpoint_it):
-                self.ipf_step("f", n)
-                self.ipf_step("b", n)
-            else:
-                self.ipf_step("b", n)
-                self.ipf_step("f", n)
-
-    def test(self):
-        print("Testing...")
-
-        self.save_step(0, 0, "f")
-        self.save_step(0, 0, "b")
-
     def forward_graph(self, net, z_t, t):
         # step 1: calculate extra features
         assert z_t.node_mask is not None
@@ -837,3 +834,17 @@ class IPFSequential(IPFBase):
         res = net(model_input)
 
         return res
+
+    def train(self):
+        print("Training...")
+
+        for n in range(self.checkpoint_it, self.n_ipf + 1):
+            print("IPF iteration: " + str(n) + "/" + str(self.n_ipf))
+            self.ipf_step("b", n)
+            self.ipf_step("f", n)
+
+    def test(self):
+        print("Testing...")
+
+        self.save_step(0, 0, "f")
+        self.save_step(0, 0, "b")

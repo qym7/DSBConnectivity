@@ -37,7 +37,9 @@ def load_ref_model(model_path: Optional[str] = None):
             "../../../sparse_diffusion/metrics/fcd/ChemNet_v0.13_pretrained.pt"
         )
         path = os.path.join(cur_path, chemnet_model_filename)
-        model_bytes = pkgutil.get_data("fcd",)
+        model_bytes = pkgutil.get_data(
+            "fcd",
+        )
 
         tmpdir = tempfile.TemporaryDirectory()
         model_path = os.path.join(tmpdir.name, chemnet_model_filename)

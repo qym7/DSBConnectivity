@@ -77,7 +77,12 @@ class GuacamolDataset(InMemoryDataset):
     all_url = "https://figshare.com/ndownloader/files/13612745"
 
     def __init__(
-        self, split, root, transform=None, pre_transform=None, pre_filter=None,
+        self,
+        split,
+        root,
+        transform=None,
+        pre_transform=None,
+        pre_filter=None,
     ):
         self.split = split
         self.atom_encoder = atom_encoder

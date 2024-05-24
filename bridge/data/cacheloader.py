@@ -28,7 +28,6 @@ class CacheLoader(Dataset):
         visualization_tools=None,
         visualize=False,
     ):
-
         super().__init__()
         self.max_n_nodes = langevin.max_n_nodes
         self.num_steps = langevin.num_steps
@@ -62,7 +61,9 @@ class CacheLoader(Dataset):
         self.times_data = torch.zeros((num_batches, batch_size * self.num_steps, 1)).to(
             device
         )  # .cpu() # steps
-        self.gammas_data = torch.zeros((num_batches, batch_size * self.num_steps, 1)).to(
+        self.gammas_data = torch.zeros(
+            (num_batches, batch_size * self.num_steps, 1)
+        ).to(
             device
         )  # .cpu() # steps
         self.n_nodes = torch.zeros((num_batches, batch_size * self.num_steps))
@@ -83,17 +84,12 @@ class CacheLoader(Dataset):
                     )
                     node_mask = arange < n_nodes.unsqueeze(1)
                     batch = utils.PlaceHolder(
-                        X=self.limit_dist.X.repeat(
-                            batch_size,
-                            self.max_n_nodes,
-                            1
-                            ).to(self.device),
+                        X=self.limit_dist.X.repeat(batch_size, self.max_n_nodes, 1).to(
+                            self.device
+                        ),
                         E=self.limit_dist.E.repeat(
-                            batch_size,
-                            self.max_n_nodes,
-                            self.max_n_nodes,
-                            1
-                            ).to(self.device),
+                            batch_size, self.max_n_nodes, self.max_n_nodes, 1
+                        ).to(self.device),
                         y=None,
                         charge=None,
                         n_nodes=n_nodes,
@@ -104,11 +100,19 @@ class CacheLoader(Dataset):
 
                 # if (n == 1) & (fb == "b"):
                 if n == 1:
-                    x, out, gammas_expanded, times_expanded = langevin.record_init_langevin(
-                        batch, node_mask
-                    )
+                    (
+                        x,
+                        out,
+                        gammas_expanded,
+                        times_expanded,
+                    ) = langevin.record_init_langevin(batch, node_mask)
                 else:
-                    x, out, gammas_expanded, times_expanded = langevin.record_langevin_seq(
+                    (
+                        x,
+                        out,
+                        gammas_expanded,
+                        times_expanded,
+                    ) = langevin.record_langevin_seq(
                         sample_net, batch, node_mask=batch.node_mask, ipf_it=n
                     )
 

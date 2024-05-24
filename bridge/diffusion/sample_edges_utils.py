@@ -12,7 +12,7 @@ def condensed_to_matrix_index(condensed_index, num_nodes):
     """
     b = 1 - (2 * num_nodes)
     i = torch.div(
-        (-b - torch.sqrt(b ** 2 - 8 * condensed_index)), 2, rounding_mode="floor"
+        (-b - torch.sqrt(b**2 - 8 * condensed_index)), 2, rounding_mode="floor"
     )
     j = condensed_index + torch.div(i * (b + i + 2), 2, rounding_mode="floor") + 1
     return torch.vstack((i.long(), j.long()))
@@ -54,7 +54,7 @@ def condensed_to_matrix_index_batch(condensed_index, num_nodes, edge_batch, ptr)
     # Edge ptr adds an offset of n (n-1) / 2 to each edge index
     ptr_condensed_index = condensed_index
     ii = torch.div(
-        (-bb - torch.sqrt(bb ** 2 - 8 * ptr_condensed_index)), 2, rounding_mode="floor"
+        (-bb - torch.sqrt(bb**2 - 8 * ptr_condensed_index)), 2, rounding_mode="floor"
     )
     jj = (
         ptr_condensed_index
@@ -65,7 +65,10 @@ def condensed_to_matrix_index_batch(condensed_index, num_nodes, edge_batch, ptr)
 
 
 def get_computational_graph(
-    triu_query_edge_index, clean_edge_index, clean_edge_attr, triu=True,
+    triu_query_edge_index,
+    clean_edge_index,
+    clean_edge_attr,
+    triu=True,
 ):
     """
     concat and remove repeated edges of query_edge_index and clean_edge_index

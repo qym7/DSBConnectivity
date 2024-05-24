@@ -43,7 +43,12 @@ class MosesDataset(InMemoryDataset):
     test_url = "https://media.githubusercontent.com/media/molecularsets/moses/master/data/test_scaffolds.csv"
 
     def __init__(
-        self, split, root, transform=None, pre_transform=None, pre_filter=None,
+        self,
+        split,
+        root,
+        transform=None,
+        pre_transform=None,
+        pre_filter=None,
     ):
         self.split = split
         self.atom_encoder = atom_encoder

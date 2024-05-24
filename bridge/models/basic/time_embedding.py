@@ -5,11 +5,11 @@ import math
 
 def get_timestep_embedding(timesteps, embedding_dim=128):
     """
-      From Fairseq.
-      Build sinusoidal embeddings.
-      This matches the implementation in tensor2tensor, but differs slightly
-      from the description in Section 3.5 of "Attention Is All You Need".
-      https://github.com/pytorch/fairseq/blob/master/fairseq/modules/sinusoidal_positional_embedding.py
+    From Fairseq.
+    Build sinusoidal embeddings.
+    This matches the implementation in tensor2tensor, but differs slightly
+    from the description in Section 3.5 of "Attention Is All You Need".
+    https://github.com/pytorch/fairseq/blob/master/fairseq/modules/sinusoidal_positional_embedding.py
     """
     half_dim = embedding_dim // 2
     emb = math.log(10000) / (half_dim - 1)

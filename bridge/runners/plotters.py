@@ -198,7 +198,6 @@ class ImPlotter(object):
 
 class TwoDPlotter(Plotter):
     def __init__(self, num_steps, gammas, im_dir="./im", gif_dir="./gif"):
-
         if not os.path.isdir(im_dir):
             os.mkdir(im_dir)
         if not os.path.isdir(gif_dir):

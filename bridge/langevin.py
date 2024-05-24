@@ -16,17 +16,8 @@ def get_noise(limit_dist, x_k, node_mask):
     device = x_k.X.device
 
     batch = utils.PlaceHolder(
-        X=limit_dist.X.repeat(
-            batch_size,
-            max_n_nodes,
-            1
-            ).to(device),
-        E=limit_dist.E.repeat(
-            batch_size,
-            max_n_nodes,
-            max_n_nodes,
-            1
-            ).to(device),
+        X=limit_dist.X.repeat(batch_size, max_n_nodes, 1).to(device),
+        E=limit_dist.E.repeat(batch_size, max_n_nodes, max_n_nodes, 1).to(device),
         y=None,
         charge=None,
         n_nodes=n_nodes,
@@ -55,6 +46,7 @@ def symmetrize_graphs(tensor):
     tensor = tensor + tensor.permute(0, 1, 3, 2)
 
     return tensor
+
 
 class Langevin(torch.nn.Module):
     def __init__(
@@ -118,12 +110,8 @@ class Langevin(torch.nn.Module):
             y=None,
         )
 
-        times_expanded = self.time.reshape((1, self.num_steps, 1)).repeat(
-            (bs, 1, 1)
-        )
-        gammas_expanded = self.gammas.reshape((1, self.num_steps, 1)).repeat(
-            (bs, 1, 1)
-        )
+        times_expanded = self.time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+        gammas_expanded = self.gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
 
         x_k = x.copy()
         noise = get_noise(self.limit_dist, x_k, x.node_mask)
@@ -131,7 +119,8 @@ class Langevin(torch.nn.Module):
             out = out.place(x_k, k)
             gamma = self.gammas[k]
             # x_k = x_k.scale(1 - gamma).add(noise.scale(gamma))
-            x_k = x_k.scale(1 - gamma/3).add(noise.scale(gamma/3))
+            # x_k = x_k.scale(1 - gamma*3).add(noise.scale(gamma*3))
+            x_k = x_k.scale(1 - gamma / 3).add(noise.scale(gamma / 3))
             x_k = x_k.sample(onehot=True, node_mask=node_mask)
             x_tot = x_tot.place(x_k, k)
 
@@ -163,7 +152,6 @@ class Langevin(torch.nn.Module):
         gammas_expanded = self.gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
 
         x = init_samples.copy()
-        # for k in tqdm(range(self.num_steps)):
         for k in range(self.num_steps):
             out = out.place(x, k)
             t = times_expanded[:, k, :]
@@ -178,8 +166,16 @@ class Langevin(torch.nn.Module):
             # change the value for the diagonal
             pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
             pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
-            pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], (1.0 - pred.X.sum(dim=-1, keepdim=True)).clamp(min=0.0))
-            pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], (1.0 - pred.E.sum(dim=-1, keepdim=True)).clamp(min=0.0))
+            pred.X.scatter_(
+                -1,
+                x.X.argmax(-1)[:, :, None],
+                (1.0 - pred.X.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+            )
+            pred.E.scatter_(
+                -1,
+                x.E.argmax(-1)[:, :, :, None],
+                (1.0 - pred.E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+            )
             # The normalization should be automatic here
             # Added to be consistent the the training process
             pred.X = (pred.X / pred.X.sum(-1, keepdim=True)).float()

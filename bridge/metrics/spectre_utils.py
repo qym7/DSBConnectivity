@@ -209,7 +209,7 @@ def get_spectral_filter_worker(eigvec, eigval, filters, bound=1.4):
     for ge in ges:
         linop.append(eigvec @ np.diag(ge) @ eigvec.T)
     linop = np.array(linop)
-    norm_filt = np.sum(linop ** 2, axis=2)
+    norm_filt = np.sum(linop**2, axis=2)
     hist_range = [0, bound]
     hist = np.array(
         [np.histogram(x, range=hist_range, bins=100)[0] for x in norm_filt]

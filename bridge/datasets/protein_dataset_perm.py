@@ -36,7 +36,12 @@ class ProteinDataset(InMemoryDataset):
     """
 
     def __init__(
-        self, split, root, transform=None, pre_transform=None, pre_filter=None,
+        self,
+        split,
+        root,
+        transform=None,
+        pre_transform=None,
+        pre_filter=None,
     ):
         self.dataset_name = "protein"
         root = root
@@ -272,10 +277,20 @@ class ProteinDataModule(AbstractDataModule):
 
         datasets = {
             "train": ProteinDataset(
-                root=root_path, transform=transform, split="train",
+                root=root_path,
+                transform=transform,
+                split="train",
             ),
-            "val": ProteinDataset(root=root_path, transform=transform, split="val",),
-            "test": ProteinDataset(root=root_path, transform=transform, split="test",),
+            "val": ProteinDataset(
+                root=root_path,
+                transform=transform,
+                split="val",
+            ),
+            "test": ProteinDataset(
+                root=root_path,
+                transform=transform,
+                split="test",
+            ),
         }
 
         self.statistics = {

@@ -47,7 +47,6 @@ def get_dataset(d_config, data_folder):
     cmp = lambda x: transforms.Compose([*x])
 
     if d_config.dataset == "CIFAR10":
-
         train_transform = [
             transforms.Resize(d_config.image_size),
             transforms.ToTensor(),
@@ -65,7 +64,6 @@ def get_dataset(d_config, data_folder):
         )
 
     elif d_config.dataset == "CELEBA":
-
         train_transform = [
             transforms.CenterCrop(140),
             transforms.Resize(d_config.image_size),
@@ -95,7 +93,6 @@ def get_dataset(d_config, data_folder):
     #                                  source_root=data_folder, train=False)
 
     elif d_config.dataset == "LSUN":
-
         ims = d_config.image_size
         train_transform = [
             transforms.Resize(ims),
@@ -165,7 +162,6 @@ def data_transform(d_config, X):
 
 
 def inverse_data_transform(d_config, X):
-
     if d_config.logit_transform:
         X = torch.sigmoid(X)
     elif d_config.rescaled:

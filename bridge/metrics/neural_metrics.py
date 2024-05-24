@@ -412,7 +412,6 @@ def load_feature_extractor(
     init="orthogonal",
     **kwargs
 ):
-
     model = GIN(
         num_layers=num_layers,
         hidden_dim=hidden_dim,
@@ -613,7 +612,7 @@ class MMDEvaluation(GINMetric):
         max_mmd = 0
         sigmas = self.get_sigmas(GR)
         for sigma in sigmas:
-            gamma = 1 / (2 * sigma ** 2)
+            gamma = 1 / (2 * sigma**2)
 
             K_GR = np.exp(-gamma * GR)
             K_GG = np.exp(-gamma * GG)
@@ -774,8 +773,8 @@ class prdcEvaluation(GINMetric):
         )
 
         if self.use_pr:
-            fake_nearest_neighbour_distances = self.__compute_nearest_neighbour_distances(
-                generated_dataset, nearest_k
+            fake_nearest_neighbour_distances = (
+                self.__compute_nearest_neighbour_distances(generated_dataset, nearest_k)
             )
             precision = (
                 (

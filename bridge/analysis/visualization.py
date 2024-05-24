@@ -44,7 +44,6 @@ class Visualizer:
             adj = adj.argmax(-1)
         assert len(adj.shape) == 2
 
-
         rows, cols = np.where(adj >= 1)
         edges = zip(rows.tolist(), cols.tolist())
         for edge in edges:
@@ -208,7 +207,10 @@ class Visualizer:
                 else:
                     if transfer:
                         t = frame / len(graphs)
-                        pos = {key: final_pos[key] * t + first_pos[key] * (1 - t) for key in final_pos.keys()}
+                        pos = {
+                            key: final_pos[key] * t + first_pos[key] * (1 - t)
+                            for key in final_pos.keys()
+                        }
                     else:
                         pos = final_pos
                     self.visualize_non_molecule(
@@ -228,9 +230,14 @@ class Visualizer:
             imageio.mimsave(gif_path, imgs, subrectangles=True, duration=200)
             if wandb.run:
                 wandb.log(
-                    {f"chain_{fb}": [wandb.Video(gif_path, caption=gif_path, format="gif")]}
+                    {
+                        f"chain_{fb}": [
+                            wandb.Video(gif_path, caption=gif_path, format="gif")
+                        ]
+                    }
                 )
                 print(f"Saving {gif_path} to wandb")
                 wandb.log(
-                    {f"chain_{fb}": wandb.Video(gif_path, fps=8, format="gif")}, commit=True
+                    {f"chain_{fb}": wandb.Video(gif_path, fps=8, format="gif")},
+                    commit=True,
                 )
