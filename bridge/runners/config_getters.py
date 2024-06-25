@@ -107,7 +107,7 @@ def get_datamodules(cfg):
     # step 1: get datamodules according to dataset name
 
     print("creating datasets")
-    if cfg["name"] in ["sbm", "sbm_syn", "comm20", "planar", "ego"]:
+    if cfg["name"] in ["sbm", "sbm_syn", "sbm_split", "comm20", "planar", "ego"]:
         from ..datasets.spectre_dataset_pyg import (
             SBMDataModule,
             SBMSynDataModule,

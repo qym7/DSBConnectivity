@@ -522,6 +522,22 @@ class PlaceHolder:
             self.node_mask = node_mask
 
         return self
+    
+    def shuffle(self, node_mask):
+        # TODO: may be buggy when there exists graphs of different sizes
+        bs, n = node_mask.shape
+        permuted_indices = torch.rand(bs, n)
+        permuted_indices[~node_mask] = 2
+        permuted_indices = permuted_indices.argsort(dim=1)
+        
+        batch_indices = torch.arange(bs).unsqueeze(1).expand(bs, n)
+        self.X = self.X[batch_indices, permuted_indices]
+        batch_indices = torch.arange(bs).unsqueeze(1).unsqueeze(2).expand(bs, n, n)
+        indices_row = permuted_indices.unsqueeze(2).expand(bs, n, n)
+        indices_column = permuted_indices.unsqueeze(1).expand(bs, n, n)
+        self.E = self.E[batch_indices, indices_row, indices_column]
+
+        return self
 
     def split(self):
         """Split a PlaceHolder representing a batch into a list of placeholders representing individual graphs."""

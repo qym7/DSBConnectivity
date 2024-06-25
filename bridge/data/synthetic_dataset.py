@@ -26,6 +26,7 @@ from ..metrics.metrics_utils import (
 )
 from ..data.synthetic_graphs import (
     generate_sbm_graphs,
+    generate_split_sbm_graphs,
     generate_tree_graphs,
     generate_planar_graphs,
 )
@@ -114,15 +115,44 @@ class SyntheticGraphDataset(InMemoryDataset):
         Download raw qm9 files. Taken from PyG QM9 class
         """
         if "sbm" in self.dataset_name:
-            networks = generate_sbm_graphs(
-                num_graphs=self.dataset_cfg.num_graphs,
-                min_num_communities=self.dataset_cfg.min_num_communities,
-                max_num_communities=self.dataset_cfg.max_num_communities,
-                min_community_size=self.dataset_cfg.min_community_size,
-                max_community_size=self.dataset_cfg.max_community_size,
-                intra_prob=self.dataset_cfg.intra_prob,
-                inter_prob=self.dataset_cfg.inter_prob,
-            )
+            if "split2" in self.dataset_name:
+                networks = generate_split_sbm_graphs(
+                    num_graphs=self.dataset_cfg.num_graphs,
+                    num_communities=2,
+                    intra_prob=self.dataset_cfg.intra_prob,
+                    inter_prob=self.dataset_cfg.inter_prob,
+                )
+            elif "split3" in self.dataset_name:
+                networks = generate_split_sbm_graphs(
+                    num_graphs=self.dataset_cfg.num_graphs,
+                    num_communities=3,
+                    intra_prob=self.dataset_cfg.intra_prob,
+                    inter_prob=self.dataset_cfg.inter_prob,
+                )
+            elif "split4" in self.dataset_name:
+                networks = generate_split_sbm_graphs(
+                    num_graphs=self.dataset_cfg.num_graphs,
+                    num_communities=2,
+                    intra_prob=self.dataset_cfg.intra_prob,
+                    inter_prob=self.dataset_cfg.inter_prob,
+                )
+            elif "split5" in self.dataset_name:
+                networks = generate_split_sbm_graphs(
+                    num_graphs=self.dataset_cfg.num_graphs,
+                    num_communities=3,
+                    intra_prob=self.dataset_cfg.intra_prob,
+                    inter_prob=self.dataset_cfg.inter_prob,
+                )
+            else:
+                networks = generate_sbm_graphs(
+                    num_graphs=self.dataset_cfg.num_graphs,
+                    min_num_communities=self.dataset_cfg.min_num_communities,
+                    max_num_communities=self.dataset_cfg.max_num_communities,
+                    min_community_size=self.dataset_cfg.min_community_size,
+                    max_community_size=self.dataset_cfg.max_community_size,
+                    intra_prob=self.dataset_cfg.intra_prob,
+                    inter_prob=self.dataset_cfg.inter_prob,
+                )
             adjs = [
                 torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
                 for network in networks
@@ -150,9 +180,9 @@ class SyntheticGraphDataset(InMemoryDataset):
 
         for i, adj in enumerate(adjs):
             # permute randomly nodes as for molecular datasets
-            random_order = torch.randperm(adj.shape[-1])
-            adj = adj[random_order, :]
-            adj = adj[:, random_order]
+            # random_order = torch.randperm(adj.shape[-1])
+            # adj = adj[random_order, :]
+            # adj = adj[:, random_order]
 
             if i in train_indices:
                 train_data.append(adj)

@@ -118,9 +118,16 @@ class Langevin(torch.nn.Module):
         for k in range(self.num_steps):
             out = out.place(x_k, k)
             gamma = self.gammas[k]
+            # The line `x_k = x_k.scale(1 - gamma/10).add(noise.scale(gamma/10))`
+            # in the code snippet is performing a scaling and adding operation on
+            # the variable `x_k`.
+            x_k = x_k.scale(1 - gamma/10).add(noise.scale(gamma/10))
             # x_k = x_k.scale(1 - gamma).add(noise.scale(gamma))
-            # x_k = x_k.scale(1 - gamma*3).add(noise.scale(gamma*3))
-            x_k = x_k.scale(1 - gamma / 3).add(noise.scale(gamma / 3))
+            # if k < self.num_steps/10:
+            #     x_k = x_k.scale(1 - gamma*10).add(noise.scale(gamma*10))
+            # else:
+            #     x_k = noise
+            # x_k = x_k.scale(1 - gamma / 3).add(noise.scale(gamma / 3))
             x_k = x_k.sample(onehot=True, node_mask=node_mask)
             x_tot = x_tot.place(x_k, k)
 

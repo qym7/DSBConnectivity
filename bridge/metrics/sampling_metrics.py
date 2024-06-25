@@ -62,6 +62,8 @@ class SamplingMetrics(nn.Module):
                 self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
             elif dataset_infos.dataset_name == "sbm_syn":
                 self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "sbm_split":
+                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
             elif dataset_infos.dataset_name == "protein":
                 self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders)
             elif dataset_infos.dataset_name == "ego":
@@ -116,6 +118,7 @@ class SamplingMetrics(nn.Module):
         # self.mean_components(connected_comp)
         # self.max_components(connected_comp)
 
+        self.reset()
         key = f"val_{fb}" if not self.test else f"test_{fb}"
         to_log = {
             f"{key}/NumNodesW1": self.num_nodes_w1.compute().item(),

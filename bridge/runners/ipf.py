@@ -775,8 +775,6 @@ class IPFSequential(IPFBase):
                         .numpy()
                         .item()
                     },
-                    # step=(n//2) * self.num_iter + i,
-                    # commit=True
                 )
 
             self.accelerator.backward(loss)
