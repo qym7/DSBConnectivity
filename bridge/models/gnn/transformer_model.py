@@ -414,9 +414,9 @@ class GraphTransformer(nn.Module):
         # final_charge = torch.square(final_charge)
         # E = torch.square(E)
 
-        final_X = torch.exp(final_X)
-        final_charge = torch.exp(final_charge)
-        E = torch.exp(E)
+        # final_X = torch.exp(final_X)
+        # final_charge = torch.exp(final_charge)
+        # E = torch.exp(E)
 
         return utils.PlaceHolder(
             X=final_X, charge=final_charge, E=E, y=y, node_mask=node_mask

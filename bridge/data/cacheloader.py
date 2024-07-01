@@ -97,14 +97,8 @@ class CacheLoader(Dataset):
                     batch = batch.sample(onehot=True, node_mask=node_mask)
 
                 batch.mask(node_mask)
-                # if fb == "f":
-                # print('shuffling')
-                # print(batch.E[0, :, 0, 0])
-                # batch.shuffle(node_mask)
-                # print(batch.E[0, :, 0, 0])
-
-                if (n == 1) & (fb == "b"):
-                # if n == 1:
+                # if (n == 1) & (fb == "b"):
+                if n == 1:
                     (
                         x,
                         out,

@@ -3,49 +3,42 @@ project_name: debug_transfer
 wandb: disabled # offline/disabled/online
 
 # data 
-Dataset: sbm_transfer
+Dataset: sbm_split
 graph: True
-
-dataset_transfer:
-  batch_size: 128
-  num_workers: 8
-
-  name: sbm_syn
-  remove_h: null
-  molecules: False
-  spectre: True
-  datadir: 'data/sbm1b/'
-
-  # min_num_communities * max_community_size > num_nodes
-  num_graphs: 200
-  num_nodes: 40
-  min_num_communities: 3
-  max_num_communities: 5
-  min_community_size: 8
-  max_community_size: 14
-  intra_prob: 0.005
-  inter_prob: 0.3
-
-# transfer
-transfer: True
-Dataset_transfer: sbm2
 
 dataset:
   batch_size: 128
   num_workers: 8
 
-  name: sbm_syn
+  name: sbm_split
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/sbm2b/'
+  datadir: 'data/sbm_split4/'
 
   num_graphs: 200
-  num_nodes: 40
-  min_num_communities: 2
-  max_num_communities: 3
-  min_community_size: 14
-  max_community_size: 20
+  num_nodes: 35
+  num_communities: 2
+  intra_prob: 0.005
+  inter_prob: 0.3
+
+# transfer
+transfer: True
+Dataset_transfer: sbm_split
+
+dataset_transfer:
+  batch_size: 128
+  num_workers: 8
+
+  name: sbm_split
+  remove_h: null
+  molecules: False
+  spectre: True
+  datadir: 'data/sbm_split5/'
+
+  num_graphs: 200
+  num_nodes: 35
+  num_communities: 3
   intra_prob: 0.005
   inter_prob: 0.3
 
@@ -75,8 +68,8 @@ grad_clip: 1.0
 n_ipf_init: 1
 batch_size: 64  # must be smaller than the size of datasets
 num_iter : 10000
-n_ipf: 16
-lr: 0.0001
+n_ipf: 30
+lr: 0.00001
 
 # diffusion schedule
 num_steps : 50
@@ -117,7 +110,6 @@ model:
     num_degree: 10
     dist_feat: True
     positional_encoding: False
-
 
 # settings for evaluations
 samples_to_generate: 40

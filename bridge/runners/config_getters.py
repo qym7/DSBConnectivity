@@ -71,6 +71,7 @@ def get_both_datamodules(cfg):
         dataset_config
     )
     if cfg.transfer:
+        print('creating transfer datasets')
         tf_dataset_config = cfg["dataset_transfer"]
         (
             tf_train_metrics,
@@ -131,7 +132,6 @@ def get_datamodules(cfg):
         dataset_infos = SpectreDatasetInfos(datamodule)
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
-        dataloaders = datamodule.dataloaders
 
     elif cfg["name"] == "protein":
         from datasets import protein_dataset
@@ -184,11 +184,11 @@ def get_datamodules(cfg):
 
 # Optimizer
 # --------------------------------------------------------------------------------
-def get_optimizers(net_f, net_b, lr):
+def get_optimizers(net_f, net_b, lr, n, N):
     # return torch.optim.Adam(net_f.parameters(), lr=lr), torch.optim.Adam(net_b.parameters(), lr=lr)
     return (
-        torch.optim.Adam(net_f.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
-        torch.optim.Adam(net_b.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
+        torch.optim.Adam(net_f.parameters(), lr=lr * np.exp(-n/N*7), amsgrad=True, weight_decay=1e-12),
+        torch.optim.Adam(net_b.parameters(), lr=lr * np.exp(-n/N*7), amsgrad=True, weight_decay=1e-12),
     )
 
 

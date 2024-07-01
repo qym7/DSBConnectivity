@@ -3,7 +3,7 @@ project_name: debug_transfer
 wandb: disabled # offline/disabled/online
 
 # data 
-Dataset: sbm_split2
+Dataset: sbm_split
 graph: True
 
 dataset_transfer:
@@ -68,14 +68,14 @@ grad_clip: 1.0
 n_ipf_init: 1
 batch_size: 64  # must be smaller than the size of datasets
 num_iter : 10000
-n_ipf: 16
-lr: 0.0001
+n_ipf: 30
+lr: 0.00001
 
 # diffusion schedule
 num_steps : 50
 gamma_max: 0.1
 gamma_min: 0.00001
-gamma_space: linspace
+gamma_space: linear
 weight_distrib: False
 weight_distrib_alpha: 100
 fast_sampling: True

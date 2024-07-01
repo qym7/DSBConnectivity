@@ -71,7 +71,18 @@ class IPFBase(torch.nn.Module):
         #     gamma_half = np.geomspace(self.args.gamma_min, self.args.gamma_max, n)
         # gammas = np.concatenate([gamma_half, np.flip(gamma_half)])
         # gammas = torch.tensor(gammas).to(self.device)
-        gammas = torch.ones(self.num_steps).to(self.device)
+        n = self.num_steps // 2
+        if args.gamma_space == 'linear':
+            gammas = torch.ones(self.num_steps).to(self.device)
+        elif args.gamma_space == 'linear_inc':
+            gamma_half = np.linspace(self.args.gamma_min, args.gamma_max, n)
+            gammas = np.concatenate([gamma_half, np.flip(gamma_half)])
+            gammas = torch.Tensor(gammas).to(self.device)
+        elif args.gamma_space == 'linear_dec':
+            gamma_half = np.linspace(self.args.gamma_min, args.gamma_max, n)
+            gammas = np.concatenate([np.flip(gamma_half), gamma_half])
+            gammas = torch.Tensor(gammas).to(self.device)
+
         gammas = gammas / torch.sum(gammas)
         self.T = torch.sum(gammas)  # T is one in our setting
         self.current_epoch = 0  # TODO: this need to be changed learning
@@ -258,7 +269,7 @@ class IPFBase(torch.nn.Module):
     def build_optimizers(self, n=0):
         # lr = self.lr / (n+1)  # decay in learning rate
         lr = self.lr
-        optimizer_f, optimizer_b = get_optimizers(self.net["f"], self.net["b"], lr)
+        optimizer_f, optimizer_b = get_optimizers(self.net["f"], self.net["b"], lr, n, self.args.n_ipf)
         optimizer_b = optimizer_b
         optimizer_f = optimizer_f
         self.optimizer = {"f": optimizer_f, "b": optimizer_b}
@@ -691,6 +702,7 @@ class IPFBase(torch.nn.Module):
                     fb=fb,
                     i=np.round(i / (self.num_iter + 1), 2),
                 )
+
                 # save results for testing
                 print("saving results for testing")
                 current_path = os.getcwd()
@@ -739,8 +751,8 @@ class IPFSequential(IPFBase):
             pred = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
 
             # dp = r * dt
-            pred.X = pred.X * gammas_expanded[:, None, :]
-            pred.E = pred.E * gammas_expanded[:, None, None, :]
+            pred.X = (pred.X * gammas_expanded[:, None, :]).clamp(min=1.0)
+            pred.E = (pred.E * gammas_expanded[:, None, None, :]).clamp(min=1.0)
             # change the value for the diagonal
             pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
             pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
@@ -754,6 +766,7 @@ class IPFSequential(IPFBase):
                 x.E.argmax(-1)[:, :, :, None],
                 (1.0 - pred.E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
             )
+
             # normalization
             pred.X = pred.X / pred.X.sum(-1, keepdim=True)
             pred.E = pred.E / pred.E.sum(-1, keepdim=True)
@@ -797,13 +810,45 @@ class IPFSequential(IPFBase):
         self.clear()
 
     def compute_loss(self, pred, out):
-        bce_loss = torch.nn.BCELoss()
-        # Calculate the losses
-        node_loss = self.args.model.lambda_train[0] * bce_loss(pred.X, out.X)
-        edge_loss = self.args.model.lambda_train[1] * bce_loss(pred.E, out.E)
-        # # CE
+        # # Calculate the losses
+        # # import pdb; pdb.set_trace()
+        # # out.X = F.one_hot(out.X.long(), num_classes=pred.X.shape[-1])
+        # # out.E = F.one_hot(out.E.long(), num_classes=pred.E.shape[-1])
+        # X_label = out.X.argmax(-1, keepdim=True)
+        # E_label = out.E.argmax(-1, keepdim=True)
+        # # node_loss = self.args.model.lambda_train[0] * out.X * torch.log(out.X / pred.X)
+        # # edge_loss = self.args.model.lambda_train[1] * out.E * torch.log(out.E / pred.E)
+        # pred.X = pred.X.gather(-1, X_label)
+        # pred.E = pred.E.gather(-1, E_label)
+        # # node_loss = self.args.model.lambda_train[0] * torch.log((out.X / pred.X)[..., X_label])
+        # # edge_loss = self.args.model.lambda_train[1] * torch.log((out.E / pred.E)[..., E_label])
+        # node_loss = self.args.model.lambda_train[0] * torch.log(1/pred.X)
+        # edge_loss = self.args.model.lambda_train[1] * torch.log(1/pred.E)
+        # node_loss = self.args.model.lambda_train[0] * (out.X - pred.X) * (out.X - pred.X)
+        # edge_loss = self.args.model.lambda_train[1] * (out.E - pred.E) * (out.E - pred.E)
+        # loss = PlaceHolder(X=node_loss, E=edge_loss, y=None, charge=None).mask(pred.node_mask)
+        # n_nodes = pred.node_mask.sum(-1)
+        # n_edges = (n_nodes * (n_nodes - 1)).sum()
+        # n_nodes = n_nodes.sum()
+        # loss = loss.X.sum()/n_nodes + loss.E.sum()/n_edges
+
+        # # BCE LOSS
+        # bce_loss = torch.nn.BCELoss()
+        # bce_loss = torch.nn.BCELoss(reduction="mean")
+        # node_loss = self.args.model.lambda_train[0] * bce_loss(pred.X, out.X)
+        # edge_loss = self.args.model.lambda_train[1] * bce_loss(pred.E, out.E)
+
+        # # MSE
         # node_loss = self.args.model.lambda_train[0] * F.mse_loss(pred.X, out.X)
         # edge_loss = self.args.model.lambda_train[1] * F.mse_loss(pred.E, out.E)
+        
+        # CE LOSS
+        ce_loss = torch.nn.CrossEntropyLoss()
+        pred.X = torch.log(pred.X + 1e-6)
+        pred.E = torch.log(pred.E + 1e-6)
+        node_loss = self.args.model.lambda_train[0] * ce_loss(pred.X, out.X)
+        edge_loss = self.args.model.lambda_train[1] * ce_loss(pred.E, out.E)
+
         loss = node_loss + edge_loss
         if pred.charge.numel() > 0:
             loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)
