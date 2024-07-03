@@ -64,6 +64,8 @@ class SamplingMetrics(nn.Module):
                 self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
             elif dataset_infos.dataset_name == "sbm_split":
                 self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "sbm_split_small":
+                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
             elif dataset_infos.dataset_name == "protein":
                 self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders)
             elif dataset_infos.dataset_name == "ego":

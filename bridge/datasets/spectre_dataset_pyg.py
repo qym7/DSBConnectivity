@@ -32,6 +32,7 @@ from ..data.synthetic_graphs import (
     generate_sbm_graphs,
     generate_tree_graphs,
     generate_planar_graphs,
+    generate_small_split_sbm_graphs,
     generate_sbm_graphs_fixed_size,
     generate_split_sbm_graphs,
 )
@@ -148,6 +149,17 @@ class SpectreGraphDataset(InMemoryDataset):
                 torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
                 for network in networks
             ]
+        elif self.dataset_name == "sbm_split_small":
+            networks = generate_small_split_sbm_graphs(
+                num_graphs=self.cfg.num_graphs,
+                num_communities=self.cfg.num_communities,
+                intra_prob=self.cfg.intra_prob,
+                inter_prob=self.cfg.inter_prob,
+            )
+            adjs = [
+                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
+                for network in networks
+            ]
         else:
             raise ValueError(f"Unknown dataset {self.dataset_name}")
 
@@ -160,7 +172,7 @@ class SpectreGraphDataset(InMemoryDataset):
                 torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
                 for network in networks
             ]
-        elif self.dataset_name in ["sbm_syn", "sbm_split"]:
+        elif self.dataset_name in ["sbm_syn"] or "sbm_split" in self.dataset_name:
             pass
         else:
             (

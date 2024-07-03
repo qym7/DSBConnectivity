@@ -27,6 +27,7 @@ from ..metrics.metrics_utils import (
 from ..data.synthetic_graphs import (
     generate_sbm_graphs,
     generate_split_sbm_graphs,
+    generate_small_split_sbm_graphs,
     generate_tree_graphs,
     generate_planar_graphs,
 )
@@ -138,6 +139,20 @@ class SyntheticGraphDataset(InMemoryDataset):
                 )
             elif "split5" in self.dataset_name:
                 networks = generate_split_sbm_graphs(
+                    num_graphs=self.dataset_cfg.num_graphs,
+                    num_communities=3,
+                    intra_prob=self.dataset_cfg.intra_prob,
+                    inter_prob=self.dataset_cfg.inter_prob,
+                )
+            elif "split6" in self.dataset_name:
+                networks = generate_small_split_sbm_graphs(
+                    num_graphs=self.dataset_cfg.num_graphs,
+                    num_communities=2,
+                    intra_prob=self.dataset_cfg.intra_prob,
+                    inter_prob=self.dataset_cfg.inter_prob,
+                )
+            elif "split7" in self.dataset_name:
+                networks = generate_small_split_sbm_graphs(
                     num_graphs=self.dataset_cfg.num_graphs,
                     num_communities=3,
                     intra_prob=self.dataset_cfg.intra_prob,

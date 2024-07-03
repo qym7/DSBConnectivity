@@ -107,7 +107,7 @@ def get_datamodules(cfg):
     # step 1: get datamodules according to dataset name
 
     print("creating datasets")
-    if cfg["name"] in ["sbm", "sbm_syn", "sbm_split", "comm20", "planar", "ego"]:
+    if cfg["name"] in ["sbm", "sbm_syn", "comm20", "planar", "ego"] or "sbm_split" in cfg["name"]:
         from ..datasets.spectre_dataset_pyg import (
             SBMDataModule,
             SBMSynDataModule,
@@ -116,10 +116,11 @@ def get_datamodules(cfg):
             PlanarDataModule,
             SpectreDatasetInfos,
         )
-
         if cfg["name"] == "sbm":
             datamodule = SBMDataModule(cfg)
-        if cfg["name"] == "sbm_syn":
+        elif cfg["name"] == "sbm_syn":
+            datamodule = SBMSynDataModule(cfg)
+        elif "sbm_split" in cfg["name"]:
             datamodule = SBMSynDataModule(cfg)
         elif cfg["name"] == "comm20":
             datamodule = Comm20DataModule(cfg)
@@ -187,6 +188,7 @@ def get_datamodules(cfg):
 def get_optimizers(net_f, net_b, lr):
     # return torch.optim.Adam(net_f.parameters(), lr=lr), torch.optim.Adam(net_b.parameters(), lr=lr)
     return (
+        # torch.optim.Adam(net_f.parameters(), lr=lr/1000, amsgrad=True, weight_decay=1e-12),
         torch.optim.Adam(net_f.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
         torch.optim.Adam(net_b.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
     )

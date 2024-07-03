@@ -101,6 +101,37 @@ def generate_split_sbm_graphs(
     return graphs
 
 
+
+def generate_small_split_sbm_graphs(
+    num_graphs,
+    num_communities,
+    intra_prob=0.005,
+    inter_prob=0.3,
+    seed=0,
+):
+    """Generate SBM graphs using the networkx library."""
+    rng = np.random.default_rng(seed)
+    graphs = []
+
+    while len(graphs) < num_graphs:
+        if num_communities == 2:
+            community_sizes = np.array([7, 10])
+        elif num_communities == 3:# Define the arrays
+            array1 = np.array([7, 5, 5])
+            # Combine the arrays into a list
+            # arrays = [array1, array2, array3]
+            # Randomly choose one of the arrays
+            # community_sizes = rng.choice(arrays)
+            community_sizes = array1
+
+        probs = np.ones([num_communities, num_communities]) * intra_prob
+        probs[np.arange(num_communities), np.arange(num_communities)] = inter_prob
+        probs[0, 0] = inter_prob * 2
+        G = nx.stochastic_block_model(community_sizes, probs, seed=rng)
+        if nx.is_connected(G):
+            graphs.append(G)
+
+    return graphs
 def generate_sbm_graphs_fixed_size(
     num_graphs,
     num_nodes,

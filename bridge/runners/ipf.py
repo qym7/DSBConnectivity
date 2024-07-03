@@ -797,13 +797,19 @@ class IPFSequential(IPFBase):
         self.clear()
 
     def compute_loss(self, pred, out):
-        bce_loss = torch.nn.BCELoss()
-        # Calculate the losses
-        node_loss = self.args.model.lambda_train[0] * bce_loss(pred.X, out.X)
-        edge_loss = self.args.model.lambda_train[1] * bce_loss(pred.E, out.E)
-        # # CE
+        # # Calculate the losses
+        # bce_loss = torch.nn.BCELoss()
+        # node_loss = self.args.model.lambda_train[0] * bce_loss(pred.X, out.X)
+        # edge_loss = self.args.model.lambda_train[1] * bce_loss(pred.E, out.E)
+        # # MSE
         # node_loss = self.args.model.lambda_train[0] * F.mse_loss(pred.X, out.X)
         # edge_loss = self.args.model.lambda_train[1] * F.mse_loss(pred.E, out.E)
+        # Calculate the losses
+        ce_loss = torch.nn.CrossEntropyLoss()
+        pred.X = torch.log(pred.X + 1e-6)
+        pred.E = torch.log(pred.E + 1e-6)
+        node_loss = self.args.model.lambda_train[0] * ce_loss(pred.X, out.X)
+        edge_loss = self.args.model.lambda_train[1] * ce_loss(pred.E, out.E)
         loss = node_loss + edge_loss
         if pred.charge.numel() > 0:
             loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)

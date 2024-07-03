@@ -41,3 +41,19 @@ CUDA_VISIBLE_DEVICES=1 python main.py  dataset=sbm_split model=gnn num_steps=50 
 CUDA_VISIBLE_DEVICES=1 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=30 project_name=sbm_split_shuffle_posenc limit_dist=marginal_tf model.positional_encoding=True
 
 CUDA_VISIBLE_DEVICES=2 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=30 project_name=sbm_split_shuffle limit_dist=marginal_tf
+
+
+CUDA_VISIBLE_DEVICES=1 python main.py  dataset=sbm_split_reverse model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=REVERSE_ce_loss_less_noise limit_dist=marginal_tf
+
+
+CUDA_VISIBLE_DEVICES=2 python main.py  dataset=sbm_split_reverse model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=REVERSE_ce_loss_less_noise_5k limit_dist=marginal_tf
+
+
+CUDA_VISIBLE_DEVICES=0 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_less_noise_5k limit_dist=marginal_tf
+
+
+CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k limit_dist=marginal_tf
+
+CUDA_VISIBLE_DEVICES=0 python main.py  dataset=sbm_split_small model=gnn num_steps=100 num_iter=2000 n_ipf=1000 project_name=SMALL_ce_loss_less_noise_2k limit_dist=marginal_tf
+
+CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split_more model=gnn num_steps=100 num_iter=5000 n_ipf=1000 project_name=MORE_ce_loss_less_noise_5k_LessLrF limit_dist=marginal_tf
