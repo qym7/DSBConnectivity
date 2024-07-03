@@ -111,11 +111,10 @@ model:
     dist_feat: True
     positional_encoding: False
 
-
 # settings for evaluations
 samples_to_generate: 40
-samples_to_save: 20
-chains_to_save: 4
+samples_to_save: 5
+chains_to_save: 2
 final_model_samples_to_generate: 40
 final_model_samples_to_save: 30
-final_model_chains_to_save: 20
+final_model_chains_to_save: 5

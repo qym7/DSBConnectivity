@@ -228,7 +228,7 @@ class Visualizer:
             gif_path = os.path.join(cur_path, f"{cur_folder}.gif")
             imgs.extend([imgs[-1]] * 10)
             imageio.mimsave(gif_path, imgs, subrectangles=True, duration=200)
-            if wandb.run:
+            if wandb.run and i==0:
                 wandb.log(
                     {
                         f"chain_{fb}": [
