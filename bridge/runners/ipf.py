@@ -258,7 +258,7 @@ class IPFBase(torch.nn.Module):
     def build_optimizers(self, n=0):
         # lr = self.lr / (n+1)  # decay in learning rate
         lr = self.lr
-        optimizer_f, optimizer_b = get_optimizers(self.net["f"], self.net["b"], lr)
+        optimizer_f, optimizer_b = get_optimizers(self.net["f"], self.net["b"], lr, n, self.n_ipf)
         optimizer_b = optimizer_b
         optimizer_f = optimizer_f
         self.optimizer = {"f": optimizer_f, "b": optimizer_b}
@@ -654,6 +654,7 @@ class IPFBase(torch.nn.Module):
             )
 
             # in this case, if fb=='f' and not transfer, then the metrics will become None
+            # import pdb; pdb.set_trace() 
             test_sampling_metrics = (
                 self.test_sampling_metrics
                 if fb == "b"
@@ -663,8 +664,18 @@ class IPFBase(torch.nn.Module):
                 self.val_sampling_metrics if fb == "b" else self.tf_val_sampling_metrics
             )
 
+            # # TODO: to delte
+            # test_sampling_metrics = (
+            #     self.test_sampling_metrics
+            #     if fb == "f"
+            #     else self.tf_test_sampling_metrics
+            # )
+            # val_sampling_metrics = (
+            #     self.val_sampling_metrics if fb == "f" else self.tf_val_sampling_metrics
+            # )
+
             if test_sampling_metrics is not None:
-                test_to_log = self.test_sampling_metrics.compute_all_metrics(
+                test_to_log = test_sampling_metrics.compute_all_metrics(
                     generated_list,
                     current_epoch=0,
                     local_rank=0,
@@ -684,7 +695,7 @@ class IPFBase(torch.nn.Module):
                     json.dump(test_to_log, file)
 
             elif val_sampling_metrics is not None:
-                val_to_log = self.val_sampling_metrics.compute_all_metrics(
+                val_to_log = val_sampling_metrics.compute_all_metrics(
                     generated_list,
                     current_epoch=0,
                     local_rank=0,
@@ -731,12 +742,38 @@ class IPFSequential(IPFBase):
             training step
             """
             self.set_seed(seed=n * self.num_iter + i)
-            x, out, gammas_expanded, times_expanded = next(new_dl)
+            x, out, clean, gammas_expanded, times_expanded = next(new_dl)
             x = PlaceHolder(X=x[0], E=x[1], y=x[2], charge=x[3], n_nodes=x[4])
             out = PlaceHolder(X=out[0], E=out[1], y=out[2], charge=out[3])
+            clean = PlaceHolder(X=clean[0], E=clean[1], y=clean[2], charge=clean[3])
 
             eval_steps = self.T - times_expanded
             pred = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
+
+            # dp = r * dt
+            pred_clean = pred.copy()
+            pred_clean.X = pred_clean.X * times_expanded[:, None, :]
+            pred_clean.E = pred_clean.E * times_expanded[:, None, None, :]
+            # pred_clean.X = pred_clean.X * eval_steps[:, None, :]
+            # pred_clean.E = pred_clean.E * eval_steps[:, None, None, :]
+            # change the value for the diagonal
+            pred_clean.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
+            pred_clean.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
+            pred_clean.X.scatter_(
+                -1,
+                x.X.argmax(-1)[:, :, None],
+                (1.0 - pred_clean.X.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+            )
+            pred.E.scatter_(
+                -1,
+                x.E.argmax(-1)[:, :, :, None],
+                (1.0 - pred_clean.E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+            )
+            # normalization
+            pred_clean.X = pred_clean.X + 1e-6
+            pred_clean.E = pred_clean.E + 1e-6
+            pred_clean.X = pred_clean.X / pred_clean.X.sum(-1, keepdim=True)
+            pred_clean.E = pred_clean.E / pred_clean.E.sum(-1, keepdim=True)
 
             # dp = r * dt
             pred.X = pred.X * gammas_expanded[:, None, :]
@@ -755,11 +792,13 @@ class IPFSequential(IPFBase):
                 (1.0 - pred.E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
             )
             # normalization
+            pred.X = pred.X + 1e-6
+            pred.E = pred.E + 1e-6
             pred.X = pred.X / pred.X.sum(-1, keepdim=True)
             pred.E = pred.E / pred.E.sum(-1, keepdim=True)
 
             # node and edge losses are not specifically used here
-            _, _, loss = self.compute_loss(pred, out)
+            _, _, loss = self.compute_loss(pred, out, pred_clean, clean, times_expanded)
 
             num_log = 5000
             if self.num_steps <= num_log:
@@ -796,7 +835,7 @@ class IPFSequential(IPFBase):
         new_dl = None
         self.clear()
 
-    def compute_loss(self, pred, out):
+    def compute_loss(self, pred, out, pred_clean, clean, t):
         # # Calculate the losses
         # bce_loss = torch.nn.BCELoss()
         # node_loss = self.args.model.lambda_train[0] * bce_loss(pred.X, out.X)
@@ -811,6 +850,18 @@ class IPFSequential(IPFBase):
         node_loss = self.args.model.lambda_train[0] * ce_loss(pred.X, out.X)
         edge_loss = self.args.model.lambda_train[1] * ce_loss(pred.E, out.E)
         loss = node_loss + edge_loss
+
+        ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
+        pred_clean.X = torch.log(pred_clean.X + 1e-6)
+        pred_clean.E = torch.log(pred_clean.E + 1e-6)
+        clean_node_loss = self.args.model.lambda_train[0] * ce_loss(pred_clean.X, clean.X)
+        clean_edge_loss = self.args.model.lambda_train[1] * ce_loss(pred_clean.E, clean.E)
+        clean_node_loss = clean_node_loss / t[:, None, :]
+        clean_edge_loss = clean_edge_loss / t[:, None, None, :]
+        clean_loss = clean_node_loss.mean() + clean_edge_loss.mean()
+
+        loss = loss + self.args.clean_loss_weight * clean_loss
+
         if pred.charge.numel() > 0:
             loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)
 

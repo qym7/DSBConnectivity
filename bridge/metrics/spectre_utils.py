@@ -888,6 +888,8 @@ class SpectreSamplingMetrics(nn.Module):
         self.train_graphs = self.loader_to_nx(dataloaders["train"])
         self.val_graphs = self.loader_to_nx(dataloaders["val"])
         self.test_graphs = self.loader_to_nx(dataloaders["test"])
+        # import pdb; pdb.set_trace()
+        # print(self.test_graphs[0])
         self.num_graphs_test = len(self.test_graphs)
         self.num_graphs_val = len(self.val_graphs)
         # print('num_train_graphs is', len(self.train_graphs))

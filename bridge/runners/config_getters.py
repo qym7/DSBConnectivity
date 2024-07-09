@@ -185,12 +185,25 @@ def get_datamodules(cfg):
 
 # Optimizer
 # --------------------------------------------------------------------------------
-def get_optimizers(net_f, net_b, lr):
+def get_optimizers(net_f, net_b, lr, n, N):
     # return torch.optim.Adam(net_f.parameters(), lr=lr), torch.optim.Adam(net_b.parameters(), lr=lr)
+    print('the new learning rate is', lr * np.exp(-n/N*10))
     return (
         # torch.optim.Adam(net_f.parameters(), lr=lr/1000, amsgrad=True, weight_decay=1e-12),
+        # torch.optim.Adam(net_f.parameters(), lr=lr/100, amsgrad=True, weight_decay=1e-12),
+        # The code is using the Adam optimizer from the PyTorch library to
+        # optimize the parameters of a neural network model `net_f`. It sets the
+        # learning rate `lr`, enables the AMSGrad variant of the Adam optimizer by
+        # setting `amsgrad=True`, and applies weight decay regularization with a
+        # weight decay factor of `1e-12`.
         torch.optim.Adam(net_f.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
         torch.optim.Adam(net_b.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
+        # torch.optim.Adam(net_f.parameters(), lr=lr/10, amsgrad=True, weight_decay=1e-12),
+        # torch.optim.Adam(net_b.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
+        # torch.optim.Adam(net_f.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
+        # torch.optim.Adam(net_b.parameters(), lr=lr/10, amsgrad=True, weight_decay=1e-12),
+        # torch.optim.Adam(net_f.parameters(), lr=lr * np.exp(-n/7*10), amsgrad=True, weight_decay=1e-12),
+        # torch.optim.Adam(net_b.parameters(), lr=lr * np.exp(-n/7*10), amsgrad=True, weight_decay=1e-12),
     )
 
 

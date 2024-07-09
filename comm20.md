@@ -51,9 +51,75 @@ CUDA_VISIBLE_DEVICES=2 python main.py  dataset=sbm_split_reverse model=gnn num_s
 
 CUDA_VISIBLE_DEVICES=0 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_less_noise_5k limit_dist=marginal_tf
 
-
 CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k limit_dist=marginal_tf
+
+CUDA_VISIBLE_DEVICES=2 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_3noise limit_dist=marginal_tf
+
+CUDA_VISIBLE_DEVICES=2 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_32noise limit_dist=marginal_tf clean_loss_weight=0.1
 
 CUDA_VISIBLE_DEVICES=0 python main.py  dataset=sbm_split_small model=gnn num_steps=100 num_iter=2000 n_ipf=1000 project_name=SMALL_ce_loss_less_noise_2k limit_dist=marginal_tf
 
 CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split_more model=gnn num_steps=100 num_iter=5000 n_ipf=1000 project_name=MORE_ce_loss_less_noise_5k_LessLrF limit_dist=marginal_tf
+
+CUDA_VISIBLE_DEVICES=2 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_1e3CleanLoss limit_dist=marginal_tf
+
+
+CUDA_VISIBLE_DEVICES=0 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_1e2CleanLoss_reverseT limit_dist=marginal_tf clean_loss_weight=0.01
+
+CUDA_VISIBLE_DEVICES=1 python main.py  dataset=sbm_split model=gnn num_steps=200 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_1e3CleanLoss_DecLR limit_dist=marginal_tf clean_loss_weight=0.001
+
+CUDA_VISIBLE_DEVICES=1 python main.py  dataset=sbm_split model=gnn num_steps=200 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_1e3CleanLoss_LessLrF limit_dist=marginal_tf clean_loss_weight=0.001
+
+CUDA_VISIBLE_DEVICES=1 python main.py  dataset=sbm_split model=gnn num_steps=200 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_1e3CleanLoss_Lr1e5 limit_dist=marginal_tf clean_loss_weight=0.001 lr=0.00001
+
+
+CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split_more model=gnn num_steps=200 num_iter=2000 n_ipf=1000 project_name=MORE_ce_loss_2k_1e3CleanLoss_Lr1e5 limit_dist=marginal_tf clean_loss_weight=0.001 lr=0.00001
+
+
+CUDA_VISIBLE_DEVICES=0 python main.py  dataset=sbm_split model=gnn num_steps=200 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_1e3CleanLoss limit_dist=marginal_tf clean_loss_weight=0.001
+
+
+CUDA_VISIBLE_DEVICES=0 python main.py  dataset=sbm_split_more model=gnn num_steps=200 num_iter=2000 n_ipf=1000 project_name=MORE_ce_loss_2k_1e3CleanLoss_Lr1e4 limit_dist=marginal_tf clean_loss_weight=0.001 lr=0.0001
+
+
+CUDA_VISIBLE_DEVICES=0 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_1e3CleanLoss_TryAGAIN limit_dist=marginal_tf clean_loss_weight=0.001
+
+
+CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_1e3CleanLoss_Lr3 limit_dist=marginal_tf clean_loss_weight=0.001 lr=0.001
+
+CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_1e3CleanLoss_Lr5 limit_dist=marginal_tf clean_loss_weight=0.001 lr=0.00001
+
+
+CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_1e3CleanLoss_Lr4Lr5 limit_dist=marginal_tf clean_loss_weight=0.001 lr=0.00001
+
+
+CUDA_VISIBLE_DEVICES=0 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_1e3CleanLoss_FLr4BLr5 limit_dist=marginal_tf clean_loss_weight=0.001 lr=0.00001
+
+
+
+
+CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_1e5CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.00001 lr=0.00001
+
+
+
+CUDA_VISIBLE_DEVICES=1 python main.py dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_0CleanLoss_Baseline_ReverseMetrics limit_dist=marginal_tf clean_loss_weight=0.0
+
+
+CUDA_VISIBLE_DEVICES=1 python main.py dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_0CleanLoss_Baseline_ReverseMetrics limit_dist=marginal_tf clean_loss_weight=0.0
+
+
+
+CUDA_VISIBLE_DEVICES=1 python main.py dataset=sbm_split model=gnn num_steps=50 num_iter=50 n_ipf=1000 project_name=ce_loss_debug limit_dist=marginal_tf clean_loss_weight=0.0
+
+
+
+
+CUDA_VISIBLE_DEVICES=1 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_1e3CleanLoss limit_dist=marginal_tf clean_loss_weight=0.001
+
+
+CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
+
+CUDA_VISIBLE_DEVICES=2 python main.py dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_Lr3 limit_dist=marginal_tf clean_loss_weight=0.0 lr=0.001
+
+
+CUDA_VISIBLE_DEVICES=1 python main.py dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
