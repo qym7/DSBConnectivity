@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SshConfigs">
+    <configs>
+      <sshConfig authType="PASSWORD" host="london.ee.ucl.ac.uk" id="946e68a7-4849-4a86-9f49-2803a75bf20c" port="22" nameFormat="DESCRIPTIVE" username="uceeosm" useOpenSSHConfig="true" />
+    </configs>
+  </component>
+</project>

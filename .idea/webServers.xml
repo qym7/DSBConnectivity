@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="6a76f06f-fb8f-48cf-a2bc-b4c0cedbbdc7" name="london.ee.ucl.ac.uk">
+        <fileTransfer rootFolder="/home/uceeosm/profile.V6/Desktop/DSB_Graph" accessType="SFTP" host="london.ee.ucl.ac.uk" port="22" sshConfigId="946e68a7-4849-4a86-9f49-2803a75bf20c" sshConfig="uceeosm@london.ee.ucl.ac.uk:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+      <webServer id="240b06f3-4fdc-47d3-8dac-cfd2cf304648" name="turin.ee.ucl.ac.uk">
+        <fileTransfer rootFolder="/home/uceeosm/Desktop/DSB_Graph" accessType="SFTP" host="london.ee.ucl.ac.uk" port="22" sshConfigId="946e68a7-4849-4a86-9f49-2803a75bf20c" sshConfig="uceeosm@london.ee.ucl.ac.uk:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

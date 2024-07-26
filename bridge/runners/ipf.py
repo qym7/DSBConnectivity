@@ -364,6 +364,34 @@ class IPFBase(torch.nn.Module):
         self.cache_init_dl = repeater(self.cache_init_dl)
         self.save_init_dl = repeater(self.save_init_dl)
 
+        # for test graphs
+        init_ds_test = self.datamodule.testing
+        self.save_init_dl_test = pygloader.DataLoader(
+            init_ds_test, batch_size=self.args.plot_npar, shuffle=True
+        )  # , **self.kwargs)
+        self.cache_init_dl_test = pygloader.DataLoader(
+            init_ds_test, batch_size=self.args.cache_npar, shuffle=True
+        )  # , **self.kwargs)
+        (self.cache_init_dl_test, self.save_init_dl_test) = self.accelerator.prepare(
+            self.cache_init_dl_test, self.save_init_dl_test
+        )
+        self.cache_init_dl_test = repeater(self.cache_init_dl_test)
+        self.save_init_dl_test = repeater(self.save_init_dl_test)
+
+        # for validation graphs
+        init_ds_val = self.datamodule.validating
+        self.save_init_dl_val = pygloader.DataLoader(
+            init_ds_val, batch_size=self.args.plot_npar, shuffle=True
+        )  # , **self.kwargs)
+        self.cache_init_dl_val = pygloader.DataLoader(
+            init_ds_val, batch_size=self.args.cache_npar, shuffle=True
+        )  # , **self.kwargs)
+        (self.cache_init_dl_val, self.save_init_dl_val) = self.accelerator.prepare(
+            self.cache_init_dl_val, self.save_init_dl_val
+        )
+        self.cache_init_dl_val = repeater(self.cache_init_dl_val)
+        self.save_init_dl_val = repeater(self.save_init_dl_val)
+
         # get all type of dataloader (currently only for the initial dataset)
         print("creating the train dataloader")
         init_train_dl = pygloader.DataLoader(
@@ -371,12 +399,12 @@ class IPFBase(torch.nn.Module):
         )
         print("creating the val dataloader")
         init_val_ds = self.datamodule.dataloaders["val"].dataset
-        init_test_dl = pygloader.DataLoader(
+        init_val_dl = pygloader.DataLoader(
             init_val_ds, batch_size=self.args.plot_npar, shuffle=False
         )
         print("creating the test dataloader")
         init_test_ds = self.datamodule.dataloaders["test"].dataset
-        init_val_dl = pygloader.DataLoader(
+        init_test_dl = pygloader.DataLoader(
             init_test_ds, batch_size=self.args.plot_npar, shuffle=False
         )
 
@@ -399,6 +427,34 @@ class IPFBase(torch.nn.Module):
             )
             self.cache_final_dl = repeater(self.cache_final_dl)
             self.save_final_dl = repeater(self.save_final_dl)
+
+            # for test graphs
+            final_ds_test = self.tf_datamodule.testing
+            self.save_final_dl_test = pygloader.DataLoader(
+                final_ds_test, batch_size=self.args.plot_npar, shuffle=True
+            )  # , **self.kwargs)
+            self.cache_final_dl_test = pygloader.DataLoader(
+                final_ds_test, batch_size=self.args.cache_npar, shuffle=True
+            )  # , **self.kwargs)
+            (self.cache_final_dl_test, self.save_final_dl_test) = self.accelerator.prepare(
+                self.cache_final_dl_test, self.save_final_dl_test
+            )
+            self.cache_final_dl_test = repeater(self.cache_final_dl_test)
+            self.save_final_dl_test = repeater(self.save_final_dl_test)
+
+            # for validation graphs
+            final_ds_val = self.tf_datamodule.validating
+            self.save_final_dl_val = pygloader.DataLoader(
+                final_ds_val, batch_size=self.args.plot_npar, shuffle=True
+            )  # , **self.kwargs)
+            self.cache_final_dl_val = pygloader.DataLoader(
+                final_ds_val, batch_size=self.args.cache_npar, shuffle=True
+            )  # , **self.kwargs)
+            (self.cache_final_dl_val, self.save_final_dl_val) = self.accelerator.prepare(
+                self.cache_final_dl_val, self.save_final_dl_val
+            )
+            self.cache_final_dl_val = repeater(self.cache_final_dl_val)
+            self.save_final_dl_val = repeater(self.save_final_dl_val)
 
             # get all type of dataloader (currently only for the initial dataset)
             print("creating the train dataloader")
@@ -494,13 +550,20 @@ class IPFBase(torch.nn.Module):
         batches = []
         all_n_nodes = []
         i = 0
+        samples_to_return = samples_to_generate
 
         while samples_to_generate > 0:
             if fb == "f" or self.args.transfer:
-                loader = self.save_init_dl if fb == "f" else self.save_final_dl
-                batch = next(loader)
-                batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
-                n_nodes = node_mask.sum(-1)
+                if test:
+                    loader = self.save_init_dl_test if fb == "f" else self.save_final_dl_test
+                    batch = next(loader)
+                    batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
+                    n_nodes = node_mask.sum(-1)
+                else:
+                    loader = self.save_init_dl_val if fb == "f" else self.save_final_dl_val
+                    batch = next(loader)
+                    batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
+                    n_nodes = node_mask.sum(-1)
             else:
                 batch_size = self.args.plot_npar
                 n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
@@ -540,21 +603,20 @@ class IPFBase(torch.nn.Module):
 
             samples_to_generate -= len(n_nodes)
             i += 1
-
         # merge things together
         samples = utils.PlaceHolder(
-            X=torch.cat([s.X for s in samples], dim=0)[:samples_to_generate],
-            E=torch.cat([s.E for s in samples], dim=0)[:samples_to_generate],
+            X=torch.cat([s.X for s in samples], dim=0)[:samples_to_return],
+            E=torch.cat([s.E for s in samples], dim=0)[:samples_to_return],
             charge=None,
             y=None,
         )
         batches = utils.PlaceHolder(
-            X=torch.cat([b.X for b in batches], dim=0)[:samples_to_generate],
-            E=torch.cat([b.E for b in batches], dim=0)[:samples_to_generate],
+            X=torch.cat([b.X for b in batches], dim=0)[:samples_to_return],
+            E=torch.cat([b.E for b in batches], dim=0)[:samples_to_return],
             charge=None,
             y=None,
         )
-        all_n_nodes = torch.cat(all_n_nodes, dim=0)[:samples_to_generate]
+        all_n_nodes = torch.cat(all_n_nodes, dim=0)[:samples_to_return]
 
         return batch, samples, chains, all_n_nodes
 
