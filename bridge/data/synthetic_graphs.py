@@ -31,8 +31,8 @@ def generate_planar_edge_remove_graphs(num_graphs, num_nodes, edge_removal, degr
   rng = np.random.default_rng(seed)
   graphs = []
 
-  points = rng.random((num_nodes, 2))
   for _ in range(num_graphs):
+      points = rng.random((num_nodes, 2))
       tri = sp.spatial.Delaunay(points)
       adj = sp.sparse.lil_array((num_nodes, num_nodes), dtype=np.int32)
 
