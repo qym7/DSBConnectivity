@@ -32,7 +32,7 @@ def molecules_to_datalist(molecules):
 
 
 def compute_all_statistics(data_list, atom_encoder, charge_dic):
-    num_nodes = node_counts(data_list)
+    num_nodes, real_node_ratio = node_counts(data_list)
     node_types = atom_type_counts(data_list, num_classes=len(atom_encoder))
     print(f"Atom types: {node_types}")
     bond_types = edge_counts(data_list)
@@ -49,17 +49,20 @@ def compute_all_statistics(data_list, atom_encoder, charge_dic):
         bond_types=bond_types,
         charge_types=charge_types,
         valencies=valency,
+        real_node_ratio=real_node_ratio,
     )
 
 
 def node_counts(data_list):
     print("Computing node counts...")
     all_node_counts = Counter()
+    total_num_nodes = 0
     for i, data in tqdm(enumerate(data_list)):
         num_nodes = data.num_nodes
         all_node_counts[num_nodes] += 1
+        total_num_nodes += num_nodes
     print("Done.")
-    return all_node_counts
+    return all_node_counts, total_num_nodes / max(all_node_counts) / len(data_list)
 
 
 def graph_counts(data_list, num_graph_types):
@@ -79,7 +82,8 @@ def atom_type_counts(data_list, num_classes):
         return torch.tensor([1.0], dtype=torch.float)
     else:
         for data in tqdm(data_list):
-            x = torch.nn.functional.one_hot(data.x, num_classes=num_classes)
+            # x = torch.nn.functional.one_hot(data.x, num_classes=num_classes)
+            x = data.x
             counts += x.sum(dim=0).cpu().numpy()
         counts = counts / counts.sum()
     print("Done.")
@@ -91,6 +95,9 @@ def edge_counts(data_list, num_bond_types=5):
     d = np.zeros(num_bond_types)
 
     for data in tqdm(data_list):
+        # data.edge_attr = data.edge_attr.argmax(-1)
+        # data.x = data.x.argmax(-1)
+
         total_pairs = data.num_nodes * (data.num_nodes - 1)
 
         num_edges = data.edge_attr.shape[0]
@@ -129,6 +136,9 @@ def charge_counts(data_list, num_classes, charge_dic):
     d = np.zeros((num_classes, len(charge_dic)))
 
     for data in tqdm(data_list):
+        # import pdb; pdb.set_trace()
+        # data.edge_attr = data.edge_attr.argmax(-1)
+        # data.x = data.x.argmax(-1)
         for atom, charge in zip(data.x, data.charge):
             try:
                 assert charge in [-2, -1, 0, 1, 2, 3]
@@ -151,6 +161,9 @@ def valency_count(data_list, atom_encoder):
     valencies = {atom_type: Counter() for atom_type in atom_encoder.keys()}
 
     for data in tqdm(data_list):
+        # data.edge_attr = data.edge_attr.argmax(-1)
+        # data.x = data.x.argmax(-1)
+
         edge_attr = data.edge_attr.clone()
         edge_attr[edge_attr == 4] = 1.5
         bond_orders = edge_attr

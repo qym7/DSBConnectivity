@@ -38,10 +38,8 @@ class SamplingMetrics(nn.Module):
             )
 
             self.domain_metrics = SamplingMolecularMetrics(
-                dataset_infos.train_smiles,
-                dataset_infos.test_smiles if test else dataset_infos.val_smiles,
                 dataset_infos,
-                test,
+                dataset_infos.train_smiles,
             )
 
         elif dataset_infos.spectre:

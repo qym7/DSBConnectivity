@@ -383,7 +383,6 @@ class PlaceHolder:
 
         # Sample E
         E_t = probE.multinomial(1, replacement=True).reshape(bs, n, n)  # (bs, n, n)
-        # E_t = Categorical(probs=probE).sample().reshape(bs, n, n)  # (bs, n, n)
         E_t = torch.triu(E_t, diagonal=1)
         E_t = E_t + torch.transpose(E_t, 1, 2)
 
@@ -393,7 +392,7 @@ class PlaceHolder:
 
         return PlaceHolder(
             X=X_t, E=E_t, y=torch.zeros(bs, 0).type_as(X_t), node_mask=node_mask
-        )
+        ).mask()
 
     def place(self, graph_data, k):
         if (self.X is not None) and (graph_data.X is not None):
@@ -482,7 +481,7 @@ class PlaceHolder:
         self.charge = self.charge.type_as(x) if self.charge.numel() > 0 else None
         return self
 
-    def mask(self, node_mask=None, collapse=False):
+    def mask(self, node_mask=None, collapse=False, mask_node=True):
         if node_mask is None:
             assert self.node_mask is not None
             node_mask = self.node_mask
@@ -500,23 +499,26 @@ class PlaceHolder:
         if collapse:
             self.X = torch.argmax(self.X, dim=-1)
             self.E = torch.argmax(self.E, dim=-1)
-            self.X[node_mask == 0] = -1
+            if mask_node:
+                self.X[node_mask == 0] = -1
             self.E[(e_mask1 * e_mask2).squeeze(-1) == 0] = -1
         else:
-            if self.X is not None:
+            if self.X is not None and mask_node:
                 self.X = self.X * x_mask
-            if self.charge is not None:
+            if self.charge is not None and mask_node:
                 if self.charge.numel() > 0:
                     self.charge = self.charge * x_mask
             if self.E is not None:
                 self.E = self.E * e_mask1 * e_mask2 * diag_mask
 
-        try:
-            assert torch.allclose(self.E, torch.transpose(self.E, 1, 2))
-        except:
-            import pdb
+        # try:
+        #     assert torch.allclose(self.E, torch.transpose(self.E, 1, 2))
+        # except:
+        #     import pdb
 
-            pdb.set_trace()
+        #     pdb.set_trace()
+
+        assert torch.allclose(self.E, torch.transpose(self.E, 1, 2))
 
         if self.node_mask is None:
             self.node_mask = node_mask
@@ -543,10 +545,12 @@ class PlaceHolder:
         """Split a PlaceHolder representing a batch into a list of placeholders representing individual graphs."""
         graph_list = []
         batch_size = self.X.shape[0]
+        node_mask = self.X > 0
         for i in range(batch_size):
-            n = torch.sum(self.node_mask[i], dim=0)
-            x = self.X[i, :n]
-            e = self.E[i, :n, :n]
+            # n = torch.sum(self.node_mask[i], dim=0)
+            # import pdb; pdb.set_trace()
+            x = self.X[i, node_mask[i]]
+            e = self.E[i, node_mask[i]][:, node_mask[i]]
             if self.y.numel() == 0:
                 y = self.y
             elif self.y is None:
@@ -1038,3 +1042,12 @@ def split_samples(samples, num_split):
         samples_lst.append(cur_samples)
 
     return samples_lst
+
+def add_virtual_node(batch, node_mask):
+    # Add virtual nodes
+    dx = batch.X.shape[-1]
+    batch.X = batch.X.argmax(-1) + 1
+    batch.X[node_mask == 0] = 0
+    batch.X = F.one_hot(batch.X, dx + 1).float()
+
+    return batch

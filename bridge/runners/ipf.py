@@ -140,6 +140,18 @@ class IPFBase(torch.nn.Module):
                 / len(self.datainfos.edge_types),
                 y=None,
             )
+
+        # add virtual node dimension to the limit_dist
+        if self.args.virtual_node:
+            real_node_ratio = self.tf_datainfos.real_node_ratio
+            if self.args.limit_dist == "marginal":
+                self.limit_dist.X = torch.cat([1-torch.ones(1)*real_node_ratio, real_node_ratio*self.limit_dist.X])
+            elif self.args.limit_dist == "marginal_tf":
+                self.limit_dist.X = torch.cat([1-torch.ones(1)*real_node_ratio, real_node_ratio*self.limit_dist.X])
+            else:
+                self.limit_dist.X = torch.ones(self.limit_dist.X.shape[0] + 1)
+            self.limit_dist.X = self.limit_dist.X / self.limit_dist.X.sum()
+
         self.langevin = Langevin(
             self.num_steps,
             max_n_nodes,
@@ -152,6 +164,7 @@ class IPFBase(torch.nn.Module):
             domain_features=self.domain_features,
             tf_extra_features=self.tf_extra_features,
             tf_domain_features=self.tf_domain_features,
+            virtual_node=self.args.virtual_node,
         )
 
         # checkpoint
@@ -318,6 +331,7 @@ class IPFBase(torch.nn.Module):
             datamodule=datamodule,
             extra_features=extra_features,
             domain_features=domain_features,
+            virtual_node=self.args.virtual_node,
         )
 
         return extra_features, dataset_infos
@@ -353,10 +367,10 @@ class IPFBase(torch.nn.Module):
         # get final stats
         init_ds = self.datamodule.inner
         self.save_init_dl = pygloader.DataLoader(
-            init_ds, batch_size=self.args.plot_npar, shuffle=True
+            init_ds, batch_size=self.args.plot_npar, shuffle=True, drop_last=True
         )  # , **self.kwargs)
         self.cache_init_dl = pygloader.DataLoader(
-            init_ds, batch_size=self.args.cache_npar, shuffle=True
+            init_ds, batch_size=self.args.cache_npar, shuffle=True, drop_last=True
         )  # , **self.kwargs)
         (self.cache_init_dl, self.save_init_dl) = self.accelerator.prepare(
             self.cache_init_dl, self.save_init_dl
@@ -367,17 +381,17 @@ class IPFBase(torch.nn.Module):
         # get all type of dataloader (currently only for the initial dataset)
         print("creating the train dataloader")
         init_train_dl = pygloader.DataLoader(
-            init_ds, batch_size=self.args.plot_npar, shuffle=False
+            init_ds, batch_size=self.args.plot_npar, shuffle=False, drop_last=True
         )
         print("creating the val dataloader")
         init_val_ds = self.datamodule.dataloaders["val"].dataset
         init_test_dl = pygloader.DataLoader(
-            init_val_ds, batch_size=self.args.plot_npar, shuffle=False
+            init_val_ds, batch_size=self.args.plot_npar, shuffle=False, drop_last=True
         )
         print("creating the test dataloader")
         init_test_ds = self.datamodule.dataloaders["test"].dataset
         init_val_dl = pygloader.DataLoader(
-            init_test_ds, batch_size=self.args.plot_npar, shuffle=False
+            init_test_ds, batch_size=self.args.plot_npar, shuffle=False, drop_last=True
         )
 
         init_loaders = {
@@ -389,10 +403,10 @@ class IPFBase(torch.nn.Module):
         if self.args.transfer:
             final_ds = self.tf_datamodule.inner
             self.save_final_dl = pygloader.DataLoader(
-                final_ds, batch_size=self.args.plot_npar, shuffle=True
+                final_ds, batch_size=self.args.plot_npar, shuffle=True, drop_last=True
             )  # , **self.kwargs)
             self.cache_final_dl = pygloader.DataLoader(
-                final_ds, batch_size=self.args.cache_npar, shuffle=True
+                final_ds, batch_size=self.args.cache_npar, shuffle=True, drop_last=True
             )  # , **self.kwargs)
             (self.cache_final_dl, self.save_final_dl) = self.accelerator.prepare(
                 self.cache_final_dl, self.save_final_dl
@@ -403,17 +417,17 @@ class IPFBase(torch.nn.Module):
             # get all type of dataloader (currently only for the initial dataset)
             print("creating the train dataloader")
             final_train_dl = pygloader.DataLoader(
-                final_ds, batch_size=self.args.plot_npar, shuffle=False
+                final_ds, batch_size=self.args.plot_npar, shuffle=False, drop_last=True
             )
             print("creating the val dataloader")
             final_val_ds = self.tf_datamodule.dataloaders["val"].dataset
             final_val_dl = pygloader.DataLoader(
-                final_val_ds, batch_size=self.args.plot_npar, shuffle=False
+                final_val_ds, batch_size=self.args.plot_npar, shuffle=False, drop_last=True
             )
             print("creating the test dataloader")
             final_test_ds = self.tf_datamodule.dataloaders["test"].dataset
             final_test_dl = pygloader.DataLoader(
-                final_test_ds, batch_size=self.args.plot_npar, shuffle=False
+                final_test_ds, batch_size=self.args.plot_npar, shuffle=False, drop_last=True
             )
             final_loaders = {
                 "train": final_train_dl,
@@ -454,7 +468,9 @@ class IPFBase(torch.nn.Module):
                 nodes_dist=self.nodes_dist,
                 dataset_infos=self.datainfos,
                 visualization_tools=self.visualization_tools,
+                virtual_node=self.args.virtual_node,
             )
+
         else:  # forward
             sample_net = self.accelerator.prepare(sample_net)
             new_dl = CacheLoader(
@@ -473,6 +489,7 @@ class IPFBase(torch.nn.Module):
                 nodes_dist=self.nodes_dist,
                 dataset_infos=self.datainfos,
                 visualization_tools=self.visualization_tools,
+                virtual_node=self.args.virtual_node,
             )
 
         new_dl = pygloader.DataLoader(new_dl, batch_size=self.batch_size, shuffle=True)
@@ -493,6 +510,7 @@ class IPFBase(torch.nn.Module):
         samples = []
         batches = []
         all_n_nodes = []
+        # all_node_masks = []
         i = 0
 
         while samples_to_generate > 0:
@@ -501,6 +519,10 @@ class IPFBase(torch.nn.Module):
                 batch = next(loader)
                 batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
                 n_nodes = node_mask.sum(-1)
+                if self.args.virtual_node:
+                    batch = utils.add_virtual_node(batch, node_mask)
+                    node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
+
             else:
                 batch_size = self.args.plot_npar
                 n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
@@ -523,6 +545,9 @@ class IPFBase(torch.nn.Module):
                 )
                 batch = batch.sample(onehot=True, node_mask=node_mask)
 
+                if self.args.virtual_node:
+                    node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
+
             batch.mask(node_mask)
             x_tot, _, _, _ = self.langevin.record_langevin_seq(
                 sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True
@@ -530,7 +555,13 @@ class IPFBase(torch.nn.Module):
 
             samples.append(x_tot.get_data(-1, dim=1).collapse())
             batches.append(batch)
+
+            if self.args.virtual_node:
+                node_mask = samples[-1].X > 0
+                n_nodes = node_mask.sum(-1)
+
             all_n_nodes.append(n_nodes)
+            # all_node_masks.append(node_mask)
             chains = utils.PlaceHolder(
                 X=x_tot.X[:chains_to_save],
                 E=x_tot.E[:chains_to_save],
@@ -555,7 +586,9 @@ class IPFBase(torch.nn.Module):
             y=None,
         )
         all_n_nodes = torch.cat(all_n_nodes, dim=0)[:samples_to_generate]
+        # all_node_masks = torch.cat(all_node_masks, dim=0)[:samples_to_generate]
 
+        # return batch, samples, chains, all_n_nodes, all_node_masks
         return batch, samples, chains, all_n_nodes
 
     def save_step(self, i, n, fb):
@@ -596,6 +629,7 @@ class IPFBase(torch.nn.Module):
 
             # generation
             self.set_seed(seed=0 + self.accelerator.process_index)
+            # batch, samples, chains, n_nodes, node_masks = self.generate_graphs(
             batch, samples, chains, n_nodes = self.generate_graphs(
                 fb, sample_net, n, test=self.args.test
             )
@@ -607,13 +641,22 @@ class IPFBase(torch.nn.Module):
                 y=None,
                 n_nodes=n_nodes,
             )
+            if self.args.virtual_node:
+                to_plot.X -= 1
+                print("virtual node", to_plot.X.min())
+
             X = to_plot.X
             E = to_plot.E
             generated_list = []
+
             for l in range(X.shape[0]):
-                cur_n = n_nodes[l]
-                atom_types = X[l, :cur_n].cpu()
-                edge_types = E[l, :cur_n, :cur_n].cpu()
+                if self.args.virtual_node:
+                    cur_mask = X[l] >= 0
+                else:
+                    cur_mask = torch.arange(X.size(-1), device=self.device) < n_nodes[l]
+
+                atom_types = X[l, cur_mask].cpu()
+                edge_types = E[l, cur_mask][:, cur_mask].cpu()
                 generated_list.append([atom_types, edge_types])
 
             print("visualizing graphs...")
@@ -626,7 +669,6 @@ class IPFBase(torch.nn.Module):
             self.visualization_tools.visualize(
                 result_path,
                 to_plot,
-                atom_decoder=None,
                 num_graphs_to_visualize=to_plot.X.shape[0],
                 fb=fb,
             )
@@ -651,6 +693,7 @@ class IPFBase(torch.nn.Module):
                 num_chains_to_visualize=len(chains.X),
                 fb=fb,
                 transfer=self.args.transfer,
+                virtual_node=self.args.virtual_node
             )
 
             # in this case, if fb=='f' and not transfer, then the metrics will become None
@@ -742,10 +785,39 @@ class IPFSequential(IPFBase):
             training step
             """
             self.set_seed(seed=n * self.num_iter + i)
+
             x, out, clean, gammas_expanded, times_expanded = next(new_dl)
-            x = PlaceHolder(X=x[0], E=x[1], y=x[2], charge=x[3], n_nodes=x[4])
-            out = PlaceHolder(X=out[0], E=out[1], y=out[2], charge=out[3])
-            clean = PlaceHolder(X=clean[0], E=clean[1], y=clean[2], charge=clean[3])
+            # if self.args.virtual_node:
+            #     x = PlaceHolder(X=x[0], E=x[1], y=x[2], charge=x[3], node_mask=x[0][..., 0]==1)
+            #     out = PlaceHolder(X=out[0], E=out[1], y=out[2], charge=out[3], node_mask=out[0][..., 0]==1)
+            #     clean = PlaceHolder(X=clean[0], E=clean[1], y=clean[2], charge=clean[3], node_mask=clean[0][..., 0]==1)
+            #     x.X = F.one_hot(x.X.argmax(-1) + 1, self.datainfos.node_types + 1).float()
+            #     out.X = F.one_hot(out.X.argmax(-1) + 1, self.datainfos.node_types + 1).float()
+            #     clean.X = F.one_hot(clean.X.argmax(-1) + 1, self.datainfos.node_types + 1).float()
+            # else:
+
+            # x = x.mask()
+            # out = out.mask()
+            # clean = clean.mask()
+
+            # if self.args.virtual_node:
+            #     x.X = F.one_hot(x.X.argmax(-1), self.datainfos.node_types + 1).float()
+            #     out.X = F.one_hot(out.X.argmax(-1), self.datainfos.node_types + 1).float()
+            #     clean.X = F.one_hot(clean.X.argmax(-1), self.datainfos.node_types + 1).float()
+
+            if self.args.virtual_node:
+                # we do not consider node mask when using virtual nodes
+                n_nodes_x = torch.ones_like(x[4]).to(self.device) * self.max_n_nodes
+                n_nodes_out = torch.ones_like(out[4]).to(self.device) * self.max_n_nodes
+                n_nodes_clean = torch.ones_like(clean[4]).to(self.device) * self.max_n_nodes
+            else:
+                n_nodes_x = x[4]
+                n_nodes_out = out[4]
+                n_nodes_clean = clean[4]
+
+            x = PlaceHolder(X=x[0], E=x[1], y=x[2], charge=x[3], n_nodes=n_nodes_x)
+            out = PlaceHolder(X=out[0], E=out[1], y=out[2], charge=out[3], n_nodes=n_nodes_out)
+            clean = PlaceHolder(X=clean[0], E=clean[1], y=clean[2], charge=clean[3], n_nodes=n_nodes_clean)
 
             eval_steps = self.T - times_expanded
             pred = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
@@ -754,8 +826,6 @@ class IPFSequential(IPFBase):
             pred_clean = pred.copy()
             pred_clean.X = pred_clean.X * times_expanded[:, None, :]
             pred_clean.E = pred_clean.E * times_expanded[:, None, None, :]
-            # pred_clean.X = pred_clean.X * eval_steps[:, None, :]
-            # pred_clean.E = pred_clean.E * eval_steps[:, None, None, :]
             # change the value for the diagonal
             pred_clean.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
             pred_clean.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
@@ -836,29 +906,37 @@ class IPFSequential(IPFBase):
         self.clear()
 
     def compute_loss(self, pred, out, pred_clean, clean, t):
-        # # Calculate the losses
-        # bce_loss = torch.nn.BCELoss()
-        # node_loss = self.args.model.lambda_train[0] * bce_loss(pred.X, out.X)
-        # edge_loss = self.args.model.lambda_train[1] * bce_loss(pred.E, out.E)
-        # # MSE
-        # node_loss = self.args.model.lambda_train[0] * F.mse_loss(pred.X, out.X)
-        # edge_loss = self.args.model.lambda_train[1] * F.mse_loss(pred.E, out.E)
+        clean_node_count = clean.node_mask.sum(-1)
+        clean_edge_count = (clean_node_count - 1) * clean_node_count
+
+        node_count = out.node_mask.sum(-1)
+        edge_count = (node_count - 1) * node_count
+        
+        if self.args.virtual_node:
+            node_count = out.node_mask.size(-1) * out.node_mask.size(-2)
+            clean_node_count = clean.node_mask.size(-1) * clean.node_mask.size(-2)
+
         # Calculate the losses
-        ce_loss = torch.nn.CrossEntropyLoss()
+        ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
         pred.X = torch.log(pred.X + 1e-6)
         pred.E = torch.log(pred.E + 1e-6)
-        node_loss = self.args.model.lambda_train[0] * ce_loss(pred.X, out.X)
-        edge_loss = self.args.model.lambda_train[1] * ce_loss(pred.E, out.E)
-        loss = node_loss + edge_loss
+        node_loss = self.args.model.lambda_train[0] * ce_loss(pred.X.permute((0, 2, 1)), out.X.permute((0, 2, 1)))
+        edge_loss = self.args.model.lambda_train[1] * ce_loss(pred.E.permute((0, 3, 1, 2)), out.E.permute((0, 3, 1, 2)))
+
+        loss = PlaceHolder(X=node_loss.unsqueeze(-1), E=edge_loss.unsqueeze(-1), y=None).mask(out.node_mask, mask_node=not self.args.virtual_node)
+        loss = (loss.X/node_count).sum() + (loss.E/edge_count).sum()
 
         ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
         pred_clean.X = torch.log(pred_clean.X + 1e-6)
         pred_clean.E = torch.log(pred_clean.E + 1e-6)
-        clean_node_loss = self.args.model.lambda_train[0] * ce_loss(pred_clean.X, clean.X)
-        clean_edge_loss = self.args.model.lambda_train[1] * ce_loss(pred_clean.E, clean.E)
-        clean_node_loss = clean_node_loss / t[:, None, :]
-        clean_edge_loss = clean_edge_loss / t[:, None, None, :]
-        clean_loss = clean_node_loss.mean() + clean_edge_loss.mean()
+        clean_node_loss = self.args.model.lambda_train[0] * ce_loss(pred_clean.X.permute((0, 2, 1)), clean.X.permute((0, 2, 1)))
+        clean_edge_loss = self.args.model.lambda_train[1] * ce_loss(pred_clean.E.permute((0, 3, 1, 2)), clean.E.permute((0, 3, 1, 2)))
+        clean_node_loss = clean_node_loss / t[:]
+        clean_edge_loss = clean_edge_loss / t[:, None]
+
+        # clean_edge_loss = clean_edge_loss + torch.transpose(clean_edge_loss, 1, 2)
+        clean_loss = PlaceHolder(X=clean_node_loss.unsqueeze(-1), E=clean_edge_loss.unsqueeze(-1), y=None).mask(clean.node_mask, mask_node=not self.args.virtual_node)
+        clean_loss = (clean_loss.X/clean_node_count).sum() + (clean_loss.E/clean_edge_count).sum()
 
         loss = loss + self.args.clean_loss_weight * clean_loss
 
@@ -873,8 +951,14 @@ class IPFSequential(IPFBase):
 
         model_input = z_t.copy()
         with torch.no_grad():
+            if self.args.virtual_node:
+                X = z_t.X.clone()
+                # virtual_mask = z_t.X.argmax(-1) > 0
+                z_t.X = z_t.X[..., 1:]
             extra_features, _, _ = self.extra_features(z_t)
             extra_domain_features = self.domain_features(z_t)
+            if self.args.virtual_node:
+                z_t.X = X
 
         model_input.X = torch.cat(
             (z_t.X, extra_features.X, extra_domain_features.X), dim=2

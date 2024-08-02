@@ -129,6 +129,7 @@ class AbstractDatasetInfos:
         get the one_hot encoding for a charge beginning from -1
         """
         one_hot_data = data.clone()
+        # import pdb; pdb.set_trace()
         one_hot_data.x = F.one_hot(data.x, num_classes=self.num_node_types).float()
         one_hot_data.edge_attr = F.one_hot(
             data.edge_attr, num_classes=self.num_edge_types
@@ -161,6 +162,7 @@ class AbstractDatasetInfos:
         self.num_node_types = len(self.node_types)
         self.num_edge_types = len(self.edge_types)
         self.num_charge_types = self.charge_types.shape[-1] if self.use_charge else 0
+        self.real_node_ratio = statistics["train"].real_node_ratio
 
         # Train + val + test for n_nodes
         train_n_nodes = statistics["train"].num_nodes
@@ -178,9 +180,13 @@ class AbstractDatasetInfos:
         self.max_n_nodes = len(n_nodes) - 1
         self.nodes_dist = DistributionNodes(n_nodes)
 
-    def compute_input_dims(self, datamodule, extra_features, domain_features):
+
+    def compute_input_dims(self, datamodule, extra_features, domain_features, virtual_node):
         data = next(iter(datamodule.train_dataloader()))
-        example_batch = self.to_one_hot(data)
+        # example_batch = self.to_one_hot(data)
+        # import pdb; pdb.set_trace()
+        example_batch = data.clone()
+        data.n_nodes = data.ptr.diff()
         ex_dense, node_mask = utils.to_dense(
             x=example_batch.x,
             edge_index=example_batch.edge_index,
@@ -198,6 +204,10 @@ class AbstractDatasetInfos:
             y=ex_dense.y.size(-1) + 1 if ex_dense.y is not None else 1,
             charge=self.num_charge_types,
         )
+
+        if virtual_node:
+            self.input_dims.X = self.input_dims.X + 1
+            self.output_dims.X = self.output_dims.X + 1
 
         # print('input', self.input_dims.y)
 

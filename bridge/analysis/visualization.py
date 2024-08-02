@@ -83,11 +83,55 @@ class Visualizer:
         plt.savefig(path)
         plt.close("all")
 
+    def mol_from_graphs(self, node_list, adjacency_matrix):
+        """
+        Convert graphs to rdkit molecules
+        node_list: the nodes of a batch of nodes (bs x n)
+        adjacency_matrix: the adjacency_matrix of the molecule (bs x n x n)
+        """
+        # dictionary to map integer value to the char of atom
+        atom_decoder = self.dataset_infos.atom_decoder
+
+        # create empty editable mol object
+        mol = Chem.RWMol()
+
+        # add atoms to mol and keep track of index
+        node_to_idx = {}
+        for i in range(len(node_list)):
+            if node_list[i] == -1:
+                continue
+            a = Chem.Atom(atom_decoder[int(node_list[i])])
+            molIdx = mol.AddAtom(a)
+            node_to_idx[i] = molIdx
+
+        for ix, row in enumerate(adjacency_matrix):
+            for iy, bond in enumerate(row):
+                # only traverse half the symmetric matrix
+                if iy <= ix:
+                    continue
+                if bond == 1:
+                    bond_type = Chem.rdchem.BondType.SINGLE
+                elif bond == 2:
+                    bond_type = Chem.rdchem.BondType.DOUBLE
+                elif bond == 3:
+                    bond_type = Chem.rdchem.BondType.TRIPLE
+                elif bond == 4:
+                    bond_type = Chem.rdchem.BondType.AROMATIC
+                else:
+                    continue
+                mol.AddBond(node_to_idx[ix], node_to_idx[iy], bond_type)
+
+        try:
+            mol = mol.GetMol()
+        except rdkit.Chem.KekulizeException:
+            print("Can't kekulize molecule")
+            mol = None
+        return mol
+
     def visualize(
         self,
         path: str,
         graphs: PlaceHolder,
-        atom_decoder,
         num_graphs_to_visualize: int,
         log="graph",
         fb="b",
@@ -108,7 +152,7 @@ class Visualizer:
             file_path = os.path.join(path, "graph_{}.png".format(i))
 
             if self.is_molecular:
-                mol = Molecule(graph_list[i], atom_decoder).rdkit_mol
+                mol = Molecule(graph_list[i].X, graph_list[i].E, self.dataset_infos.atom_decoder, charge=None).rdkit_mol
                 try:
                     Draw.MolToFile(mol, file_path)
                 except rdkit.Chem.KekulizeException:
@@ -122,6 +166,19 @@ class Visualizer:
                     print(f"Saving {file_path} to wandb")
                 wandb.log({log: [wandb.Image(file_path)]}, commit=False)
 
+        # define path to save figures
+        # if not os.path.exists(path):
+        #     os.makedirs(path)
+
+        # # visualize the final molecules
+        # for i in range(num_graphs_to_visualize):
+        #     file_path = os.path.join(path, 'graph_{}.png'.format(i))
+        #     graph = self.to_networkx(graphs[i][0].numpy(), graphs[i][1].numpy())
+        #     self.visualize_non_molecule(graph=graph, pos=None, path=file_path)
+        #     im = plt.imread(file_path)
+        #     if wandb.run and log is not None:
+        #         wandb.log({log: [wandb.Image(im, caption=file_path)]})
+
     def visualize_chains(
         self,
         path: str,
@@ -131,6 +188,7 @@ class Visualizer:
         num_chains_to_visualize: int,
         fb: str,
         transfer=False,
+        virtual_node=False,
     ):
         # bs, n_steps, ...
         for i in range(num_chains_to_visualize):  # Iterate over the chains
@@ -140,12 +198,21 @@ class Visualizer:
                 os.makedirs(cur_path)
 
             graphs = []
-            chain = PlaceHolder(
-                X=chains.X[i, :, : num_nodes[i]],
-                E=chains.E[i, :, : num_nodes[i], : num_nodes[i]],
-                charge=None,  # chains.charge[:, i, : num_nodes[i]].long(),
-                y=None,
-            )
+            if virtual_node:
+                cur_mask = chains.X[i, -1].argmax(-1) > 0
+                chain = PlaceHolder(
+                    X=chains.X[i, :, cur_mask, 1:],
+                    E=chains.E[i, :, cur_mask][:, :, cur_mask],
+                    charge=None,  # chains.charge[:, i, : num_nodes[i]].long(),
+                    y=None,
+                )
+            else:
+                chain = PlaceHolder(
+                    X=chains.X[i, :, : num_nodes[i]],
+                    E=chains.E[i, :, : num_nodes[i], : num_nodes[i]],
+                    charge=None,  # chains.charge[:, i, : num_nodes[i]].long(),
+                    y=None,
+                )
 
             # Iterate over the frames of each molecule
             for j in range(chain.X.shape[0]):
@@ -158,7 +225,7 @@ class Visualizer:
                 if self.is_molecular:
                     graphs.append(
                         Molecule(
-                            graph=graph, atom_decoder=self.dataset_infos.atom_decoder
+                            node_types=graph.X.argmax(-1), bond_types=graph.E.argmax(-1), atom_decoder=self.dataset_infos.atom_decoder, charge=None
                         )
                     )
                 else:

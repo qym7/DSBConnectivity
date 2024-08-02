@@ -15,9 +15,12 @@ def get_noise(limit_dist, x_k, node_mask):
     max_n_nodes = x_k.X.shape[1]
     device = x_k.X.device
 
+    limit_X = limit_dist.X
+    limit_E = limit_dist.E
+
     batch = utils.PlaceHolder(
-        X=limit_dist.X.repeat(batch_size, max_n_nodes, 1).to(device),
-        E=limit_dist.E.repeat(batch_size, max_n_nodes, max_n_nodes, 1).to(device),
+        X=limit_X.repeat(batch_size, max_n_nodes, 1).to(device),
+        E=limit_E.repeat(batch_size, max_n_nodes, max_n_nodes, 1).to(device),
         y=None,
         charge=None,
         n_nodes=n_nodes,
@@ -62,6 +65,7 @@ class Langevin(torch.nn.Module):
         domain_features=None,
         tf_extra_features=None,
         tf_domain_features=None,
+        virtual_node=False,
     ):
         super().__init__()
         # self.std_final = utils.PlaceHolder(
@@ -69,6 +73,7 @@ class Langevin(torch.nn.Module):
         # )
         self.graph = graph
         self.limit_dist = limit_dist
+        self.virtual_node = virtual_node
 
         # extra fetaures
         self.extra_features = extra_features
@@ -91,7 +96,7 @@ class Langevin(torch.nn.Module):
 
     def record_init_langevin(self, x, node_mask):
         bs = x.X.shape[0]
-        dx = x.X.shape[-1]
+        dx = x.X.shape[-1]  # for virtual nodes, there is an extra dimension
         de = x.E.shape[-1]
 
         x_tot = utils.PlaceHolder(
@@ -129,7 +134,12 @@ class Langevin(torch.nn.Module):
             # else:
             #     x_k = noise
             # x_k = x_k.scale(1 - gamma / 3).add(noise.scale(gamma / 3))
-            x_k = x_k.sample(onehot=True, node_mask=node_mask)
+
+            if self.virtual_node:
+                x_k = x_k.sample(onehot=True, node_mask=torch.ones(x_k.X.shape[:-1]).to(x_k.X.device).bool())
+            else:
+                x_k = x_k.sample(onehot=True, node_mask=node_mask)
+
             x_tot = x_tot.place(x_k, k)
 
         return x_tot, out, gammas_expanded, times_expanded
@@ -138,8 +148,9 @@ class Langevin(torch.nn.Module):
         self, net, init_samples, node_mask, t_batch=None, ipf_it=0, sample=False
     ):
         bs = init_samples.X.shape[0]
-        dx = init_samples.X.shape[-1]
+        dx = init_samples.X.shape[-1]  # for virtual nodes, there is an extra dimension
         de = init_samples.E.shape[-1]
+
         x_tot = utils.PlaceHolder(
             X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(self.device),
             E=torch.Tensor(
@@ -148,6 +159,7 @@ class Langevin(torch.nn.Module):
             y=None,
             node_mask=node_mask,
         )
+
         out = utils.PlaceHolder(
             X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(self.device),
             E=torch.Tensor(
@@ -167,7 +179,6 @@ class Langevin(torch.nn.Module):
             with torch.no_grad():
                 pred = self.forward_graph(net, x, t)
 
-            # dp = r * dt
             pred.X = pred.X * gamma[:, None, :]
             pred.E = pred.E * gamma[:, None, None, :]
 
@@ -189,7 +200,11 @@ class Langevin(torch.nn.Module):
             pred.X = (pred.X / pred.X.sum(-1, keepdim=True)).float()
             pred.E = (pred.E / pred.E.sum(-1, keepdim=True)).float()
 
-            x = pred.sample(onehot=True, node_mask=node_mask).mask()
+            if self.virtual_node:
+                x = pred.sample(onehot=True, node_mask=torch.ones(x.X.shape[:-1]).to(x.X.device).bool())
+            else:
+                x = pred.sample(onehot=True, node_mask=node_mask)
+
             x_tot = x_tot.place(x, k)
 
         return x_tot, out, gammas_expanded, times_expanded
@@ -200,8 +215,14 @@ class Langevin(torch.nn.Module):
 
         model_input = z_t.copy()
         with torch.no_grad():
+            if self.virtual_node:
+                X = z_t.X.clone()
+                # virtual_mask = z_t.X.argmax(-1) > 0
+                z_t.X = z_t.X[..., 1:]
             extra_features, _, _ = self.extra_features(z_t)
             extra_domain_features = self.domain_features(z_t)
+            if self.virtual_node:
+                z_t.X = X
 
         model_input.X = torch.cat(
             (z_t.X, extra_features.X, extra_domain_features.X), dim=2

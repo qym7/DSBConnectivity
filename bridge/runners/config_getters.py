@@ -38,15 +38,6 @@ def get_plotter(runner, args):
 
 
 def get_graph_models(args, dataset_infos):
-    # kwargs = {
-    #     "n_layers": args.model.n_layers,
-    #     "input_dims": args.model.input_dims,
-    #     "hidden_dims": args.model.hidden_dims,
-    #     "output_dims": args.model.output_dims,
-    #     "sn_hidden_dim": args.model.sn_hidden_dim,
-    #     "output_y": args.model.output_y,
-    #     "dropout": args.model.dropout
-    #     }
     kwargs = {
         "input_dims": dataset_infos.input_dims,
         "n_layers": args.model.n_layers,
@@ -152,26 +143,26 @@ def get_datamodules(cfg):
 
     elif cfg["name"] in ["qm9", "guacamol", "moses"]:
         if cfg["name"] == "qm9":
-            from datasets import qm9_dataset
+            from ..datasets import qm9_dataset
 
             datamodule = qm9_dataset.QM9DataModule(cfg)
             dataset_infos = qm9_dataset.QM9Infos(datamodule=datamodule, cfg=cfg)
 
         elif cfg["name"] == "guacamol":
-            from datasets import guacamol_dataset
+            from ..datasets import guacamol_dataset
 
             datamodule = guacamol_dataset.GuacamolDataModule(cfg)
             dataset_infos = guacamol_dataset.GuacamolInfos(datamodule, cfg)
 
         elif cfg.name == "moses":
-            from datasets import moses_dataset
+            from ..datasets import moses_dataset
 
             datamodule = moses_dataset.MosesDataModule(cfg)
             dataset_infos = moses_dataset.MosesInfos(datamodule, cfg)
         else:
             raise ValueError("Dataset not implemented")
 
-        if cfg.model.extra_features is not None:
+        if cfg.extra_features is not None:
             domain_features = ExtraMolecularFeatures(dataset_infos=dataset_infos)
         else:
             domain_features = DummyExtraFeatures()

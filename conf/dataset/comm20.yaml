@@ -5,6 +5,10 @@ Dataset: comm20
 graph: True
 project_name: comm20
 
+# new configs that need to be better organizsed...
+clean_loss_weight: 0.0001
+virtual_node: False
+
 data:
   dataset: "comm20"
   image_size: 20

@@ -27,6 +27,7 @@ class CacheLoader(Dataset):
         dataset_infos=None,
         visualization_tools=None,
         visualize=False,
+        virtual_node=False,
     ):
         super().__init__()
         self.max_n_nodes = langevin.max_n_nodes
@@ -37,6 +38,7 @@ class CacheLoader(Dataset):
         self.device = device
         self.visualization_tools = visualization_tools
         self.visualize = visualize
+        self.virtual_node = virtual_node
 
         self.limit_dist = limit_dist
 
@@ -46,7 +48,7 @@ class CacheLoader(Dataset):
                 batch_size * self.num_steps,
                 3,
                 self.max_n_nodes,
-                len(dataset_infos.node_types),
+                len(dataset_infos.node_types) + 1 if virtual_node else len(dataset_infos.node_types),
             ).to(self.device),
             E=torch.Tensor(
                 num_batches,
@@ -54,7 +56,7 @@ class CacheLoader(Dataset):
                 3,
                 self.max_n_nodes,
                 self.max_n_nodes,
-                len(dataset_infos.bond_types),
+                len(dataset_infos.edge_types),
             ).to(self.device),
             y=None,
         )
@@ -75,6 +77,10 @@ class CacheLoader(Dataset):
                     batch = next(loader)
                     batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
                     n_nodes = node_mask.sum(-1)
+                    if self.virtual_node:
+                        batch = utils.add_virtual_node(batch, node_mask)
+                        node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
+
                 else:
                     n_nodes = self.nodes_dist.sample_n(batch_size, device)
                     arange = (
@@ -95,6 +101,9 @@ class CacheLoader(Dataset):
                         n_nodes=n_nodes,
                     )
                     batch = batch.sample(onehot=True, node_mask=node_mask)
+
+                    if self.virtual_node:
+                        node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
 
                 batch.mask(node_mask)
 
@@ -122,8 +131,11 @@ class CacheLoader(Dataset):
                     (x.E.unsqueeze(2), out.E.unsqueeze(2), batch.E.unsqueeze(1).repeat(1, x.E.shape[1], 1, 1, 1).unsqueeze(2)), dim=2
                 ).flatten(start_dim=0, end_dim=1)
 
-                self.data.X[b] = batch_X
-                self.data.E[b] = batch_E
+                try:
+                    self.data.X[b] = batch_X
+                    self.data.E[b] = batch_E
+                except:
+                    import pdb; pdb.set_trace()
 
                 # store steps
                 flat_times = times_expanded.flatten(start_dim=0, end_dim=1)

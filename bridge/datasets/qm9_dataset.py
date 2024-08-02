@@ -2,7 +2,6 @@ import os
 import os.path as osp
 import pathlib
 
-
 import torch
 import torch.nn.functional as F
 from rdkit import Chem, RDLogger
@@ -91,6 +90,7 @@ class QM9Dataset(InMemoryDataset):
             bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
             charge_types=torch.from_numpy(np.load(self.processed_paths[4])).float(),
             valencies=load_pickle(self.processed_paths[5]),
+            real_node_ratio=torch.from_numpy(np.load(self.processed_paths[7])).float(),
         )
         self.smiles = load_pickle(self.processed_paths[6])
 
@@ -120,7 +120,8 @@ class QM9Dataset(InMemoryDataset):
                 f"train_bond_types_{h}.npy",
                 f"train_charge_{h}.npy",
                 f"train_valency_{h}.pickle",
-                "train_smiles.pickle",
+                f"train_smiles.pickle",
+                f"train_real_node_ratio_{h}.npy",
             ]
         elif self.split == "val":
             return [
@@ -131,6 +132,7 @@ class QM9Dataset(InMemoryDataset):
                 f"val_charge_{h}.npy",
                 f"val_valency_{h}.pickle",
                 f"val_smiles_{h}.pickle",
+                f"val_real_node_ratio_{h}.npy",
             ]
         else:
             return [
@@ -141,6 +143,7 @@ class QM9Dataset(InMemoryDataset):
                 f"test_charge_{h}.npy",
                 f"test_valency_{h}.pickle",
                 f"test_smiles_{h}.pickle",
+                f"test_real_node_ratio_{h}.npy",
             ]
 
     def download(self):
@@ -217,6 +220,9 @@ class QM9Dataset(InMemoryDataset):
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
 
+            # data.edge_attr = F.one_hot(data.edge_attr, num_classes=5).to(torch.float)
+            # data.x = F.one_hot(data.x, num_classes=len(list(self.atom_encoder.keys()))).to(torch.float)
+
             if data.edge_index.numel() > 0:
                 data_list.append(data)
 
@@ -229,6 +235,13 @@ class QM9Dataset(InMemoryDataset):
         np.save(self.processed_paths[4], statistics.charge_types)
         save_pickle(statistics.valencies, self.processed_paths[5])
         save_pickle(set(all_smiles), self.processed_paths[6])
+        np.save(self.processed_paths[7], statistics.real_node_ratio)
+    
+        for data in data_list:
+            data.x = F.one_hot(data.x.to(torch.long), num_classes=len(statistics.node_types)).to(torch.float)
+            data.edge_attr = F.one_hot(data.edge_attr.to(torch.long), num_classes=len(statistics.bond_types)).to(torch.float)
+            data.charge = F.one_hot(data.charge.to(torch.long) + 1, num_classes=len(statistics.charge_types[0])).to(torch.float)
+        
         torch.save(self.collate(data_list), self.processed_paths[0])
         print("Number of molecules that could not be mapped to smiles: ", num_errors)
 
@@ -236,12 +249,13 @@ class QM9Dataset(InMemoryDataset):
 class QM9DataModule(MolecularDataModule):
     def __init__(self, cfg):
         self.cfg = cfg
-        self.datadir = cfg.dataset.datadir
+        self.datadir = cfg.datadir
         base_path = pathlib.Path(get_original_cwd()).parents[0]
         root_path = os.path.join(base_path, self.datadir)
 
-        target = getattr(cfg.general, "guidance_target", None)
-        regressor = getattr(self, "regressor", None)
+        # target = getattr(cfg.general, "guidance_target", None)
+        # regressor = getattr(self, "regressor", None)
+        target = regressor = None
         if regressor and target == "mu":
             transform = SelectMuTransform()
         elif regressor and target == "homo":
@@ -251,26 +265,26 @@ class QM9DataModule(MolecularDataModule):
         else:
             transform = RemoveYTransform()
 
-        self.remove_h = cfg.dataset.remove_h
+        self.remove_h = cfg.remove_h
         datasets = {
             "train": QM9Dataset(
                 split="train",
                 root=root_path,
-                remove_h=self.cfg.dataset.remove_h,
+                remove_h=self.cfg.remove_h,
                 target_prop=target,
                 transform=RemoveYTransform(),
             ),
             "val": QM9Dataset(
                 split="val",
                 root=root_path,
-                remove_h=self.cfg.dataset.remove_h,
+                remove_h=self.cfg.remove_h,
                 target_prop=target,
                 transform=RemoveYTransform(),
             ),
             "test": QM9Dataset(
                 split="test",
                 root=root_path,
-                remove_h=self.cfg.dataset.remove_h,
+                remove_h=self.cfg.remove_h,
                 target_prop=target,
                 transform=transform,
             ),
@@ -282,6 +296,8 @@ class QM9DataModule(MolecularDataModule):
             "test": datasets["test"].statistics,
         }
         super().__init__(cfg, datasets)
+        super().prepare_dataloader()
+        self.inner = self.train_dataset
 
 
 class QM9Infos(AbstractDatasetInfos):
@@ -289,8 +305,8 @@ class QM9Infos(AbstractDatasetInfos):
         # basic settings
         self.name = "qm9"
         self.is_molecular = True
-        self.remove_h = cfg.dataset.remove_h
-        self.use_charge = cfg.model.use_charge
+        self.remove_h = cfg.remove_h
+        self.use_charge = cfg.use_charge
         self.collapse_charges = torch.Tensor([-1, 0, 1]).int()
 
         # statistics
@@ -307,7 +323,6 @@ class QM9Infos(AbstractDatasetInfos):
             }
             self.atom_decoder = [key for key in self.atom_encoder.keys()]
         super().complete_infos(datamodule.statistics, self.atom_encoder)
-
         # dimensions settings
         self.output_dims = PlaceHolder(
             X=self.num_node_types, charge=self.num_charge_types, E=5, y=0
@@ -318,5 +333,17 @@ class QM9Infos(AbstractDatasetInfos):
         # special settings
         # atom_encoder = {'H': 0, 'C': 1, 'N': 2, 'O': 3, 'F': 4}
         self.valencies = [4, 3, 2, 1] if self.remove_h else [1, 4, 3, 2, 1]
-        self.atom_weights = [12, 14, 16, 19] if self.remove_h else [1, 12, 14, 16, 19]
+        # self.atom_weights = [12, 14, 16, 19] if self.remove_h else [1, 12, 14, 16, 19]
+        self.atom_weights = {0: 12, 1: 14, 2: 16, 3: 19} if self.remove_h else {0: 1, 1: 12, 2: 14, 3: 16, 4: 19}
         self.max_weight = 40 * 19  # Quite arbitrary
+
+        if self.remove_h:
+            self.valency_distribution = torch.zeros(3 * self.max_n_nodes - 2)
+            self.valency_distribution[0:6] = torch.tensor(
+                [2.6071e-06, 0.163, 0.352, 0.320, 0.16313, 0.00073]
+            )
+        else:
+            self.valency_distribution = torch.zeros(3 * self.max_n_nodes - 2)
+            self.valency_distribution[0:6] = torch.tensor(
+                [0, 0.5136, 0.0840, 0.0554, 0.3456, 0.0012]
+            )

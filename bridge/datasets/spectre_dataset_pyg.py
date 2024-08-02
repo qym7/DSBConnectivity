@@ -70,6 +70,7 @@ class SpectreGraphDataset(InMemoryDataset):
             num_nodes=load_pickle(self.processed_paths[1]),
             node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
             bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
+            real_node_ratio=torch.from_numpy(np.load(self.processed_paths[4])).float(),
         )
 
     @property
@@ -95,6 +96,7 @@ class SpectreGraphDataset(InMemoryDataset):
                 f"train_n.pickle",
                 f"train_node_types.npy",
                 f"train_bond_types.npy",
+                f"train_real_node_ratio.npy",
             ]
         elif self.split == "val":
             return [
@@ -102,6 +104,7 @@ class SpectreGraphDataset(InMemoryDataset):
                 f"val_n.pickle",
                 f"val_node_types.npy",
                 f"val_bond_types.npy",
+                f"val_real_node_ratio.npy",
             ]
         else:
             return [
@@ -109,6 +112,7 @@ class SpectreGraphDataset(InMemoryDataset):
                 f"test_n.pickle",
                 f"test_node_types.npy",
                 f"test_bond_types.npy",
+                f"test_real_node_ratio.npy",
             ]
 
     def download(self):
@@ -248,6 +252,7 @@ class SpectreGraphDataset(InMemoryDataset):
                 edge_index=edge_index,
                 edge_attr=edge_attr.float(),
                 n_nodes=n_nodes,
+                charge=X.new_zeros((*X.shape[:-1], 0))
             )
 
             if self.pre_filter is not None and not self.pre_filter(data):
@@ -257,13 +262,14 @@ class SpectreGraphDataset(InMemoryDataset):
 
             data_list.append(data)
 
-        num_nodes = node_counts(data_list)
+        num_nodes, real_node_ratio = node_counts(data_list)
         node_types = atom_type_counts(data_list, num_classes=1)
         bond_types = edge_counts(data_list, num_bond_types=2)
         torch.save(self.collate(data_list), self.processed_paths[0])
         save_pickle(num_nodes, self.processed_paths[1])
         np.save(self.processed_paths[2], node_types)
         np.save(self.processed_paths[3], bond_types)
+        np.save(real_node_ratio, self.processed_paths[4])
 
 
 class SpectreGraphDataModule(AbstractDataModule):

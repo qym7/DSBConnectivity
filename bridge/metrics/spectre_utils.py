@@ -976,7 +976,6 @@ class SpectreSamplingMetrics(nn.Module):
             atom_types, edge_types = graph
             A = edge_types.bool().cpu().numpy()
             adjacency_matrices.append(A)
-
             nx_graph = nx.from_numpy_array(A)
             networkx_graphs.append(nx_graph)
 
