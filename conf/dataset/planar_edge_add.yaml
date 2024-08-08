@@ -37,9 +37,8 @@ dataset:
 
   num_graphs: 200
   num_nodes: 35
-  edge_removal: 10
   avg_degree: 6
-  shortest_path: True
+  shortest_path: False
 
 final_adaptive: False
 adaptive_mean: True

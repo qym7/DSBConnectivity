@@ -168,8 +168,7 @@ class Visualizer:
             # The direction is changed for the cacheloader visualization before
             # final_graph = graphs[-1] if fb == "b" else graphs[0]
             # first_graph = graphs[0] if fb == "b" else graphs[-1]
-
-            # compute positions for the final graph
+            
             final_graph = graphs[-1]
             first_graph = graphs[0]
 
@@ -190,13 +189,7 @@ class Visualizer:
                         conf.SetAtomPosition(l, Point3D(x, y, z))
             else:
                 final_pos = nx.spring_layout(final_graph, seed=0)
-                # TODO: This section below was commented out for the planar edge removal experiment.
-                #  Uncomment and re-enable for other experiments.
-                # first_pos = nx.spring_layout(first_graph, seed=0)
-
-            # TODO: remove the below section when not performing the planar egde removal experiment
-            num_edges_start = first_graph.number_of_edges() if not self.is_molecular else first_graph.rdkit_mol.GetNumBonds()
-            num_edges_end = final_graph.number_of_edges() if not self.is_molecular else final_graph.rdkit_mol.GetNumBonds()
+                first_pos = nx.spring_layout(first_graph, seed=0)
 
             # Visualize and save
             save_paths = []
@@ -213,16 +206,14 @@ class Visualizer:
                         legend=f"Frame {frame}",
                     )
                 else:
-                    # TODO: This section below was commented out for the planar edge removal experiment.
-                    #  Uncomment and re-enable for other experiments.
-                    # if transfer:
-                    #     t = frame / len(graphs)
-                    #     pos = {
-                    #         key: final_pos[key] * t + first_pos[key] * (1 - t)
-                    #         for key in final_pos.keys()
-                    #     }
-                    # else:
-                    pos = final_pos
+                    if transfer:
+                        t = frame / len(graphs)
+                        pos = {
+                            key: final_pos[key] * t + first_pos[key] * (1 - t)
+                            for key in final_pos.keys()
+                        }
+                    else:
+                        pos = final_pos
                     self.visualize_non_molecule(
                         graph=graphs[frame], pos=pos, path=file_name
                     )
@@ -244,9 +235,6 @@ class Visualizer:
                         f"chain_{fb}": [
                             wandb.Video(gif_path, caption=gif_path, format="gif")
                         ],
-                        # TODO: remove the below section when not performing the planar egde removal experiment
-                        f"num_edges_start_{fb}": num_edges_start,
-                        f"num_edges_end_{fb}": num_edges_end
                     }
                 )
                 print(f"Saving {gif_path} to wandb")
