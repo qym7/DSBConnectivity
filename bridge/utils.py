@@ -354,7 +354,7 @@ class PlaceHolder:
 
         return d_data
 
-    def sample(self, onehot=False, node_mask=None):
+    def sample(self, onehot=False, node_mask=None, virtual_node=False):
         bs, n, _ = self.X.shape
         probX = self.X
         probE = self.E
@@ -392,7 +392,7 @@ class PlaceHolder:
 
         return PlaceHolder(
             X=X_t, E=E_t, y=torch.zeros(bs, 0).type_as(X_t), node_mask=node_mask
-        ).mask()
+        ).mask(virtual_node=virtual_node)
 
     def place(self, graph_data, k):
         if (self.X is not None) and (graph_data.X is not None):
@@ -481,7 +481,16 @@ class PlaceHolder:
         self.charge = self.charge.type_as(x) if self.charge.numel() > 0 else None
         return self
 
-    def mask(self, node_mask=None, collapse=False, mask_node=True):
+    def mask(self, node_mask=None, collapse=False, mask_node=True, virtual_node=False):
+        if virtual_node:
+            holder = self.copy()
+            virtual_node_mask = holder.X.argmax(-1, keepdim=True) != 0
+            e_mask1 = virtual_node_mask.unsqueeze(2)  # bs, n, 1, 1
+            e_mask2 = virtual_node_mask.unsqueeze(1)  # bs, 1, n, 1
+            holder.E = holder.E * e_mask1 * e_mask2
+            holder.E[holder.E.sum(-1) == 0] = F.one_hot(torch.tensor(0), holder.E.shape[-1], ).type_as(holder.E).to(holder.E.device)
+            return holder
+
         if node_mask is None:
             assert self.node_mask is not None
             node_mask = self.node_mask

@@ -4,6 +4,7 @@ import time
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
+import torch.nn.functional as F
 
 from .. import utils
 
@@ -103,9 +104,10 @@ class CacheLoader(Dataset):
                     batch = batch.sample(onehot=True, node_mask=node_mask)
 
                     if self.virtual_node:
+                        batch.X[node_mask] = F.one_hot(torch.tensor(0), batch.X.shape[-1], ).to(batch.E.device)
                         node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
 
-                batch.mask(node_mask)
+                batch.mask(node_mask, virtual_node=self.virtual_node)
 
                 if (n == 1) & (fb == "b"):
                     (

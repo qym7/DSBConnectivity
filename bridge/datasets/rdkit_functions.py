@@ -137,13 +137,13 @@ class BasicMolecularMetrics(object):
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
         nc_max = num_components.max() if len(num_components) > 0 else 0
-        connectivity = (num_components == 1).sum() / len(num_components)
+        real_node_ratioivity = (num_components == 1).sum() / len(num_components)
 
         print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
         print(
-            f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
+            f"Number of real_node_ratioed components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
         )
-        print(f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%")
+        print(f"real_node_ratioivity over {len(generated)} molecules: {real_node_ratioivity * 100 :.2f}%")
 
         relaxed_valid, relaxed_validity = self.compute_relaxed_validity(generated)
         print(
@@ -167,7 +167,7 @@ class BasicMolecularMetrics(object):
             uniqueness = 0.0
             unique = []
         return (
-            [validity, relaxed_validity, uniqueness, novelty, connectivity],
+            [validity, relaxed_validity, uniqueness, novelty, real_node_ratioivity],
             unique,
             dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
             all_smiles,
@@ -315,11 +315,11 @@ def correct_mol(m):
     return mol, no_correct
 
 
-def valid_mol_can_with_seg(m, largest_connected_comp=True):
+def valid_mol_can_with_seg(m, largest_real_node_ratioed_comp=True):
     if m is None:
         return None
     sm = Chem.MolToSmiles(m, isomericSmiles=True)
-    if largest_connected_comp and "." in sm:
+    if largest_real_node_ratioed_comp and "." in sm:
         vsm = [
             (s, len(s)) for s in sm.split(".")
         ]  # 'C.CC.CCc1ccc(N)cc1CCC=O'.split('.')
@@ -413,7 +413,6 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info):
         "Relaxed Validity": rdkit_metrics[0][1],
         "Uniqueness": rdkit_metrics[0][2],
         "Novelty": rdkit_metrics[0][3],
-        "Connectivity": rdkit_metrics[0][4],
         "nc_max": nc["nc_max"],
         "nc_mu": nc["nc_mu"],
     }

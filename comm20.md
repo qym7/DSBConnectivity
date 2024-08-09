@@ -15,7 +15,9 @@ CUDA_VISIBLE_DEVICES=0 python main.py dataset=qm9 model=gnn num_steps=50 num_ite
 
 ## Molecular transfer
 
-CUDA_VISIBLE_DEVICES=1 python main.py dataset=qm9 model=gnn num_steps=10 num_iter=10 n_ipf=10 project_name=ce_loss_2k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
+CUDA_VISIBLE_DEVICES=2 python main.py dataset=qm9 model=gnn num_steps=50 num_iter=2000 n_ipf=100 project_name=VirtualNode_2k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001 virtual_node=True
+
+CUDA_VISIBLE_DEVICES=1 python main.py dataset=qm9_2_qm9 model=gnn num_steps=50 num_iter=2000 n_ipf=50 project_name=QM9Transfer_ce_loss_2k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
 
 CUDA_VISIBLE_DEVICES=0 python main.py dataset=qm9_2_qm9 model=gnn num_steps=10 num_iter=10 n_ipf=10 project_name=ce_loss_2k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
 

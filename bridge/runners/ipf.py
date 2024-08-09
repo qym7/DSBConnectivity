@@ -151,6 +151,7 @@ class IPFBase(torch.nn.Module):
             else:
                 self.limit_dist.X = torch.ones(self.limit_dist.X.shape[0] + 1)
             self.limit_dist.X = self.limit_dist.X / self.limit_dist.X.sum()
+            # self.limit_dist.X = torch.cat([torch.tensor([0]), self.limit_dist.X])
 
         self.langevin = Langevin(
             self.num_steps,
@@ -522,7 +523,6 @@ class IPFBase(torch.nn.Module):
                 if self.args.virtual_node:
                     batch = utils.add_virtual_node(batch, node_mask)
                     node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
-
             else:
                 batch_size = self.args.plot_npar
                 n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
@@ -546,9 +546,10 @@ class IPFBase(torch.nn.Module):
                 batch = batch.sample(onehot=True, node_mask=node_mask)
 
                 if self.args.virtual_node:
+                    batch.X[node_mask] = F.one_hot(torch.tensor(0), batch.X.shape[-1], ).to(batch.E.device)
                     node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
 
-            batch.mask(node_mask)
+            batch.mask(node_mask, virtual_node=self.args.virtual_node)
             x_tot, _, _, _ = self.langevin.record_langevin_seq(
                 sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True
             )
@@ -561,7 +562,6 @@ class IPFBase(torch.nn.Module):
                 n_nodes = node_mask.sum(-1)
 
             all_n_nodes.append(n_nodes)
-            # all_node_masks.append(node_mask)
             chains = utils.PlaceHolder(
                 X=x_tot.X[:chains_to_save],
                 E=x_tot.E[:chains_to_save],
@@ -643,7 +643,7 @@ class IPFBase(torch.nn.Module):
             )
             if self.args.virtual_node:
                 to_plot.X -= 1
-                print("virtual node", to_plot.X.min())
+                print("virtual node existence when there is -1", to_plot.X.min())
 
             X = to_plot.X
             E = to_plot.E
@@ -668,7 +668,8 @@ class IPFBase(torch.nn.Module):
 
             self.visualization_tools.visualize(
                 result_path,
-                to_plot,
+                # to_plot,
+                graph_list=generated_list,
                 num_graphs_to_visualize=to_plot.X.shape[0],
                 fb=fb,
             )
@@ -697,7 +698,7 @@ class IPFBase(torch.nn.Module):
             )
 
             # in this case, if fb=='f' and not transfer, then the metrics will become None
-            # import pdb; pdb.set_trace() 
+            # import pdb; pdb.set_trace()
             test_sampling_metrics = (
                 self.test_sampling_metrics
                 if fb == "b"
@@ -706,16 +707,6 @@ class IPFBase(torch.nn.Module):
             val_sampling_metrics = (
                 self.val_sampling_metrics if fb == "b" else self.tf_val_sampling_metrics
             )
-
-            # # TODO: to delte
-            # test_sampling_metrics = (
-            #     self.test_sampling_metrics
-            #     if fb == "f"
-            #     else self.tf_test_sampling_metrics
-            # )
-            # val_sampling_metrics = (
-            #     self.val_sampling_metrics if fb == "f" else self.tf_val_sampling_metrics
-            # )
 
             if test_sampling_metrics is not None:
                 test_to_log = test_sampling_metrics.compute_all_metrics(
@@ -907,14 +898,15 @@ class IPFSequential(IPFBase):
 
     def compute_loss(self, pred, out, pred_clean, clean, t):
         clean_node_count = clean.node_mask.sum(-1)
-        clean_edge_count = (clean_node_count - 1) * clean_node_count
-
         node_count = out.node_mask.sum(-1)
         edge_count = (node_count - 1) * node_count
         
         if self.args.virtual_node:
             node_count = out.node_mask.size(-1) * out.node_mask.size(-2)
             clean_node_count = clean.node_mask.size(-1) * clean.node_mask.size(-2)
+
+        clean_edge_count = (clean_node_count - 1) * clean_node_count
+        edge_count = edge_count.sum()
 
         # Calculate the losses
         ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
@@ -923,7 +915,9 @@ class IPFSequential(IPFBase):
         node_loss = self.args.model.lambda_train[0] * ce_loss(pred.X.permute((0, 2, 1)), out.X.permute((0, 2, 1)))
         edge_loss = self.args.model.lambda_train[1] * ce_loss(pred.E.permute((0, 3, 1, 2)), out.E.permute((0, 3, 1, 2)))
 
-        loss = PlaceHolder(X=node_loss.unsqueeze(-1), E=edge_loss.unsqueeze(-1), y=None).mask(out.node_mask, mask_node=not self.args.virtual_node)
+        loss = PlaceHolder(X=node_loss.unsqueeze(-1), E=edge_loss.unsqueeze(-1), y=None)
+        if not self.args.virtual_node:
+            loss = loss.mask(out.node_mask)
         loss = (loss.X/node_count).sum() + (loss.E/edge_count).sum()
 
         ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
@@ -935,7 +929,9 @@ class IPFSequential(IPFBase):
         clean_edge_loss = clean_edge_loss / t[:, None]
 
         # clean_edge_loss = clean_edge_loss + torch.transpose(clean_edge_loss, 1, 2)
-        clean_loss = PlaceHolder(X=clean_node_loss.unsqueeze(-1), E=clean_edge_loss.unsqueeze(-1), y=None).mask(clean.node_mask, mask_node=not self.args.virtual_node)
+        clean_loss = PlaceHolder(X=clean_node_loss.unsqueeze(-1), E=clean_edge_loss.unsqueeze(-1), y=None)
+        if not self.args.virtual_node:
+            clean_loss = clean_loss.mask(clean.node_mask)
         clean_loss = (clean_loss.X/clean_node_count).sum() + (clean_loss.E/clean_edge_count).sum()
 
         loss = loss + self.args.clean_loss_weight * clean_loss

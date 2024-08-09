@@ -136,7 +136,7 @@ class Langevin(torch.nn.Module):
             # x_k = x_k.scale(1 - gamma / 3).add(noise.scale(gamma / 3))
 
             if self.virtual_node:
-                x_k = x_k.sample(onehot=True, node_mask=torch.ones(x_k.X.shape[:-1]).to(x_k.X.device).bool())
+                x_k = x_k.sample(onehot=True, node_mask=torch.ones(x_k.X.shape[:-1]).to(x_k.X.device).bool(), virtual_node=True)
             else:
                 x_k = x_k.sample(onehot=True, node_mask=node_mask)
 
@@ -201,7 +201,7 @@ class Langevin(torch.nn.Module):
             pred.E = (pred.E / pred.E.sum(-1, keepdim=True)).float()
 
             if self.virtual_node:
-                x = pred.sample(onehot=True, node_mask=torch.ones(x.X.shape[:-1]).to(x.X.device).bool())
+                x = pred.sample(onehot=True, node_mask=torch.ones(x.X.shape[:-1]).to(x.X.device).bool(), virtual_node=True)
             else:
                 x = pred.sample(onehot=True, node_mask=node_mask)
 
