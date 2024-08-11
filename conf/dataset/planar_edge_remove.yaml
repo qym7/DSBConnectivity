@@ -2,56 +2,53 @@
 project_name: debug_transfer
 #wandb: disabled # offline/disabled/online
 
-# data 
-Dataset: sbm_split2
+# data
+Dataset: planar_edge_remove
 graph: True
 
 dataset_transfer:
   batch_size: 128
   num_workers: 8
 
-  name: sbm_split
+  name: planar_edge_remove
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/sbm_split4/'
+  datadir: 'data/planar_edge/'
 
   num_graphs: 200
   num_nodes: 35
-  num_communities: 2
-  intra_prob: 0.005
-  inter_prob: 0.3
+  edge_removal: 0
 
 # transfer
 transfer: True
-Dataset_transfer: sbm_split
+Dataset_transfer: planar_edge_remove
 
 dataset:
   batch_size: 128
   num_workers: 8
 
-  name: sbm_split
+  name: planar_edge_remove
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/sbm_split5/'
+  datadir: 'data/planar_edge_remove_10/'
 
   num_graphs: 200
   num_nodes: 35
-  num_communities: 3
-  intra_prob: 0.005
-  inter_prob: 0.3
+  edge_removal: 10
+  degree: False
 
 final_adaptive: False
 adaptive_mean: True
 mean_final: torch.zeros([${data.channels}, ${data.image_size}, ${data.image_size}])
 var_final: 100 * torch.ones([${data.channels}, ${data.image_size}, ${data.image_size}])
-load: False #'/home/uceeosm/Desktop/DSB_Graph/DSBConnectivity/experiments/2024-07-10/main/clean_loss_weight=0.0001,limit_dist=marginal_tf,lr=0.001,model=gnn,n_ipf=30,num_iter=5000,num_steps=50,project_name=best_with_clean_loss/12-26-49/checkpoints/sample_net_b_30_4999.ckpt'
+load: False
 
 # device
 device: cuda
 dataparallel: True
-num_workers: 8 
+num_workers: 8
 pin_memory: False
 
 log_stride : 20000
@@ -86,7 +83,7 @@ cache_refresh_stride: 200
 
 thres: 1.0
 
-model: 
+model:
     n_layers: 8
     hidden_dims: {'dx': 256, 'de': 64, 'dy': 256, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 128, 'dim_ffy': 128}
     hidden_mlp_dims: { 'X': 128, 'E': 64, 'y': 256}
@@ -119,6 +116,5 @@ chains_to_save: 4
 final_model_samples_to_generate: 40
 final_model_samples_to_save: 30
 final_model_chains_to_save: 20
+
 clean_loss_weight: 0.0
-final_chains_to_save: 8
-final_samples_to_generate: 40

@@ -68,6 +68,10 @@ class SamplingMetrics(nn.Module):
                 self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders)
             elif dataset_infos.dataset_name == "ego":
                 self.domain_metrics = EgoSamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "planar_edge_remove":
+                self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
+            elif dataset_infos.dataset_name == "planar_edge_add":
+                self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
             else:
                 raise ValueError(
                     "Dataset {} not implemented".format(dataset_infos.dataset_name)

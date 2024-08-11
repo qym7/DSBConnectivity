@@ -152,4 +152,11 @@ CUDA_VISIBLE_DEVICES=3 python main.py  dataset=sbm_split model=gnn num_steps=50 
 CUDA_VISIBLE_DEVICES=2 python main.py dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_Lr3 limit_dist=marginal_tf clean_loss_weight=0.0 lr=0.001
 
 
-CUDA_VISIBLE_DEVICES=1 python main.py dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001 -->
+CUDA_VISIBLE_DEVICES=1 python main.py dataset=sbm_split model=gnn num_steps=50 num_iter=2000 n_ipf=1000 project_name=ce_loss_2k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
+
+CUDA_VISIBLE_DEVICES=3 python3 main.py dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=sbm_split_best_test_graphs limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
+
+
+CUDA_VISIBLE_DEVICES=3 python3 main.py dataset=planar_edge_remove model=gnn num_steps=50 num_iter=5000 n_ipf=30 project_name=fixed_degree_clw0.0001_lr0.001 limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
+
+CUDA_VISIBLE_DEVICES=7 python3 main.py dataset=planar_edge_add model=gnn num_steps=50 num_iter=5000 n_ipf=30 project_name=fixed_shortest_path_clw0.0001_lr0.001 limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001

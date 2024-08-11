@@ -26,6 +26,108 @@ def generate_planar_graphs(num_graphs, min_size, max_size, seed=0):
     return graphs
 
 
+def generate_planar_edge_remove_graphs(num_graphs, num_nodes, edge_removal, degree=False, seed=0):
+  """Generate planar graphs using Delauney triangulation (with or without edge removal)."""
+  rng = np.random.default_rng(seed)
+  graphs = []
+
+  for _ in range(num_graphs):
+      points = rng.random((num_nodes, 2))
+      tri = sp.spatial.Delaunay(points)
+      adj = sp.sparse.lil_array((num_nodes, num_nodes), dtype=np.int32)
+
+      for t in tri.simplices:
+          adj[t[0], t[1]] = 1
+          adj[t[1], t[2]] = 1
+          adj[t[2], t[0]] = 1
+          adj[t[1], t[0]] = 1
+          adj[t[2], t[1]] = 1
+          adj[t[0], t[2]] = 1
+
+      G = nx.from_scipy_sparse_array(adj)
+
+      if edge_removal != 0:
+          # calculate the number of edges to remove
+          num_edges = G.number_of_edges()
+          edges_to_remove = int(num_edges * (edge_removal / 100.0))
+
+          if degree:
+              # sort edges by the sum of degrees of their endpoints in descending order
+              edges = sorted(G.edges(), key=lambda e: G.degree[e[0]] + G.degree[e[1]], reverse=True)
+
+              removed_edges = 0
+              for edge in edges:
+                  G.remove_edge(*edge)
+                  if nx.is_connected(G) and nx.check_planarity(G)[0]:
+                      removed_edges += 1
+                      if removed_edges >= edges_to_remove:
+                          break
+                  else:
+                      G.add_edge(*edge)  # add the edge again if removing it breaks connectivity or planarity
+          else:
+              # randomly remove edges while maintaining planarity
+              edges = list(G.edges())
+              rng.shuffle(edges)
+
+              for _ in range(edges_to_remove):
+                  edge = edges.pop()
+                  G.remove_edge(*edge)
+                  if not nx.check_planarity(G)[0]:
+                      G.add_edge(*edge)  # add the edge again if removing it breaks planarity
+
+      graphs.append(G)
+
+  return graphs
+
+
+def generate_planar_edge_add_graphs(num_graphs, num_nodes, avg_degree=3, shortest_path=False, seed=0):
+    """Generate planar graphs using Delaunay triangulation and add edges based on shortest path distance."""
+    rng = np.random.default_rng(seed)
+    graphs = []
+
+    for _ in range(num_graphs):
+        points = rng.random((num_nodes, 2))
+        tri = sp.spatial.Delaunay(points)
+        adj = sp.sparse.lil_matrix((num_nodes, num_nodes), dtype=np.int32)
+
+        for t in tri.simplices:
+            adj[t[0], t[1]] = 1
+            adj[t[1], t[2]] = 1
+            adj[t[2], t[0]] = 1
+            adj[t[1], t[0]] = 1
+            adj[t[2], t[1]] = 1
+            adj[t[0], t[2]] = 1
+
+        G = nx.from_scipy_sparse_matrix(adj)
+
+        if avg_degree > 0:
+            if shortest_path:
+                # Add edges based on shortest path distance
+                potential_edges = [(u, v) for u in range(num_nodes) for v in range(u + 1, num_nodes) if not G.has_edge(u, v)]
+                potential_edges = sorted(potential_edges, key=lambda edge: nx.shortest_path_length(G, edge[0], edge[1]))
+
+                for u, v in potential_edges:
+                    G.add_edge(u, v)
+                    if not nx.check_planarity(G)[0]:
+                        G.remove_edge(u, v)
+            else:
+                # Add edges to increase density while maintaining average node degree
+                max_edges = avg_degree * num_nodes // 2
+                potential_edges = [(u, v) for u in range(num_nodes) for v in range(u + 1, num_nodes) if not G.has_edge(u, v)]
+                rng.shuffle(potential_edges)
+
+                for u, v in potential_edges:
+                    if G.number_of_edges() >= max_edges:
+                        break
+                    G.add_edge(u, v)
+                    if not nx.check_planarity(G)[0] or G.number_of_edges() > max_edges:
+                        G.remove_edge(u, v)
+
+        graphs.append(G)
+
+    return graphs
+
+
 def generate_tree_graphs(num_graphs, min_size, max_size, seed=0):
     """Generate tree graphs using the networkx library."""
     rng = np.random.default_rng(seed)

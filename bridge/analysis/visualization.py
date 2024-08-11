@@ -235,6 +235,7 @@ class Visualizer:
             # The direction is changed for the cacheloader visualization before
             # final_graph = graphs[-1] if fb == "b" else graphs[0]
             # first_graph = graphs[0] if fb == "b" else graphs[-1]
+            
             final_graph = graphs[-1]
             first_graph = graphs[0]
 
@@ -300,7 +301,7 @@ class Visualizer:
                     {
                         f"chain_{fb}": [
                             wandb.Video(gif_path, caption=gif_path, format="gif")
-                        ]
+                        ],
                     }
                 )
                 print(f"Saving {gif_path} to wandb")
