@@ -89,6 +89,10 @@ class CacheLoader(Dataset):
                         .expand(batch_size, -1)
                     )
                     node_mask = arange < n_nodes.unsqueeze(1)
+                    if self.virtual_node:
+                        node_mask = torch.ones_like(node_mask).to(self.device).bool()
+                        n_nodes = node_mask.sum(-1)
+
                     batch = utils.PlaceHolder(
                         X=self.limit_dist.X.repeat(batch_size, self.max_n_nodes, 1).to(
                             self.device
@@ -100,10 +104,8 @@ class CacheLoader(Dataset):
                         charge=None,
                         n_nodes=n_nodes,
                     )
-                    batch = batch.sample(onehot=True, node_mask=node_mask)
 
-                    if self.virtual_node:
-                        node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
+                    batch = batch.sample(onehot=True, node_mask=node_mask)
 
                 batch.mask(node_mask)
 

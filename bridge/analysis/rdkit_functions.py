@@ -141,6 +141,9 @@ class BasicMolecularMetrics(object):
         print(
             f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
         )
+        
+        connectivity = (num_components == 1).sum()/len(num_components)
+        print(f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%")
 
         relaxed_valid, relaxed_validity = self.compute_relaxed_validity(generated)
         print(
@@ -164,7 +167,7 @@ class BasicMolecularMetrics(object):
             uniqueness = 0.0
             unique = []
         return (
-            [validity, relaxed_validity, uniqueness, novelty],
+            [validity, relaxed_validity, uniqueness, novelty, connectivity],
             unique,
             dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
             all_smiles,
@@ -410,6 +413,7 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info):
         "Relaxed Validity": rdkit_metrics[0][1],
         "Uniqueness": rdkit_metrics[0][2],
         "Novelty": rdkit_metrics[0][3],
+        "Connectivity": rdkit_metrics[0][4],
         "nc_max": nc["nc_max"],
         "nc_mu": nc["nc_mu"],
     }

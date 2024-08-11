@@ -25,21 +25,23 @@ class Visualizer:
         if self.is_molecular:
             self.remove_h = dataset_infos.remove_h
 
-    def to_networkx(self, graph: PlaceHolder):
+    # def to_networkx(self, graph: PlaceHolder):
+    def to_networkx(self, graph):
         """
         Convert graphs to networkx graphs
         node_list: the nodes of a batch of nodes (bs x n)
         adjacency_matrix: the adjacency_matrix of the molecule (bs x n x n)
         """
         nx_graph = nx.Graph()
-        if len(graph.X.shape) == 2:
-            graph.X = graph.X.argmax(-1)
-        graph.X = graph.X.cpu().numpy()
+        X = graph[0]
+        E = graph[1]
+        if len(X.shape) == 2:
+            X = X.argmax(-1)
 
-        for i in range(len(graph.X)):
-            nx_graph.add_node(i, number=i, symbol=graph.X[i], color_val=graph.X[i])
+        for i in range(len(X)):
+            nx_graph.add_node(i, number=i, symbol=X[i], color_val=X[i])
 
-        adj = graph.E.cpu().numpy()
+        adj = E
         if len(adj.shape) == 3:
             adj = adj.argmax(-1)
         assert len(adj.shape) == 2
@@ -131,7 +133,8 @@ class Visualizer:
     def visualize(
         self,
         path: str,
-        graphs: PlaceHolder,
+        # graphs: PlaceHolder,
+        graph_list: list,
         num_graphs_to_visualize: int,
         log="graph",
         fb="b",
@@ -142,17 +145,18 @@ class Visualizer:
         log = f"{log}_{fb}"
 
         # visualize the final molecules
-        num_graphs = graphs.X.shape[0]
+        num_graphs = len(graph_list)
         num_graphs_to_visualize = min(num_graphs_to_visualize, num_graphs)
         if num_graphs_to_visualize > 0:
             print(f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}")
 
-        graph_list = graphs.split()
+        # graph_list = graphs.split()
         for i in range(num_graphs_to_visualize):
             file_path = os.path.join(path, "graph_{}.png".format(i))
 
             if self.is_molecular:
-                mol = Molecule(graph_list[i].X, graph_list[i].E, self.dataset_infos.atom_decoder, charge=None).rdkit_mol
+                # import pdb; pdb.set_trace()
+                mol = Molecule(torch.Tensor(graph_list[i][0]), torch.Tensor(graph_list[i][1]), self.dataset_infos.atom_decoder, charge=None).rdkit_mol
                 try:
                     Draw.MolToFile(mol, file_path)
                 except rdkit.Chem.KekulizeException:
