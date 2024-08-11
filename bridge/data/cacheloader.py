@@ -22,7 +22,6 @@ class CacheLoader(Dataset):
         limit_dist=None,
         dataloader_f=None,
         transfer=False,
-        graph=False,
         nodes_dist=None,
         dataset_infos=None,
         visualization_tools=None,
@@ -33,7 +32,6 @@ class CacheLoader(Dataset):
         self.max_n_nodes = langevin.max_n_nodes
         self.num_steps = langevin.num_steps
         self.num_batches = num_batches
-        self.graph = graph
         self.nodes_dist = nodes_dist
         self.device = device
         self.visualization_tools = visualization_tools

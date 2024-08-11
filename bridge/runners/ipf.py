@@ -12,8 +12,6 @@ import numpy as np
 
 # from torch.utils.data import DataLoader
 from tqdm import tqdm
-import torch.autograd.profiler as profiler
-from torch.utils.data import WeightedRandomSampler
 from accelerate import Accelerator, DistributedType
 
 # from torch_geometric.loader import DataLoader as pygloader.DataLoader
@@ -27,15 +25,13 @@ from ..data import CacheLoader
 from ..langevin import Langevin
 from ..metrics.sampling_metrics import SamplingMetrics
 from ..analysis.visualization import Visualizer
-
 from ..diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
-from ..diffusion.extra_features_molecular import ExtraMolecularFeatures
 
 
 def setup_wandb(cfg):
     kwargs = {
         "name": cfg.project_name,
-        "project": f"DSB_{cfg.Dataset}",
+        "project": f"DSB_{cfg.dataset.name}",
         "settings": wandb.Settings(_disable_stats=True),
         "reinit": True,
         "mode": cfg.wandb,
@@ -62,7 +58,6 @@ class IPFBase(torch.nn.Module):
         self.grad_clipping = self.args.grad_clipping
         self.fast_sampling = self.args.fast_sampling
         self.lr = self.args.lr
-        self.graph = self.args.graph
 
         # n = self.num_steps // 2
         # if self.args.gamma_space == "linspace":
@@ -161,7 +156,6 @@ class IPFBase(torch.nn.Module):
             time_sampler,
             limit_dist=self.limit_dist,
             device=self.device,
-            graph=self.graph,
             extra_features=self.extra_features,
             domain_features=self.domain_features,
             tf_extra_features=self.tf_extra_features,
@@ -182,8 +176,6 @@ class IPFBase(torch.nn.Module):
             self.checkpoint_it = 1
             self.checkpoint_pass = "b"
 
-        self.plotter = self.get_plotter()
-
         if self.accelerator.process_index == 0:
             if not os.path.exists("./im"):
                 os.mkdir("./im")
@@ -197,9 +189,6 @@ class IPFBase(torch.nn.Module):
 
     def get_logger(self, name="logs"):
         return get_logger(self.args, name)
-
-    def get_plotter(self):
-        return get_plotter(self, self.args)
 
     def build_models(self, forward_or_backward=None):
         # running network
@@ -369,10 +358,10 @@ class IPFBase(torch.nn.Module):
         # get final stats
         init_ds = self.datamodule.inner
         self.save_init_dl = pygloader.DataLoader(
-            init_ds, batch_size=self.args.plot_npar, shuffle=True, drop_last=True
+            init_ds, batch_size=self.args.batch_size, shuffle=True, drop_last=True
         )  # , **self.kwargs)
         self.cache_init_dl = pygloader.DataLoader(
-            init_ds, batch_size=self.args.cache_npar, shuffle=True, drop_last=True
+            init_ds, batch_size=self.args.batch_size, shuffle=True, drop_last=True
         )  # , **self.kwargs)
         (self.cache_init_dl, self.save_init_dl) = self.accelerator.prepare(
             self.cache_init_dl, self.save_init_dl
@@ -381,12 +370,12 @@ class IPFBase(torch.nn.Module):
         self.save_init_dl = repeater(self.save_init_dl)
 
         # for test graphs
-        init_ds_test = self.datamodule.testing
+        init_ds_test = self.datamodule.dataloaders["test"].dataset
         self.save_init_dl_test = pygloader.DataLoader(
-            init_ds_test, batch_size=self.args.plot_npar, shuffle=True
+            init_ds_test, batch_size=self.args.batch_size, shuffle=True
         )  # , **self.kwargs)
         self.cache_init_dl_test = pygloader.DataLoader(
-            init_ds_test, batch_size=self.args.cache_npar, shuffle=True
+            init_ds_test, batch_size=self.args.batch_size, shuffle=True
         )  # , **self.kwargs)
         (self.cache_init_dl_test, self.save_init_dl_test) = self.accelerator.prepare(
             self.cache_init_dl_test, self.save_init_dl_test
@@ -395,12 +384,12 @@ class IPFBase(torch.nn.Module):
         self.save_init_dl_test = repeater(self.save_init_dl_test)
 
         # for validation graphs
-        init_ds_val = self.datamodule.validating
+        init_ds_val = self.datamodule.dataloaders["val"].dataset
         self.save_init_dl_val = pygloader.DataLoader(
-            init_ds_val, batch_size=self.args.plot_npar, shuffle=True
+            init_ds_val, batch_size=self.args.batch_size, shuffle=True
         )  # , **self.kwargs)
         self.cache_init_dl_val = pygloader.DataLoader(
-            init_ds_val, batch_size=self.args.cache_npar, shuffle=True
+            init_ds_val, batch_size=self.args.batch_size, shuffle=True
         )  # , **self.kwargs)
         (self.cache_init_dl_val, self.save_init_dl_val) = self.accelerator.prepare(
             self.cache_init_dl_val, self.save_init_dl_val
@@ -411,17 +400,17 @@ class IPFBase(torch.nn.Module):
         # get all type of dataloader (currently only for the initial dataset)
         print("creating the train dataloader")
         init_train_dl = pygloader.DataLoader(
-            init_ds, batch_size=self.args.plot_npar, shuffle=False, drop_last=True
+            init_ds, batch_size=self.args.batch_size, shuffle=False, drop_last=True
         )
         print("creating the val dataloader")
         init_val_ds = self.datamodule.dataloaders["val"].dataset
         init_val_dl = pygloader.DataLoader(
-            init_val_ds, batch_size=self.args.plot_npar, shuffle=False
+            init_val_ds, batch_size=self.args.batch_size, shuffle=False
         )
         print("creating the test dataloader")
         init_test_ds = self.datamodule.dataloaders["test"].dataset
         init_test_dl = pygloader.DataLoader(
-            init_test_ds, batch_size=self.args.plot_npar, shuffle=False
+            init_test_ds, batch_size=self.args.batch_size, shuffle=False
         )
 
         init_loaders = {
@@ -433,10 +422,10 @@ class IPFBase(torch.nn.Module):
         if self.args.transfer:
             final_ds = self.tf_datamodule.inner
             self.save_final_dl = pygloader.DataLoader(
-                final_ds, batch_size=self.args.plot_npar, shuffle=True, drop_last=True
+                final_ds, batch_size=self.args.batch_size, shuffle=True, drop_last=True
             )  # , **self.kwargs)
             self.cache_final_dl = pygloader.DataLoader(
-                final_ds, batch_size=self.args.cache_npar, shuffle=True, drop_last=True
+                final_ds, batch_size=self.args.batch_size, shuffle=True, drop_last=True
             )  # , **self.kwargs)
             (self.cache_final_dl, self.save_final_dl) = self.accelerator.prepare(
                 self.cache_final_dl, self.save_final_dl
@@ -447,10 +436,10 @@ class IPFBase(torch.nn.Module):
             # for test graphs
             final_ds_test = self.tf_datamodule.testing
             self.save_final_dl_test = pygloader.DataLoader(
-                final_ds_test, batch_size=self.args.plot_npar, shuffle=True
+                final_ds_test, batch_size=self.args.batch_size, shuffle=True
             )  # , **self.kwargs)
             self.cache_final_dl_test = pygloader.DataLoader(
-                final_ds_test, batch_size=self.args.cache_npar, shuffle=True
+                final_ds_test, batch_size=self.args.batch_size, shuffle=True
             )  # , **self.kwargs)
             (self.cache_final_dl_test, self.save_final_dl_test) = self.accelerator.prepare(
                 self.cache_final_dl_test, self.save_final_dl_test
@@ -461,10 +450,10 @@ class IPFBase(torch.nn.Module):
             # for validation graphs
             final_ds_val = self.tf_datamodule.validating
             self.save_final_dl_val = pygloader.DataLoader(
-                final_ds_val, batch_size=self.args.plot_npar, shuffle=True
+                final_ds_val, batch_size=self.args.batch_size, shuffle=True
             )  # , **self.kwargs)
             self.cache_final_dl_val = pygloader.DataLoader(
-                final_ds_val, batch_size=self.args.cache_npar, shuffle=True
+                final_ds_val, batch_size=self.args.batch_size, shuffle=True
             )  # , **self.kwargs)
             (self.cache_final_dl_val, self.save_final_dl_val) = self.accelerator.prepare(
                 self.cache_final_dl_val, self.save_final_dl_val
@@ -475,17 +464,17 @@ class IPFBase(torch.nn.Module):
             # get all type of dataloader (currently only for the initial dataset)
             print("creating the train dataloader")
             final_train_dl = pygloader.DataLoader(
-                final_ds, batch_size=self.args.plot_npar, shuffle=False, drop_last=True
+                final_ds, batch_size=self.args.batch_size, shuffle=False, drop_last=True
             )
             print("creating the val dataloader")
-            final_val_ds = self.tf_datamodule.dataloaders["val"].dataset
+            final_val_ds = self.tf_datamodule.validating
             final_val_dl = pygloader.DataLoader(
-                final_val_ds, batch_size=self.args.plot_npar, shuffle=False, drop_last=True
+                final_val_ds, batch_size=self.args.batch_size, shuffle=False, drop_last=True
             )
             print("creating the test dataloader")
-            final_test_ds = self.tf_datamodule.dataloaders["test"].dataset
+            final_test_ds = self.tf_datamodule.testing
             final_test_dl = pygloader.DataLoader(
-                final_test_ds, batch_size=self.args.plot_npar, shuffle=False, drop_last=True
+                final_test_ds, batch_size=self.args.batch_size, shuffle=False, drop_last=True
             )
             final_loaders = {
                 "train": final_train_dl,
@@ -518,11 +507,10 @@ class IPFBase(torch.nn.Module):
                 self.langevin,
                 n,
                 limit_dist=self.limit_dist,
-                batch_size=self.args.cache_npar,
+                batch_size=self.args.batch_size,
                 device=self.device,
                 dataloader_f=self.cache_final_dl,
                 transfer=self.args.transfer,
-                graph=self.graph,
                 nodes_dist=self.nodes_dist,
                 dataset_infos=self.datainfos,
                 visualization_tools=self.visualization_tools,
@@ -539,11 +527,10 @@ class IPFBase(torch.nn.Module):
                 self.langevin,
                 n,
                 limit_dist=self.limit_dist,
-                batch_size=self.args.cache_npar,
+                batch_size=self.args.batch_size,
                 device=self.device,
                 dataloader_f=self.cache_final_dl,
                 transfer=self.args.transfer,
-                graph=self.graph,
                 nodes_dist=self.nodes_dist,
                 dataset_infos=self.datainfos,
                 visualization_tools=self.visualization_tools,
@@ -585,7 +572,7 @@ class IPFBase(torch.nn.Module):
                     batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
                     n_nodes = node_mask.sum(-1)
             else:
-                batch_size = self.args.plot_npar
+                batch_size = self.args.batch_size
                 n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
                 arange = (
                     torch.arange(self.max_n_nodes, device=self.device)
@@ -769,16 +756,6 @@ class IPFBase(torch.nn.Module):
                 self.val_sampling_metrics if fb == "b" else self.tf_val_sampling_metrics
             )
 
-            # # TODO: to delte
-            # test_sampling_metrics = (
-            #     self.test_sampling_metrics
-            #     if fb == "f"
-            #     else self.tf_test_sampling_metrics
-            # )
-            # val_sampling_metrics = (
-            #     self.val_sampling_metrics if fb == "f" else self.tf_val_sampling_metrics
-            # )
-
             if test_sampling_metrics is not None:
                 test_to_log = test_sampling_metrics.compute_all_metrics(
                     generated_list,
@@ -849,23 +826,6 @@ class IPFSequential(IPFBase):
             self.set_seed(seed=n * self.num_iter + i)
 
             x, out, clean, gammas_expanded, times_expanded = next(new_dl)
-            # if self.args.virtual_node:
-            #     x = PlaceHolder(X=x[0], E=x[1], y=x[2], charge=x[3], node_mask=x[0][..., 0]==1)
-            #     out = PlaceHolder(X=out[0], E=out[1], y=out[2], charge=out[3], node_mask=out[0][..., 0]==1)
-            #     clean = PlaceHolder(X=clean[0], E=clean[1], y=clean[2], charge=clean[3], node_mask=clean[0][..., 0]==1)
-            #     x.X = F.one_hot(x.X.argmax(-1) + 1, self.datainfos.node_types + 1).float()
-            #     out.X = F.one_hot(out.X.argmax(-1) + 1, self.datainfos.node_types + 1).float()
-            #     clean.X = F.one_hot(clean.X.argmax(-1) + 1, self.datainfos.node_types + 1).float()
-            # else:
-
-            # x = x.mask()
-            # out = out.mask()
-            # clean = clean.mask()
-
-            # if self.args.virtual_node:
-            #     x.X = F.one_hot(x.X.argmax(-1), self.datainfos.node_types + 1).float()
-            #     out.X = F.one_hot(out.X.argmax(-1), self.datainfos.node_types + 1).float()
-            #     clean.X = F.one_hot(clean.X.argmax(-1), self.datainfos.node_types + 1).float()
 
             if self.args.virtual_node:
                 # we do not consider node mask when using virtual nodes

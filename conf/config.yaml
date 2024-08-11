@@ -1,35 +1,36 @@
 # @package _global_
-graph: False
+project_name: comm20
 
 defaults:
   - launcher: local
   - job
-  - dataset: 2d #celeba, 2d, stackedmnist
-  - model: Basic #Basic, UNET
+  - model: gnn
 
 # data
-data_dir: ./data/
+virtual_node: False
+transfer: False
+dataset:
+  batch_size: ${batch_size}
+  num_workers: 8
 
-# logging
-LOGGER: CSV # NEPTUNE, CSV, NONE
-CSV_log_dir: ./
+  name: "comm20"
+  image_size: 20
+  channels: 1
+  random_flip: true
+  datadir: './data/comm20/'
 
 cache_gpu: False
-num_cache_batches: 1
-cache_refresh_stride: 100
 plot_level: 1
 mean_match: True
 paths: 
   experiments_dir_name: experiments
 wandb: 'online'             # online | offline | disabled
 
-
-
 # settings
 seed: 1234
-limit_dist: marginal            # uniform | marginal | marginal_tf
 
 # settings for evaluations
+load: False
 final_model_samples_to_generate: 100
 final_model_samples_to_save: 30
 final_model_chains_to_save: 20
@@ -46,3 +47,44 @@ sample_checkpoint_f: ""
 sample_checkpoint_b: ""
 checkpoint_f: ""
 checkpoint_b: ""
+
+# cache
+num_cache_batches: 1
+cache_refresh_stride: 200
+
+# train
+batch_size: 32
+use_prev_net: True
+ema: True
+ema_rate: 0.999
+grad_clipping: True
+grad_clip: 1.0
+n_ipf_init: 1
+num_iter : 2000
+n_ipf: 1000
+lr: 0.0001
+limit_dist: marginal_tf            # uniform | marginal | marginal_tf,  ame with marginal when without transfer data
+clean_loss_weight: 0.0001
+
+# diffusion schedule
+num_steps : 50
+gamma_max: 0.1
+gamma_min: 0.00001
+gamma_space: linspace
+weight_distrib: False
+weight_distrib_alpha: 100
+fast_sampling: True
+
+# device
+device: cuda
+dataparallel: True
+num_workers: 8 
+pin_memory: False
+log_stride : 20000
+gif_stride: 20000
+
+
+# logging
+LOGGER: CSV # NEPTUNE, CSV, NONE
+CSV_log_dir: ./
+

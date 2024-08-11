@@ -24,7 +24,7 @@ from ..metrics.metrics_utils import (
     atom_type_counts,
     edge_counts,
 )
-from ..data.synthetic_graphs import (
+from ..experiment.synthetic_graphs import (
     generate_sbm_graphs,
     generate_split_sbm_graphs,
     generate_small_split_sbm_graphs,

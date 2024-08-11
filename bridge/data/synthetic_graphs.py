@@ -171,7 +171,7 @@ def generate_sbm_graphs(
     return graphs
 
 
-def generate_split_sbm_graphs(
+def generate_split_2_to_3_sbm_graphs(
     num_graphs,
     num_communities,
     intra_prob=0.005,
@@ -187,10 +187,6 @@ def generate_split_sbm_graphs(
             community_sizes = np.array([15, 20])
         elif num_communities == 3:# Define the arrays
             array1 = np.array([15, 10, 10])
-            # Combine the arrays into a list
-            # arrays = [array1, array2, array3]
-            # Randomly choose one of the arrays
-            # community_sizes = rng.choice(arrays)
             community_sizes = array1
 
         probs = np.ones([num_communities, num_communities]) * intra_prob

@@ -233,7 +233,7 @@ class Visualizer:
                         )
                     )
                 else:
-                    graphs.append(self.to_networkx(graph))
+                    graphs.append(self.to_networkx([chain.X[j].cpu().numpy(), chain.E[j].cpu().numpy()]))
 
             # Find the coordinates of nodes in the final graph and align all the molecules
             # The direction is changed for the cacheloader visualization before

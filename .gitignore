@@ -1,5 +1,6 @@
 # chechpoints and data
 data_to_run/
+data/
 experiments/
 
 # Byte-compiled / optimized / DLL files

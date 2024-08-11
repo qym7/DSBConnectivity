@@ -34,7 +34,7 @@ from ..data.synthetic_graphs import (
     generate_planar_graphs,
     generate_small_split_sbm_graphs,
     generate_sbm_graphs_fixed_size,
-    generate_split_sbm_graphs,
+    generate_split_2_to_3_sbm_graphs,
     generate_planar_edge_remove_graphs,
     generate_planar_edge_add_graphs,
 )
@@ -145,7 +145,7 @@ class SpectreGraphDataset(InMemoryDataset):
                 for network in networks
             ]
         elif self.dataset_name == "sbm_split":
-            networks = generate_split_sbm_graphs(
+            networks = generate_split_2_to_3_sbm_graphs(
                 num_graphs=self.cfg.num_graphs,
                 num_communities=self.cfg.num_communities,
                 intra_prob=self.cfg.intra_prob,
@@ -292,7 +292,7 @@ class SpectreGraphDataset(InMemoryDataset):
         save_pickle(num_nodes, self.processed_paths[1])
         np.save(self.processed_paths[2], node_types)
         np.save(self.processed_paths[3], bond_types)
-        np.save(real_node_ratio, self.processed_paths[4])
+        np.save(self.processed_paths[4], real_node_ratio)
 
 
 class SpectreGraphDataModule(AbstractDataModule):
@@ -300,7 +300,7 @@ class SpectreGraphDataModule(AbstractDataModule):
         self.cfg = cfg
         self.dataset_name = self.cfg.name
         self.datadir = cfg.datadir
-        base_path = pathlib.Path(get_original_cwd()).parents[0]
+        base_path = pathlib.Path(get_original_cwd())
         root_path = os.path.join(base_path, self.datadir)
         pre_transform = RemoveYTransform()
 

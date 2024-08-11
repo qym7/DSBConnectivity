@@ -511,14 +511,14 @@ class PlaceHolder:
             if self.E is not None:
                 self.E = self.E * e_mask1 * e_mask2 * diag_mask
 
-        # try:
-        #     assert torch.allclose(self.E, torch.transpose(self.E, 1, 2))
-        # except:
-        #     import pdb
+        try:
+            assert torch.allclose(self.E, torch.transpose(self.E, 1, 2), atol=1e-5)
+        except:
+            import pdb
 
-        #     pdb.set_trace()
+            pdb.set_trace()
 
-        assert torch.allclose(self.E, torch.transpose(self.E, 1, 2))
+        # assert torch.allclose(self.E, torch.transpose(self.E, 1, 2), atol=1e-5)
 
         if self.node_mask is None:
             self.node_mask = node_mask
