@@ -30,8 +30,8 @@ from ..diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
 
 def setup_wandb(cfg):
     kwargs = {
-        "name": cfg.project_name,
-        "project": f"DSB_{cfg.dataset.name}",
+        "name": f"{cfg.name}",
+        "project": f"DSB_{cfg.project_name}",
         "settings": wandb.Settings(_disable_stats=True),
         "reinit": True,
         "mode": cfg.wandb,
@@ -305,14 +305,15 @@ class IPFBase(torch.nn.Module):
         edge_f = self.args.model.edge_features
         extra_features = (
             ExtraFeatures(
-                eigenfeatures=self.args.model.eigenfeatures,
-                edge_features_type=edge_f,
+                extra_features_type=self.args.model.extra_features,
+                # eigenfeatures=self.args.model.eigenfeatures,
+                # edge_features_type=edge_f,
                 dataset_info=dataset_infos,
-                num_eigenvectors=self.args.model.num_eigenvectors,
-                num_eigenvalues=self.args.model.num_eigenvalues,
-                num_degree=self.args.model.num_degree,
-                dist_feat=self.args.model.dist_feat,
-                use_positional=self.args.model.positional_encoding,
+                # num_eigenvectors=self.args.model.num_eigenvectors,
+                # num_eigenvalues=self.args.model.num_eigenvalues,
+                # num_degree=self.args.model.num_degree,
+                # dist_feat=self.args.model.dist_feat,
+                # use_positional=self.args.model.positional_encoding,
             )
             if ef is not None
             else DummyExtraFeatures()

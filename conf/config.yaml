@@ -62,7 +62,7 @@ grad_clip: 1.0
 n_ipf_init: 1
 num_iter : 2000
 n_ipf: 1000
-lr: 0.0001
+lr: 0.001
 limit_dist: marginal_tf            # uniform | marginal | marginal_tf,  ame with marginal when without transfer data
 clean_loss_weight: 0.0001
 
@@ -87,4 +87,4 @@ gif_stride: 20000
 # logging
 LOGGER: CSV # NEPTUNE, CSV, NONE
 CSV_log_dir: ./
-
+name: default
