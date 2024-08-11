@@ -101,13 +101,12 @@ def get_datamodules(cfg):
             datamodule = Comm20DataModule(cfg)
         elif cfg["name"] == "ego":
             datamodule = EgoDataModule(cfg)
-        else:
+        elif cfg["name"] == "planar":
             datamodule = PlanarDataModule(cfg)
 
         dataset_infos = SpectreDatasetInfos(datamodule)
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
-        dataloaders = datamodule.dataloaders
 
     elif cfg["name"] == "protein":
         from datasets import protein_dataset

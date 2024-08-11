@@ -7,9 +7,9 @@ class DummyExtraFeatures:
         """This class does not compute anything, just returns empty tensors."""
 
     def __call__(self, noisy_data):
-        X = noisy_data["X_t"]
-        E = noisy_data["E_t"]
-        y = noisy_data["y_t"]
+        X = noisy_data.X
+        E = noisy_data.E
+        y = noisy_data.y
         empty_x = X.new_zeros((*X.shape[:-1], 0))
         empty_e = E.new_zeros((*E.shape[:-1], 0))
         empty_y = y.new_zeros((y.shape[0], 0))
@@ -26,11 +26,11 @@ class ExtraFeatures:
             self.eigenfeatures = EigenFeatures(mode=extra_features_type)
 
     def __call__(self, noisy_data):
-        n = noisy_data["node_mask"].sum(dim=1).unsqueeze(1) / self.max_n_nodes
+        n = noisy_data.node_mask.sum(dim=1).unsqueeze(1) / self.max_n_nodes
         x_cycles, y_cycles = self.ncycles(noisy_data)  # (bs, n_cycles)
 
         if self.features_type == "cycles":
-            E = noisy_data["E_t"]
+            E = noisy_data.E
             extra_edge_attr = torch.zeros((*E.shape[:-1], 0)).type_as(E)
             return utils.PlaceHolder(
                 X=x_cycles, E=extra_edge_attr, y=torch.hstack((n, y_cycles))
@@ -38,7 +38,7 @@ class ExtraFeatures:
 
         elif self.features_type == "eigenvalues":
             eigenfeatures = self.eigenfeatures(noisy_data)
-            E = noisy_data["E_t"]
+            E = noisy_data.E
             extra_edge_attr = torch.zeros((*E.shape[:-1], 0)).type_as(E)
             n_components, batched_eigenvalues = eigenfeatures  # (bs, 1), (bs, 10)
             return utils.PlaceHolder(
@@ -59,7 +59,7 @@ class ExtraFeatures:
 
         elif self.features_type == "all":
             eigenfeatures = self.eigenfeatures(noisy_data)
-            E = noisy_data["E_t"]
+            E = noisy_data.E
             extra_edge_attr = torch.zeros((*E.shape[:-1], 0)).type_as(E)
             n_components, batched_eigenvalues, nonlcc_indicator, k_lowest_eigvec = (
                 eigenfeatures  # (bs, 1), (bs, 10),
@@ -95,7 +95,7 @@ class RRWPFeatures:
         self.k = k
 
     def __call__(self, noisy_data):
-        E = noisy_data["E_t"].float()[..., 1:].sum(-1)  # bs, n, n
+        E = noisy_data.E.float()[..., 1:].sum(-1)  # bs, n, n
         # degree = E.sum(dim=-1).float().unsqueeze(1)  # bs, 1, n
         # degree = degree.repeat(1, E.shape[1], 1)  # bs, n, n
         (
@@ -131,12 +131,12 @@ class NodeCycleFeatures:
         self.kcycles = KNodeCycles()
 
     def __call__(self, noisy_data):
-        adj_matrix = noisy_data["E_t"][..., 1:].sum(dim=-1).float()
+        adj_matrix = noisy_data.E[..., 1:].sum(dim=-1).float()
 
         x_cycles, y_cycles = self.kcycles.k_cycles(
             adj_matrix=adj_matrix
         )  # (bs, n_cycles)
-        x_cycles = x_cycles.type_as(adj_matrix) * noisy_data["node_mask"].unsqueeze(-1)
+        x_cycles = x_cycles.type_as(adj_matrix) * noisy_data.node_mask.unsqueeze(-1)
         # Avoid large values when the graph is dense
         x_cycles = x_cycles / 10
         y_cycles = y_cycles / 10
@@ -155,8 +155,8 @@ class EigenFeatures:
         self.mode = mode
 
     def __call__(self, noisy_data):
-        E_t = noisy_data["E_t"]
-        mask = noisy_data["node_mask"]
+        E_t = noisy_data.E
+        mask = noisy_data.node_mask
         A = E_t[..., 1:].sum(dim=-1).float() * mask.unsqueeze(1) * mask.unsqueeze(2)
         # L = compute_laplacian(A, normalize="sym")
         L = compute_laplacian(A, normalize=False)
@@ -186,7 +186,7 @@ class EigenFeatures:
             # Retrieve eigenvectors features
             nonlcc_indicator, k_lowest_eigenvector = get_eigenvectors_features(
                 vectors=eigvectors,
-                node_mask=noisy_data["node_mask"],
+                node_mask=noisy_data.node_mask,
                 n_connected=n_connected_comp,
             )
             return (

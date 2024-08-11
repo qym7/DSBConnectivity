@@ -217,9 +217,8 @@ class Langevin(torch.nn.Module):
         with torch.no_grad():
             if self.virtual_node:
                 X = z_t.X.clone()
-                # virtual_mask = z_t.X.argmax(-1) > 0
                 z_t.X = z_t.X[..., 1:]
-            extra_features, _, _ = self.extra_features(z_t)
+            extra_features = self.extra_features(z_t)
             extra_domain_features = self.domain_features(z_t)
             if self.virtual_node:
                 z_t.X = X

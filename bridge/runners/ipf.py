@@ -572,6 +572,10 @@ class IPFBase(torch.nn.Module):
                     batch = next(loader)
                     batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
                     n_nodes = node_mask.sum(-1)
+                if self.args.virtual_node:
+                    batch.X = torch.cat([~node_mask.unsqueeze(-1), batch.X], dim=-1)
+                    node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
+                    n_nodes = node_mask.sum(-1)
             else:
                 batch_size = self.args.batch_size
                 n_nodes = self.nodes_dist.sample_n(batch_size, self.device)
@@ -988,7 +992,7 @@ class IPFSequential(IPFBase):
             if self.args.virtual_node:
                 X = z_t.X.clone()
                 z_t.X = z_t.X[..., 1:]
-            extra_features, _, _ = self.extra_features(z_t)
+            extra_features = self.extra_features(z_t)
             extra_domain_features = self.domain_features(z_t)
             if self.args.virtual_node:
                 z_t.X = X

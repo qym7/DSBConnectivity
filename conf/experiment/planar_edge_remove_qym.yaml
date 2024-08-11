@@ -2,18 +2,16 @@
 project_name: planar_edge_remove
 #wandb: disabled # offline/disabled/online
 
-# data
-graph: True
 
 dataset_transfer:
   batch_size: ${batch_size}
   num_workers: 8
 
-  name: planar_edge_remove
+  name: planar
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/planar_edge/'
+  datadir: 'data/planar/'
 
   num_graphs: 200
   num_nodes: 35

@@ -60,7 +60,7 @@ ema_rate: 0.999
 grad_clipping: True
 grad_clip: 1.0
 n_ipf_init: 1
-num_iter : 2000
+num_iter: 2000
 n_ipf: 1000
 lr: 0.001
 limit_dist: marginal_tf            # uniform | marginal | marginal_tf,  ame with marginal when without transfer data

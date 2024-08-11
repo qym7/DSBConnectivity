@@ -9,11 +9,11 @@ dataset_transfer:
   batch_size: ${batch_size}
   num_workers: 8
 
-  name: planar
+  name: planar_edge_remove
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/planar/'
+  datadir: 'data/planar_edge/'
 
   num_graphs: 200
   num_nodes: 35
