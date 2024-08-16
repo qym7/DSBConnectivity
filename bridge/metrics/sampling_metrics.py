@@ -122,6 +122,8 @@ class SamplingMetrics(nn.Module):
         # self.mean_components(connected_comp)
         # self.max_components(connected_comp)
 
+        # import pdb; pdb.set_trace()
+
         self.reset()
         key = f"val_{fb}" if not self.test else f"test_{fb}"
         to_log = {

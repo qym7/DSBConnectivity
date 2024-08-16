@@ -483,7 +483,6 @@ class PlaceHolder:
 
     def mask(self, node_mask=None, collapse=False, mask_node=True):
         if node_mask is None:
-            assert self.node_mask is not None
             node_mask = self.node_mask
         bs, n = node_mask.shape
         x_mask = node_mask.unsqueeze(-1)  # bs, n, 1

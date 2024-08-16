@@ -59,15 +59,17 @@ class IPFBase(torch.nn.Module):
         self.fast_sampling = self.args.fast_sampling
         self.lr = self.args.lr
 
-        # n = self.num_steps // 2
-        # if self.args.gamma_space == "linspace":
-        #     gamma_half = np.linspace(self.args.gamma_min, args.gamma_max, n)
-        # elif self.args.gamma_space == "geomspace":
-        #     gamma_half = np.geomspace(self.args.gamma_min, self.args.gamma_max, n)
-        # gammas = np.concatenate([gamma_half, np.flip(gamma_half)])
-        # gammas = torch.tensor(gammas).to(self.device)
-        gammas = torch.ones(self.num_steps).to(self.device)
-        gammas = gammas / torch.sum(gammas)
+        if self.args.gamma_space != "linear":
+            n = self.num_steps // 2
+            if self.args.gamma_space == "linspace":
+                gamma_half = np.linspace(self.args.gamma_min, args.gamma_max, n)
+            elif self.args.gamma_space == "geomspace":
+                gamma_half = np.geomspace(self.args.gamma_min, self.args.gamma_max, n)
+            gammas = np.concatenate([gamma_half, np.flip(gamma_half)])
+            gammas = torch.tensor(gammas).to(self.device)
+        else:
+            gammas = torch.ones(self.num_steps).to(self.device)
+            gammas = gammas / torch.sum(gammas)
         self.T = torch.sum(gammas)  # T is one in our setting
         self.current_epoch = 0  # TODO: this need to be changed learning
 
@@ -122,6 +124,14 @@ class IPFBase(torch.nn.Module):
         if self.args.limit_dist == "marginal":
             self.limit_dist = utils.PlaceHolder(
                 X=self.datainfos.node_types, E=self.datainfos.edge_types, y=None
+            )
+        if self.args.limit_dist == "absorbing":
+            dist_X = torch.zeros_like(self.datainfos.node_types)
+            dist_X[0] = 1
+            dist_E = torch.zeros_like(self.datainfos.edge_types)
+            dist_E[0] = 1
+            self.limit_dist = utils.PlaceHolder(
+                X=dist_X, E=dist_E, y=None
             )
         elif self.args.limit_dist == "marginal_tf":
             self.limit_dist = utils.PlaceHolder(
@@ -604,7 +614,7 @@ class IPFBase(torch.nn.Module):
                 #     node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
                 batch = batch.sample(onehot=True, node_mask=node_mask)
 
-            batch.mask(node_mask)
+            batch.mask(node_mask=node_mask)
             x_tot, _, _, _ = self.langevin.record_langevin_seq(
                 sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True
             )

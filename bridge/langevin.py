@@ -126,8 +126,8 @@ class Langevin(torch.nn.Module):
             # The line `x_k = x_k.scale(1 - gamma/10).add(noise.scale(gamma/10))`
             # in the code snippet is performing a scaling and adding operation on
             # the variable `x_k`.
-            # x_k = x_k.scale(1 - gamma/10).add(noise.scale(gamma/10))
-            x_k = x_k.scale(1 - gamma).add(noise.scale(gamma))
+            x_k = x_k.scale(1 - gamma/10).add(noise.scale(gamma/10))
+            # x_k = x_k.scale(1 - gamma).add(noise.scale(gamma))
             # x_k = x_k.scale(1 - gamma*3).add(noise.scale(gamma*3))
             # if k < self.num_steps/10:
             #     x_k = x_k.scale(1 - gamma*10).add(noise.scale(gamma*10))

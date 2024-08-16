@@ -1,6 +1,5 @@
 # @package _global_
 project_name: planar
-
 dataset:
   batch_size: ${batch_size}
   num_workers: 8
@@ -13,7 +12,7 @@ dataset:
 
 
 batch_size: 128
-num_iter: 10000
+num_iter: 5000
 
 # settings for evaluations
 samples_to_generate: 40
