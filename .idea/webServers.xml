@@ -16,6 +16,13 @@
           </advancedOptions>
         </fileTransfer>
       </webServer>
+      <webServer id="a290387d-c9b1-45e3-9c01-3e5929ece48f" name="scratch">
+        <fileTransfer rootFolder="/scratch/uceeosm" accessType="SFTP" host="london.ee.ucl.ac.uk" port="22" sshConfigId="946e68a7-4849-4a86-9f49-2803a75bf20c" sshConfig="uceeosm@london.ee.ucl.ac.uk:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
     </option>
   </component>
 </project>

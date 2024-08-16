@@ -120,7 +120,7 @@ class QM9Dataset(InMemoryDataset):
                 f"train_bond_types_{h}.npy",
                 f"train_charge_{h}.npy",
                 f"train_valency_{h}.pickle",
-                f"train_smiles.pickle",
+                f"train_smiles_qm9_{h}.pickle",
                 f"train_real_node_ratio_{h}.npy",
             ]
         elif self.split == "val":
@@ -131,7 +131,7 @@ class QM9Dataset(InMemoryDataset):
                 f"val_bond_types_{h}.npy",
                 f"val_charge_{h}.npy",
                 f"val_valency_{h}.pickle",
-                f"val_smiles_{h}.pickle",
+                f"val_smiles_qm9_{h}.pickle",
                 f"val_real_node_ratio_{h}.npy",
             ]
         else:
@@ -142,7 +142,7 @@ class QM9Dataset(InMemoryDataset):
                 f"test_bond_types_{h}.npy",
                 f"test_charge_{h}.npy",
                 f"test_valency_{h}.pickle",
-                f"test_smiles_{h}.pickle",
+                f"test_smiles_qm9_{h}.pickle",
                 f"test_real_node_ratio_{h}.npy",
             ]
 
@@ -194,7 +194,7 @@ class QM9Dataset(InMemoryDataset):
         with open(self.raw_paths[-1], "r") as f:
             skip = [int(x.split()[0]) - 1 for x in f.read().split("\n")[9:-2]]
 
-        suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=False, sanitize=False)
+        suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=self.remove_h, sanitize=self.remove_h)
         data_list = []
         all_smiles = []
         num_errors = 0
@@ -202,9 +202,10 @@ class QM9Dataset(InMemoryDataset):
             if i in skip or i not in target_df.index:
                 continue
 
-            # if mol is None:
-            #     num_errors += 1
-            #     continue
+            if mol is None:
+                num_errors += 1
+                continue
+
             smiles = Chem.MolToSmiles(mol, isomericSmiles=False, canonical=True)
             if smiles is None:
                 num_errors += 1
