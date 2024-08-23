@@ -260,39 +260,55 @@ def SA_score_data_separation(path, path_greater, path_less, remove_h):
     os.makedirs(path_greater, exist_ok=True)
     os.makedirs(path_less, exist_ok=True)
 
+    all_data = []
     for dataset in list_file:
         with open(os.path.join(path, dataset + '.pickle'), 'rb') as file:
             data = pickle.load(file)
+            all_data.extend(data)
+    random.shuffle(all_data)
 
-        sa_greater_4 = []
-        sa_less_4 = []
+    sa_greater_3 = []
+    sa_less_3 = []
 
-        for smiles in data:
-            mol = Chem.MolFromSmiles(smiles)
-            if mol is not None:
-                sa_score = sascorer.calculateScore(mol)
-                if sa_score <= 4:
-                    sa_less_4.append(smiles)
-                else:
-                    sa_greater_4.append(smiles)
+    for smiles in all_data:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            sa_score = sascorer.calculateScore(mol)
+            if sa_score <= 3:
+                sa_less_3.append(smiles)
+            elif sa_score > 3:
+                sa_greater_3.append(smiles)
 
-        if 'train' in dataset:
-            selected_greater = random.sample(sa_greater_4, 34500)
-            selected_less = random.sample(sa_less_4, 34500)
-        else:
-            selected_greater = random.sample(sa_greater_4, 4500)
-            selected_less = random.sample(sa_less_4, 4500)
+    # Split sizes for the SA <= 3 (favourable and smaller dataset)
+    less_3_size = len(sa_less_3)
+    split1_less = int(less_3_size * 0.8)
+    split2_less = int(less_3_size * 0.9)
 
-        with open(os.path.join(path_greater, dataset + '.csv'), 'w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['SMILES'])
-            for point in selected_greater:
-                writer.writerow([point])
+    train_less = sa_less_3[:split1_less]
+    val_less = sa_less_3[split1_less:split2_less]
+    test_less = sa_less_3[split2_less:]
 
-        with open(os.path.join(path_less, dataset + '.csv'), 'w', newline='') as file:
+    train_greater = sa_greater_3[:split1_less]
+    val_greater = sa_greater_3[split1_less:split2_less]
+    test_greater = sa_greater_3[split2_less:]
+
+    less_lists = [train_less, test_less, val_less]
+    greater_lists = [train_greater, test_greater, val_greater]
+
+    for dataset, selected_less in zip(list_file, less_lists):
+        file_path = os.path.join(path_less, dataset + '.csv')
+        with open(file_path, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['SMILES'])
             for point in selected_less:
+                writer.writerow([point])
+
+    for dataset, selected_greater in zip(list_file, greater_lists):
+        file_path = os.path.join(path_greater, dataset + '.csv')
+        with open(file_path, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['SMILES'])
+            for point in selected_greater:
                 writer.writerow([point])
 
 
