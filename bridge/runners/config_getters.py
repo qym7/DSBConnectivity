@@ -124,12 +124,18 @@ def get_datamodules(cfg):
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
 
-    elif cfg["name"] in ["qm9", "guacamol", "moses"]:
+    elif cfg["name"] in ["qm9", "guacamol", "moses", "qm9_smiles"]:
         if cfg["name"] == "qm9":
             from ..datasets import qm9_dataset
 
             datamodule = qm9_dataset.QM9DataModule(cfg)
             dataset_infos = qm9_dataset.QM9Infos(datamodule=datamodule, cfg=cfg)
+
+        elif cfg["name"] == "qm9_smiles":
+            from ..datasets import qm9_smiles_dataset
+
+            datamodule = qm9_smiles_dataset.QM9SmilesDataModule(cfg)
+            dataset_infos = qm9_smiles_dataset.QM9SmilesInfos(datamodule=datamodule, cfg=cfg)
 
         elif cfg["name"] == "guacamol":
             from ..datasets import guacamol_dataset

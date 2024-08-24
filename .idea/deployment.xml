@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" serverName="turin.ee.ucl.ac.uk" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" serverName="scratch" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="london.ee.ucl.ac.uk">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/DSBConnectivity/" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="scratch">
         <serverdata>
           <mappings>
             <mapping deploy="/DSBConnectivity/" local="$PROJECT_DIR$" web="/" />

@@ -136,12 +136,20 @@ class SamplingMetrics(nn.Module):
         }
 
         if self.domain_metrics is not None:
-            domain_key = f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
-            do_metrics = self.domain_metrics.forward(
-                generated_graphs, current_epoch, local_rank, test=self.test
-            )
-            do_metrics = {f"{domain_key}/{k}": do_metrics[k] for k in do_metrics}
-            to_log.update(do_metrics)
+            if self.dataset_infos.is_molecular:
+                domain_key = f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
+                do_metrics = self.domain_metrics.forward(
+                    generated_graphs, current_epoch, local_rank, fb, test=self.test
+                )
+                do_metrics = {f"{domain_key}/{k}": do_metrics[k] for k in do_metrics}
+                to_log.update(do_metrics)
+            else:
+                domain_key = f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
+                do_metrics = self.domain_metrics.forward(
+                    generated_graphs, current_epoch, local_rank, test=self.test
+                )
+                do_metrics = {f"{domain_key}/{k}": do_metrics[k] for k in do_metrics}
+                to_log.update(do_metrics)
 
         if wandb.run:
             wandb.log(to_log, commit=False)

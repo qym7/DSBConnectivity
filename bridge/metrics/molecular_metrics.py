@@ -291,7 +291,7 @@ class SamplingMolecularMetrics(nn.Module):
         self.train_smiles = train_smiles
         self.dataset_info = di
 
-    def forward(self, graphs: list, current_epoch, local_rank, test=False):
+    def forward(self, graphs: list, current_epoch, local_rank, fb, test=False):
         # molecules = []
         # for graph in graphs:
         #     print(graph[0].shape, graph[1].shape, graph[1].dtype)
@@ -302,7 +302,7 @@ class SamplingMolecularMetrics(nn.Module):
         #     )
 
         molecules = graphs
-        stability, rdkit_metrics, all_smiles, res_dic = compute_molecular_metrics(molecules, self.train_smiles, self.dataset_info)
+        stability, rdkit_metrics, all_smiles, res_dic = compute_molecular_metrics(molecules, self.train_smiles, self.dataset_info, fb)
 
         if test and local_rank == 0:
             with open(r'final_smiles.txt', 'w') as fp:

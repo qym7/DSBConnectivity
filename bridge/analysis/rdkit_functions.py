@@ -2,17 +2,22 @@ import numpy as np
 import torch
 import re
 import wandb
+import os
+import sys
 
 try:
-    from rdkit import Chem
-
+    from rdkit import Chem, DataStructs, RDLogger
     print("Found rdkit, all good")
+    from rdkit.Chem import RDConfig, QED, Crippen, AllChem, MolFromSmiles, MolToSmiles
+    sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+    import sascorer
 except ModuleNotFoundError as e:
     use_rdkit = False
     from warnings import warn
-
     warn("Didn't find rdkit, this will fail")
     assert use_rdkit, "Didn't find rdkit"
+
+RDLogger.DisableLog('rdApp.*')
 
 
 allowed_bonds = {
@@ -130,6 +135,19 @@ class BasicMolecularMetrics(object):
                     print("Can't kekulize molecule")
         return valid, len(valid) / len(generated)
 
+    def compute_sascore(self, all_smiles):
+        count_true_sa = 0
+        sa_values = []
+        for smiles in all_smiles:
+            mol = MolFromSmiles(smiles)
+            sa_score = sascorer.calculateScore(mol)
+            sa_values.append(sa_score)
+            if sa_score <= 4:
+                count_true_sa += 1
+
+        sa_avg = sum(sa_values) / float(len(sa_values))
+        return sa_values, sa_avg, count_true_sa / len(all_smiles)
+
     def evaluate(self, generated):
         """generated: list of pairs (positions: n x 3, atom_types: n [int])
         the positions and atom types should already be masked."""
@@ -162,12 +180,15 @@ class BasicMolecularMetrics(object):
                 )
             else:
                 novelty = -1.0
+            _, sa_avg, sa_success = self.compute_sascore(unique)
         else:
             novelty = -1.0
             uniqueness = 0.0
+            sa_success = 0.0
+            sa_avg = 0.0
             unique = []
         return (
-            [validity, relaxed_validity, uniqueness, novelty, connectivity],
+            [validity, relaxed_validity, uniqueness, novelty, connectivity, sa_success, sa_avg],
             unique,
             dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
             all_smiles,
@@ -371,7 +392,7 @@ def check_stability(
     return molecule_stable, n_stable_bonds, len(atom_types)
 
 
-def compute_molecular_metrics(molecule_list, train_smiles, dataset_info):
+def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, fb):
     """molecule_list: (dict)"""
 
     if not dataset_info.remove_h:
@@ -395,13 +416,13 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info):
         fraction_mol_stable = molecule_stable / float(n_molecules)
         fraction_atm_stable = nr_stable_bonds / float(n_atoms)
         validity_dict = {
-            "mol_stable": fraction_mol_stable,
-            "atm_stable": fraction_atm_stable,
+            f"mol_metrics_charts_{fb}/mol_stable": fraction_mol_stable,
+            f"mol_metrics_charts_{fb}/atm_stable": fraction_atm_stable,
         }
         if wandb.run:
             wandb.log(validity_dict)
     else:
-        validity_dict = {"mol_stable": -1, "atm_stable": -1}
+        validity_dict = {f"mol_metrics_charts_{fb}/mol_stable": -1, f"mol_metrics_charts_{fb}/atm_stable": -1}
 
     metrics = BasicMolecularMetrics(dataset_info, train_smiles)
     rdkit_metrics = metrics.evaluate(molecule_list)
@@ -409,13 +430,15 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info):
 
     nc = rdkit_metrics[-2]
     dic = {
-        "Validity": rdkit_metrics[0][0],
-        "Relaxed Validity": rdkit_metrics[0][1],
-        "Uniqueness": rdkit_metrics[0][2],
-        "Novelty": rdkit_metrics[0][3],
-        "Connectivity": rdkit_metrics[0][4],
-        "nc_max": nc["nc_max"],
-        "nc_mu": nc["nc_mu"],
+        f"mol_metrics_charts_{fb}/Validity": rdkit_metrics[0][0],
+        f"mol_metrics_charts_{fb}/Relaxed Validity": rdkit_metrics[0][1],
+        f"mol_metrics_charts_{fb}/Uniqueness": rdkit_metrics[0][2],
+        f"mol_metrics_charts_{fb}/Novelty": rdkit_metrics[0][3],
+        f"mol_metrics_charts_{fb}/Connectivity": rdkit_metrics[0][4],
+        f"mol_metrics_charts_{fb}/SA Score Success Rate": rdkit_metrics[0][5],
+        f"mol_metrics_charts_{fb}/SA Average Value": rdkit_metrics[0][6],
+        f"mol_metrics_charts_{fb}/nc_max": nc["nc_max"],
+        f"mol_metrics_charts_{fb}/nc_mu": nc["nc_mu"],
     }
     if wandb.run:
         dic = dic
