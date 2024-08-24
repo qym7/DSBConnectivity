@@ -257,10 +257,10 @@ class TrainMolecularMetricsDiscrete(nn.Module):
 
 
 class SamplingMolecularMetrics(nn.Module):
-    def __init__(self, dataset_infos, train_smiles):
+    def __init__(self, dataset_infos, test_smiles, train_smiles):
         super().__init__()
         di = dataset_infos
-        
+
         self.dataset_infos = di
         self.generated_n_dist = GeneratedNDistribution(di.max_n_nodes) # this metrics is essential when using virtual nodes
         self.generated_node_dist = GeneratedNodesDistribution(di.num_node_types)
@@ -289,6 +289,7 @@ class SamplingMolecularMetrics(nn.Module):
         self.valency_dist_mae = HistogramsMAE(valency_target_dist)
 
         self.train_smiles = train_smiles
+        self.test_smiles = test_smiles
         self.dataset_info = di
 
     def forward(self, graphs: list, current_epoch, local_rank, fb, test=False):
@@ -302,7 +303,7 @@ class SamplingMolecularMetrics(nn.Module):
         #     )
 
         molecules = graphs
-        stability, rdkit_metrics, all_smiles, res_dic = compute_molecular_metrics(molecules, self.train_smiles, self.dataset_info, fb)
+        stability, rdkit_metrics, all_smiles, to_log = compute_molecular_metrics(molecules, self.test_smiles, self.train_smiles, self.dataset_info, fb)
 
         if test and local_rank == 0:
             with open(r'final_smiles.txt', 'w') as fp:
@@ -328,7 +329,6 @@ class SamplingMolecularMetrics(nn.Module):
         generated_valency_dist = self.generated_valency_dist.compute()
         self.valency_dist_mae(generated_valency_dist)
 
-        to_log = {}
         for i, atom_type in enumerate(self.dataset_info.atom_decoder):
             generated_probability = generated_node_dist[i]
             target_probability = self.node_target_dist[i]
@@ -349,6 +349,11 @@ class SamplingMolecularMetrics(nn.Module):
         edge_mae = self.edge_dist_mae.compute()
         valency_mae = self.valency_dist_mae.compute()
 
+        to_log.update({'basic_metrics/n_mae': n_mae.item()})
+        to_log.update({'basic_metrics/node_mae': node_mae.item()})
+        to_log.update({'basic_metrics/edge_mae': edge_mae.item()})
+        to_log.update({'basic_metrics/valency_mae': valency_mae.item()})
+
         if wandb.run:
             wandb.log(to_log, commit=False)
             wandb.run.summary['Gen n distribution'] = generated_n_dist
@@ -356,19 +361,9 @@ class SamplingMolecularMetrics(nn.Module):
             wandb.run.summary['Gen edge distribution'] = generated_edge_dist
             wandb.run.summary['Gen valency distribution'] = generated_valency_dist
 
-            wandb.log({'basic_metrics/n_mae': n_mae,
-                       'basic_metrics/node_mae': node_mae,
-                       'basic_metrics/edge_mae': edge_mae,
-                       'basic_metrics/valency_mae': valency_mae}, commit=False)
-
         if local_rank == 0:
             print("Custom metrics computed.")
-        # if local_rank == 0:
-        #     valid_unique_molecules = rdkit_metrics[1]
-        #     textfile = open(f'graphs/valid_unique_molecules_e{current_epoch}_b.txt', "w")
-        #     textfile.writelines(valid_unique_molecules)
-        #     textfile.close()
-        #     print("Stability metrics:", stability, "--", rdkit_metrics[0])
+
         return to_log
 
     def reset(self):

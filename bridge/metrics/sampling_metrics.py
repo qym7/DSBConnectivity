@@ -1,4 +1,5 @@
 from collections import Counter
+import math
 
 import torch.nn as nn
 import numpy as np
@@ -37,8 +38,11 @@ class SamplingMetrics(nn.Module):
                 SamplingMolecularMetrics,
             )
 
+            all_val_smiles = set(list(dataset_infos.val_smiles) + list(dataset_infos.test_smiles))
             self.domain_metrics = SamplingMolecularMetrics(
                 dataset_infos,
+                # dataset_infos.val_smiles if not test else dataset_infos.test_smiles,
+                all_val_smiles,
                 dataset_infos.train_smiles,
             )
 
@@ -133,6 +137,12 @@ class SamplingMetrics(nn.Module):
             f"{key}/MaxComponents": self.max_components.compute().item(),
         }
 
+        for k in to_log:
+            if math.isnan(to_log[k]):
+                to_log[k] = 0.0
+            if math.isinf(to_log[k]):
+                to_log[k] = 0.0
+
         if self.domain_metrics is not None:
             if self.dataset_infos.is_molecular:
                 domain_key = f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
@@ -151,6 +161,7 @@ class SamplingMetrics(nn.Module):
 
         if wandb.run:
             wandb.log(to_log, commit=False)
+        to_log = {k: float(to_log[k]) for k in to_log}
         print(to_log)
 
         return to_log

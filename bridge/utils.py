@@ -495,7 +495,10 @@ class PlaceHolder:
             .expand(bs, -1, -1)
             .unsqueeze(-1)
         )  # bs, n, n, 1
+        X = self.X.clone()
+        E = self.E.clone()
 
+        # try:
         if collapse:
             self.X = torch.argmax(self.X, dim=-1)
             self.E = torch.argmax(self.E, dim=-1)
@@ -510,13 +513,11 @@ class PlaceHolder:
                     self.charge = self.charge * x_mask
             if self.E is not None:
                 self.E = self.E * e_mask1 * e_mask2 * diag_mask
+        assert torch.allclose(self.E, torch.transpose(self.E, 1, 2), atol=1e-5)
+        # except:
+        #     import pdb
 
-        try:
-            assert torch.allclose(self.E, torch.transpose(self.E, 1, 2), atol=1e-5)
-        except:
-            import pdb
-
-            pdb.set_trace()
+        #     pdb.set_trace()
 
         # assert torch.allclose(self.E, torch.transpose(self.E, 1, 2), atol=1e-5)
 

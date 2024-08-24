@@ -13,7 +13,8 @@ dataset:
 
 
 batch_size: 128
-num_iter: 10000
+# num_iter: 10000
+num_iter: 2000
 
 # settings for evaluations
 samples_to_generate: 40
