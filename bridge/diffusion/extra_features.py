@@ -1,5 +1,8 @@
+import math
+
 import torch
 from .. import utils
+
 
 
 class DummyExtraFeatures:
@@ -16,11 +19,39 @@ class DummyExtraFeatures:
         return utils.PlaceHolder(X=empty_x, E=empty_e, y=empty_y)
 
 
+
+class PositionalEncoding:
+    def __init__(self, n_max_dataset, D=30):
+        self.n_max = n_max_dataset
+        self.d = math.floor(D / 2)
+
+    def __call__(self, dense_noisy_data):
+        device = dense_noisy_data.X.device
+        n_max_batch = dense_noisy_data.X.shape[1]
+
+        arange_n = torch.arange(n_max_batch, device=device)                                    # n_max
+        arange_d = torch.arange(self.d, device=device)                                         # d
+        frequencies = math.pi / torch.pow(self.n_max, 2 * arange_d / self.d)    # d
+
+        sines = torch.sin(arange_n.unsqueeze(1) * frequencies.unsqueeze(0))     # N, d
+        cosines = torch.cos(arange_n.unsqueeze(1) * frequencies.unsqueeze(0))   # N, d
+        encoding = torch.hstack((sines, cosines))                               # N, D
+        extra_x = encoding.unsqueeze(0)                                         # 1, N, D
+        extra_x = extra_x * dense_noisy_data.node_mask.unsqueeze(-1)             # B, N, D
+        return extra_x
+
+
 class ExtraFeatures:
-    def __init__(self, extra_features_type, dataset_info):
+    def __init__(self, extra_features_type, dataset_info, rrwp_steps, use_positional: bool):
         self.max_n_nodes = dataset_info.max_n_nodes
         self.ncycles = NodeCycleFeatures()
         self.features_type = extra_features_type
+        self.rrwp_steps = rrwp_steps
+        
+        self.use_positional = use_positional
+        if use_positional:
+            self.positional_encoding = PositionalEncoding(dataset_info.max_n_nodes)
+
         self.RRWP = RRWPFeatures()
         if extra_features_type in ["eigenvalues", "all"]:
             self.eigenfeatures = EigenFeatures(mode=extra_features_type)
@@ -32,30 +63,38 @@ class ExtraFeatures:
         if self.features_type == "cycles":
             E = noisy_data.E
             extra_edge_attr = torch.zeros((*E.shape[:-1], 0)).type_as(E)
-            return utils.PlaceHolder(
+            feats = utils.PlaceHolder(
                 X=x_cycles, E=extra_edge_attr, y=torch.hstack((n, y_cycles))
             )
 
-        elif self.features_type == "eigenvalues":
-            eigenfeatures = self.eigenfeatures(noisy_data)
-            E = noisy_data.E
-            extra_edge_attr = torch.zeros((*E.shape[:-1], 0)).type_as(E)
-            n_components, batched_eigenvalues = eigenfeatures  # (bs, 1), (bs, 10)
-            return utils.PlaceHolder(
-                X=x_cycles,
-                E=extra_edge_attr,
-                y=torch.hstack((n, y_cycles)),
-            )
-
         elif self.features_type == "rrwp":
-            rrwp_edge_attr = self.RRWP(noisy_data)
+            E = noisy_data.E.float()[..., 1:].sum(-1)  # bs, n, n
+            rrwp_edge_attr = self.RRWP(E, k=self.rrwp_steps)
             diag_index = torch.arange(rrwp_edge_attr.shape[1])
             rrwp_node_attr = rrwp_edge_attr[:, diag_index, diag_index, :]
-            return utils.PlaceHolder(
+
+            feats - utils.PlaceHolder(
                 X=rrwp_node_attr,
                 E=rrwp_edge_attr,
                 y=torch.hstack((n, y_cycles)),
             )
+
+        elif self.features_type == "rrwp_comp":
+            E = noisy_data.E.float()[..., 1:].sum(-1)  # bs, n, n
+            rrwp_edge_attr = self.RRWP(E, k=int(self.rrwp_steps / 2))
+            diag_index = torch.arange(rrwp_edge_attr.shape[1])
+            rrwp_node_attr = rrwp_edge_attr[:, diag_index, diag_index, :]
+
+            comp_E = 1 - noisy_data.E.float()[..., 1:].sum(-1)  # bs, n, n
+            comp_rrwp_edge_attr = self.RRWP(comp_E, k=int(self.rrwp_steps / 2))
+            comp_rrwp_node_attr = comp_rrwp_edge_attr[:, diag_index, diag_index, :]
+
+            feats = utils.PlaceHolder(
+                X=torch.cat((rrwp_node_attr, comp_rrwp_node_attr), dim=-1),
+                E=torch.cat((rrwp_edge_attr, comp_rrwp_edge_attr), dim=-1),
+                y=torch.hstack((n, y_cycles)),
+            )
+
 
         elif self.features_type == "all":
             eigenfeatures = self.eigenfeatures(noisy_data)
@@ -65,7 +104,7 @@ class ExtraFeatures:
                 eigenfeatures  # (bs, 1), (bs, 10),
             )
 
-            return utils.PlaceHolder(
+            feats = utils.PlaceHolder(
                 X=torch.cat(
                     (x_cycles, nonlcc_indicator, k_lowest_eigvec),
                     dim=-1,
@@ -89,13 +128,18 @@ class ExtraFeatures:
         else:
             raise ValueError(f"Features type {self.features_type} not implemented")
 
+        if self.use_positional:
+            node_feat = self.positional_encoding(noisy_data)
+            feats.X = torch.cat([feats.X, node_feat], dim=-1)
+
+        return feats
+
 
 class RRWPFeatures:
     def __init__(self, k=10):
         self.k = k
 
-    def __call__(self, noisy_data):
-        E = noisy_data.E.float()[..., 1:].sum(-1)  # bs, n, n
+    def __call__(self, E, k):
         # degree = E.sum(dim=-1).float().unsqueeze(1)  # bs, 1, n
         # degree = degree.repeat(1, E.shape[1], 1)  # bs, n, n
         (
@@ -111,7 +155,7 @@ class RRWPFeatures:
 
         rrwp_list = [E]
         # multiplication_list = [E]
-        for i in range(self.k):
+        for i in range(k):
             cur_rrwp = rrwp_list[-1] @ E
             rrwp_list.append(cur_rrwp)
             # cur_rrwp = E @ multiplication_list[-1]

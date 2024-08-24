@@ -87,7 +87,10 @@ class XEyTransformerLayer(nn.Module):
 
         # try:
         # import pdb; pdb.set_trace()
-        newX, newE, new_y = self.self_attn(oX, oE, oy, node_mask=node_mask)
+        try:
+            newX, newE, new_y = self.self_attn(oX, oE, oy, node_mask=node_mask)
+        except:
+            import pdb; pdb.set_trace()
         # print('new y', new_y.shape)
         # except:
         #     import pdb; pdb.set_trace()

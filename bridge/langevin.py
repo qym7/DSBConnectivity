@@ -126,15 +126,26 @@ class Langevin(torch.nn.Module):
             # The line `x_k = x_k.scale(1 - gamma/10).add(noise.scale(gamma/10))`
             # in the code snippet is performing a scaling and adding operation on
             # the variable `x_k`.
-            x_k = x_k.scale(1 - gamma/10).add(noise.scale(gamma/10))
+            # x_k = x_k.scale(1 - gamma/10).add(noise.scale(gamma/10))
+            # x_k = x_k.scale(1 - gamma/2).add(noise.scale(gamma/2))
             # x_k = x_k.scale(1 - gamma).add(noise.scale(gamma))
-            # x_k = x_k.scale(1 - gamma*3).add(noise.scale(gamma*3))
-            # if k < self.num_steps/10:
-            #     x_k = x_k.scale(1 - gamma*10).add(noise.scale(gamma*10))
+            # The line `# x_k = x_k.scale(1 - gamma*3).add(noise.scale(gamma*3))`
+            # is currently commented out in the code snippet. If you were to
+            # uncomment it, this line would perform a scaling and adding operation
+            # on the variable `x_k`.
+            # x_k = x_k.scale(1 - gamma/2).add(noise.scale(gamma/2))
+            x_k = x_k.scale(1 - gamma).add(noise.scale(gamma))
+            # if k < self.num_steps/2:
+            #     x_k = x_k.scale(1 - gamma*2).add(noise.scale(gamma*2))
             # else:
             #     x_k = noise
             # x_k = x_k.scale(1 - gamma / 3).add(noise.scale(gamma / 3))
-
+            # The line `# x_k = x_k.scale(1 - gamma*2).add(noise.scale(gamma*2))`
+            # is currently commented out in the code snippet. If you were to
+            # uncomment it, this line would perform a scaling and adding operation
+            # on the variable `x_k`.
+            x_k.X = x_k.X.clamp(0.0, 1.0)
+            x_k.E = x_k.E.clamp(0.0, 1.0)
             if self.virtual_node:
                 x_k = x_k.sample(onehot=True, node_mask=torch.ones(x_k.X.shape[:-1]).to(x_k.X.device).bool())
             else:
@@ -172,10 +183,21 @@ class Langevin(torch.nn.Module):
         gammas_expanded = self.gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
 
         x = init_samples.copy()
-        for k in range(self.num_steps):
-            out = out.place(x, k)
-            t = times_expanded[:, k, :]
-            gamma = gammas_expanded[:, k, :]
+        # for k in range(self.num_steps):
+        num_repeat = 1
+        for i in range(self.num_steps*num_repeat):
+
+            out_save = i % num_repeat == 0
+            k = i // num_repeat
+
+            if out_save:
+                out = out.place(x, k)
+
+            # t = times_expanded[:, k, :]
+            # gamma = gammas_expanded[:, k, :]
+            t = torch.ones_like(times_expanded[:, k, :], device=self.device) * i / self.num_steps / num_repeat
+            gamma = gammas_expanded[:, k, :] / num_repeat
+            # / k * i / self.num_steps*num_repeat
             with torch.no_grad():
                 pred = self.forward_graph(net, x, t)
 
@@ -205,7 +227,9 @@ class Langevin(torch.nn.Module):
             else:
                 x = pred.sample(onehot=True, node_mask=node_mask)
 
-            x_tot = x_tot.place(x, k)
+            # if out_save and k > 0:
+            if i % num_repeat == num_repeat - 1:
+                x_tot = x_tot.place(x, k)
 
         return x_tot, out, gammas_expanded, times_expanded
 

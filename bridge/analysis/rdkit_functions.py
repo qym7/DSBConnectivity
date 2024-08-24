@@ -50,12 +50,14 @@ ATOM_VALENCY = {6: 4, 7: 3, 8: 2, 9: 1, 15: 3, 16: 2, 17: 1, 35: 1, 53: 1}
 
 
 class BasicMolecularMetrics(object):
-    def __init__(self, dataset_info, train_smiles=None):
+    def __init__(self, dataset_info, test_smiles=None, train_smiles=None):
         self.atom_decoder = dataset_info.atom_decoder
         self.dataset_info = dataset_info
-
         # Retrieve dataset smiles only for qm9 currently.
+        self.test_smiles = test_smiles
         self.dataset_smiles_list = train_smiles
+        _, self.test_sa_avg, self.test_sa_success = self.compute_sascore(test_smiles)
+        _, self.train_sa_avg, self.train_sa_success = self.compute_sascore(train_smiles)
 
     def compute_validity(self, generated):
         """generated: list of couples (positions, atom_types)"""
@@ -101,7 +103,9 @@ class BasicMolecularMetrics(object):
 
     def compute_novelty(self, unique):
         num_novel = 0
+        num_coverage = 0
         novel = []
+        coverage = []
         if self.dataset_smiles_list is None:
             print("Dataset smiles is None, novelty computation skipped")
             return 1, 1
@@ -109,7 +113,11 @@ class BasicMolecularMetrics(object):
             if smiles not in self.dataset_smiles_list:
                 novel.append(smiles)
                 num_novel += 1
-        return novel, num_novel / len(unique)
+        for smiles in unique:
+            if smiles in self.test_smiles:
+                coverage.append(smiles)
+                num_coverage += 1
+        return novel, num_novel / len(unique), coverage, num_coverage / len(unique)
 
     def compute_relaxed_validity(self, generated):
         valid = []
@@ -174,21 +182,30 @@ class BasicMolecularMetrics(object):
             )
 
             if self.dataset_smiles_list is not None:
-                _, novelty = self.compute_novelty(unique)
+                _, novelty, _, coverage = self.compute_novelty(unique)
                 print(
                     f"Novelty over {len(unique)} unique valid molecules: {novelty * 100 :.2f}%"
+                )
+                print(
+                    f"Coverage over {len(unique)} unique valid molecules: {coverage * 100 :.2f}%"
                 )
             else:
                 novelty = -1.0
             _, sa_avg, sa_success = self.compute_sascore(unique)
+
+            _, _, vun_sa = self.compute_sascore(list(set(unique)))
+            vun_sa = vun_sa * len(list(set(unique))) / len(generated)
+
         else:
             novelty = -1.0
             uniqueness = 0.0
             sa_success = 0.0
             sa_avg = 0.0
+            vun_sa = 0.0
+            coverage = 0.0
             unique = []
         return (
-            [validity, relaxed_validity, uniqueness, novelty, connectivity, sa_success, sa_avg],
+            [validity, relaxed_validity, uniqueness, novelty, connectivity, sa_success, sa_avg, self.train_sa_avg, self.train_sa_success, self.test_sa_avg, self.test_sa_success, coverage, vun_sa],
             unique,
             dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
             all_smiles,
@@ -281,6 +298,7 @@ def build_molecule_with_partial_charges(
                 if an in (7, 8, 16) and (v - ATOM_VALENCY[an]) == 1:
                     mol.GetAtomWithIdx(idx).SetFormalCharge(1)
                     # print("Formal charge added")
+
     return mol
 
 
@@ -392,7 +410,7 @@ def check_stability(
     return molecule_stable, n_stable_bonds, len(atom_types)
 
 
-def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, fb):
+def compute_molecular_metrics(molecule_list, test_smiles, train_smiles, dataset_info, fb):
     """molecule_list: (dict)"""
 
     if not dataset_info.remove_h:
@@ -424,7 +442,7 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, fb):
     else:
         validity_dict = {f"mol_metrics_charts_{fb}/mol_stable": -1, f"mol_metrics_charts_{fb}/atm_stable": -1}
 
-    metrics = BasicMolecularMetrics(dataset_info, train_smiles)
+    metrics = BasicMolecularMetrics(dataset_info, test_smiles, train_smiles)
     rdkit_metrics = metrics.evaluate(molecule_list)
     all_smiles = rdkit_metrics[-1]
 
@@ -435,8 +453,15 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, fb):
         f"mol_metrics_charts_{fb}/Uniqueness": rdkit_metrics[0][2],
         f"mol_metrics_charts_{fb}/Novelty": rdkit_metrics[0][3],
         f"mol_metrics_charts_{fb}/Connectivity": rdkit_metrics[0][4],
-        f"mol_metrics_charts_{fb}/SA Score Success Rate": rdkit_metrics[0][5],
-        f"mol_metrics_charts_{fb}/SA Average Value": rdkit_metrics[0][6],
+        f"mol_metrics_charts_{fb}/SA Score Success Rate (<4)": float(rdkit_metrics[0][5]),
+        f"mol_metrics_charts_{fb}/SA Average Value": float(rdkit_metrics[0][6]),
+        f"mol_metrics_charts_{fb}/train_SA Average Value": float(rdkit_metrics[0][7]),
+        f"mol_metrics_charts_{fb}/train_SA Score Success Rate (<4)": float(rdkit_metrics[0][8]),
+        f"mol_metrics_charts_{fb}/test_SA Average Value": float(rdkit_metrics[0][9]),
+        f"mol_metrics_charts_{fb}/test_SA Score Success Rate (<4)": float(rdkit_metrics[0][10]),
+        f"mol_metrics_charts_{fb}/coverage except training": float(rdkit_metrics[0][11]),
+        f"mol_metrics_charts_{fb}/SA.V.U.N.": float(rdkit_metrics[0][-1]),
+        f"mol_metrics_charts_{fb}/SA Average Value": float(rdkit_metrics[0][6]),
         f"mol_metrics_charts_{fb}/nc_max": nc["nc_max"],
         f"mol_metrics_charts_{fb}/nc_mu": nc["nc_mu"],
     }
