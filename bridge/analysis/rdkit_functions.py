@@ -150,7 +150,7 @@ class BasicMolecularMetrics(object):
             mol = MolFromSmiles(smiles)
             sa_score = sascorer.calculateScore(mol)
             sa_values.append(sa_score)
-            if sa_score <= 4:
+            if sa_score <= 3:
                 count_true_sa += 1
 
         sa_avg = sum(sa_values) / float(len(sa_values))
@@ -192,7 +192,6 @@ class BasicMolecularMetrics(object):
             else:
                 novelty = -1.0
             _, sa_avg, sa_success = self.compute_sascore(unique)
-
             _, _, vun_sa = self.compute_sascore(list(set(unique)))
             vun_sa = vun_sa * len(list(set(unique))) / len(generated)
 
