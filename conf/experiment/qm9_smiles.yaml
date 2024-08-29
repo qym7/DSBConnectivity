@@ -30,13 +30,14 @@ dataset_transfer:
   pin_memory: False
 
 # settings for evaluations
-load: False
-samples_to_generate: 1028
+forward_path: null
+backward_path: null
+samples_to_generate: 1024
 samples_to_save: 20
 chains_to_save: 2
-final_model_samples_to_generate: 10000
-final_model_samples_to_save: 30
-final_model_chains_to_save: 20
+final_samples_to_generate: 10000
+final_samples_to_save: 30
+final_chains_to_save: 20
 
 # training
 batch_size: 1024

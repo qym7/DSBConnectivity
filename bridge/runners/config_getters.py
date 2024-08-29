@@ -33,11 +33,10 @@ def get_graph_models(args, dataset_infos):
 
     net_f, net_b = GraphTransformer(**kwargs), GraphTransformer(**kwargs)
 
-    import pdb; pdb
     if args.forward_path is not None:
-        net_f.load_state_dict(torch.load(args.forward_path))
+        net_f.load_state_dict(torch.load(args.forward_path, map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu')))
     if args.backward_path is not None:
-        net_b.load_state_dict(torch.load(args.backward_path))
+        net_b.load_state_dict(torch.load(args.backward_path, map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu')))
 
     return net_f, net_b
 

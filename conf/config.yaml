@@ -24,16 +24,18 @@ plot_level: 1
 mean_match: True
 paths: 
   experiments_dir_name: experiments
+  name: ${name}
 wandb: 'online'             # online | offline | disabled
 
 # settings
 seed: 1234
 
 # settings for evaluations
-load: False
-final_model_samples_to_generate: 100
-final_model_samples_to_save: 30
-final_model_chains_to_save: 20
+forward_path: null
+backward_path: null
+final_samples_to_generate: 100
+final_samples_to_save: 30
+final_chains_to_save: 20
 samples_to_generate: 32
 samples_to_save: 10
 chains_to_save: 1

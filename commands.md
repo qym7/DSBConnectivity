@@ -47,14 +47,15 @@ CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_01noise_vi
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_01noise_3e5clean num_steps=50 num_iter=2000 n_ipf=1000 virtual_node=False noise_level=0.1 clean_loss_weight=0.00003
 
-
-
 ## SBM
 
 CUDA_VISIBLE_DEVICES=3 python main.py main.py dataset=sbm_split model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
 
 
 CUDA_VISIBLE_DEVICES=3 python main.py main.py dataset=sbm_large_to_small model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
+
+# test
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=qm9_01noise_test wandb=disabled test=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/sample_net_f_32_1999.ckpt dataset.batch_size=2048 final_samples_to_generate=30000
 
 <!-- # comm20
 

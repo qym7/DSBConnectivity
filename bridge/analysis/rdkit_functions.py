@@ -159,6 +159,8 @@ class BasicMolecularMetrics(object):
     def evaluate(self, generated):
         """generated: list of pairs (positions: n x 3, atom_types: n [int])
         the positions and atom types should already be masked."""
+        
+        print(f"Number of generated molecules: {len(generated)}")
         valid, validity, num_components, all_smiles = self.compute_validity(generated)
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
@@ -192,14 +194,18 @@ class BasicMolecularMetrics(object):
             else:
                 novelty = -1.0
 
-            print((num_components==1).sum())
+            # print((num_components==1).sum())
             existing_smiles = [smiles for smiles in all_smiles if smiles is not None]
-            print(len(existing_smiles))
+            # print(len(existing_smiles))
             # unique = all_smiles[num_components == 1]
             # unique = list(set(unique_connected))
             _, sa_avg, sa_success = self.compute_sascore(unique)
             _, _, vun_sa = self.compute_sascore(list(set(unique)))
             vun_sa = vun_sa * len(list(set(unique))) / len(generated)
+            
+            print(f"SA Score Success Rate (<3) over {len(unique)} unique valid molecules: {sa_success * 100 :.2f}%")
+            print(f"SA Average Value over {len(unique)} unique valid molecules: {sa_avg :.2f}")
+            print(f"SA.V.U.N. over {len(unique)} unique valid molecules: {vun_sa :.2f}")
 
         else:
             novelty = -1.0

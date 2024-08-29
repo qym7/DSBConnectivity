@@ -8,11 +8,12 @@ job:
 
 run:
   # Output directory for normal runs
-  dir: ./${paths.experiments_dir_name}/${now:%Y-%m-%d}/${name}/${hydra.job.override_dirname}/${now:%H-%M-%S}
+  # dir: ./${paths.experiments_dir_name}/${now:%Y-%m-%d}/${name}/${hydra.job.override_dirname}/${now:%H-%M-%S}
+  dir: ./${paths.experiments_dir_name}/${now:%Y-%m-%d}/${paths.name}/${now:%H-%M-%S}
 
 sweep:
 #   # Output directory for sweep runs
-  dir: ./${paths.experiments_dir_name}/${name}/${hydra.job.override_dirname}
+  dir: ./${paths.experiments_dir_name}/${paths.name}/
   subdir: ./
 
 job_logging:

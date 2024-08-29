@@ -736,7 +736,7 @@ class IPFBase(torch.nn.Module):
             self.visualization_tools.visualize(
                 result_path,
                 graph_list=generated_list,
-                num_graphs_to_visualize=to_plot.X.shape[0],
+                num_graphs_to_visualize=self.args.final_samples_to_save,
                 fb=fb,
             )
 
@@ -757,7 +757,7 @@ class IPFBase(torch.nn.Module):
                 chains=chains,
                 num_nodes=n_nodes,
                 local_rank=0,
-                num_chains_to_visualize=len(chains.X),
+                num_chains_to_visualize=self.args.final_chains_to_save,
                 fb=fb,
                 transfer=self.args.transfer,
                 virtual_node=self.args.virtual_node
@@ -794,6 +794,15 @@ class IPFBase(torch.nn.Module):
                 with open(res_path, "w") as file:
                     json.dump(test_to_log, file)
 
+                res_path = os.path.join(
+                    current_path,
+                    f"val_{fb}_{n}.txt",
+                )
+
+                for k in val_to_log:
+                    with open(res_path, "a") as file:
+                        file.write(f"{k}: {val_to_log[k]}\n")
+
             elif val_sampling_metrics is not None:
                 val_to_log = val_sampling_metrics.compute_all_metrics(
                     generated_list,
@@ -812,6 +821,15 @@ class IPFBase(torch.nn.Module):
 
                 with open(res_path, "w") as file:
                     json.dump(val_to_log, file)
+                
+                res_path = os.path.join(
+                    current_path,
+                    f"val_{fb}_{n}.txt",
+                )
+
+                for k in val_to_log:
+                    with open(res_path, "a") as file:
+                        file.write(f"{k}: {val_to_log[k]}\n")
 
     def set_seed(self, seed=0):
         torch.manual_seed(seed)
@@ -1049,5 +1067,7 @@ class IPFSequential(IPFBase):
     def test(self):
         print("Testing...")
 
-        self.save_step(0, 0, "f")
-        self.save_step(0, 0, "b")
+        if self.args.forward_path is not None:
+            self.save_step(0, 0, "f")
+        if self.args.backward_path is not None:
+            self.save_step(0, 0, "b")
