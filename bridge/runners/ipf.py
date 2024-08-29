@@ -56,6 +56,7 @@ class IPFBase(torch.nn.Module):
         self.batch_size = self.args.batch_size
         self.num_iter = self.args.num_iter
         self.grad_clipping = self.args.grad_clipping
+        self.grad_clip_value = self.args.grad_clip
         self.fast_sampling = self.args.fast_sampling
         self.lr = self.args.lr
 
@@ -171,6 +172,7 @@ class IPFBase(torch.nn.Module):
             tf_extra_features=self.tf_extra_features,
             tf_domain_features=self.tf_domain_features,
             virtual_node=self.args.virtual_node,
+            noise_level=self.args.noise_level,
         )
 
         # checkpoint
@@ -925,6 +927,9 @@ class IPFSequential(IPFBase):
                 )
 
             self.accelerator.backward(loss)
+            if self.args.grad_clipping:
+                torch.nn.utils.clip_grad_norm_(self.net[forward_or_backward].parameters(), self.grad_clip_value)
+
             self.optimizer[forward_or_backward].step()
             self.optimizer[forward_or_backward].zero_grad()
             if self.args.ema:
@@ -944,7 +949,7 @@ class IPFSequential(IPFBase):
         self.clear()
 
     def compute_loss(self, pred, out, pred_clean, clean, t):
-        use_edge_loss = False
+        use_edge_loss = True
         clean_node_count = clean.node_mask.sum(-1)
         node_count = out.node_mask.sum(-1)
 
@@ -1026,7 +1031,10 @@ class IPFSequential(IPFBase):
             (z_t.y, extra_features.y, extra_domain_features.y, t)
         ).float()
 
+        # try:
         res = net(model_input)
+        # except:
+        #     import pdb; pdb.set_trace()
 
         return res
 

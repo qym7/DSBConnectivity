@@ -66,6 +66,7 @@ class Langevin(torch.nn.Module):
         tf_extra_features=None,
         tf_domain_features=None,
         virtual_node=False,
+        noise_level=1.0,
     ):
         super().__init__()
         # self.std_final = utils.PlaceHolder(
@@ -74,6 +75,7 @@ class Langevin(torch.nn.Module):
         self.graph = graph
         self.limit_dist = limit_dist
         self.virtual_node = virtual_node
+        self.noise_level = noise_level
 
         # extra fetaures
         self.extra_features = extra_features
@@ -134,7 +136,8 @@ class Langevin(torch.nn.Module):
             # uncomment it, this line would perform a scaling and adding operation
             # on the variable `x_k`.
             # x_k = x_k.scale(1 - gamma/2).add(noise.scale(gamma/2))
-            x_k = x_k.scale(1 - gamma).add(noise.scale(gamma))
+            # x_k = x_k.scale(1 - gamma).add(noise.scale(gamma))
+            x_k = x_k.scale(1 - gamma * self.noise_level).add(noise.scale(gamma * self.noise_level))
             # if k < self.num_steps/2:
             #     x_k = x_k.scale(1 - gamma*2).add(noise.scale(gamma*2))
             # else:

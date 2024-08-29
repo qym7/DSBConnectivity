@@ -28,7 +28,25 @@ CUDA_VISIBLE_DEVICES=2 python main.py dataset=qm9 model=gnn num_steps=10 num_ite
 
 CUDA_VISIBLE_DEVICES=0 python main.py dataset=qm9 model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=RECHECK_ce_loss_5k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
 
-# CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=qm9_sa_score_virtual_05noise num_iter=10 virtual_node=True
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles  num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_Lr3_1e4CleanLossRegByT_Virtual_UseEdgeLoss limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001 virtual_node=True
+
+# QM9 smiles
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=qm9_01noise_noclean num_steps=50 num_iter=2000 n_ipf=1000 virtual_node=False noise_level=0.1 clean_loss_weight=0.0 lr=0.001
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=debug num_steps=50 num_iter=1000 n_ipf=1000 virtual_node=False noise_level=0.1 clean_loss_weight=0.0 lr=0.001
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=qm9_01noise_1e4cleancloss_edgeloss num_steps=50 num_iter=1000 n_ipf=1000 virtual_node=False noise_level=0.1 clean_loss_weight=0.0001 lr=0.001
+
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=qm9_005noise num_steps=50 num_iter=2000 n_ipf=1000 virtual_node=False noise_level=0.05 noise_level=0.05
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=qm9_01noise_3e4clean num_steps=50 num_iter=2000 n_ipf=1000 virtual_node=False noise_level=0.1 clean_loss_weight=0.0003
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_01noise_virtual num_steps=50 num_iter=2000 n_ipf=1000 virtual_node=False noise_level=0.1 virtual_node=True
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_01noise_3e5clean num_steps=50 num_iter=2000 n_ipf=1000 virtual_node=False noise_level=0.1 clean_loss_weight=0.00003
+
 
 
 ## SBM

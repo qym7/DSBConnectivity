@@ -167,7 +167,7 @@ class BasicMolecularMetrics(object):
         print(
             f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
         )
-        
+
         connectivity = (num_components == 1).sum()/len(num_components)
         print(f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%")
 
@@ -191,6 +191,12 @@ class BasicMolecularMetrics(object):
                 )
             else:
                 novelty = -1.0
+
+            print((num_components==1).sum())
+            existing_smiles = [smiles for smiles in all_smiles if smiles is not None]
+            print(len(existing_smiles))
+            # unique = all_smiles[num_components == 1]
+            # unique = list(set(unique_connected))
             _, sa_avg, sa_success = self.compute_sascore(unique)
             _, _, vun_sa = self.compute_sascore(list(set(unique)))
             vun_sa = vun_sa * len(list(set(unique))) / len(generated)
@@ -452,12 +458,12 @@ def compute_molecular_metrics(molecule_list, test_smiles, train_smiles, dataset_
         f"mol_metrics_charts_{fb}/Uniqueness": rdkit_metrics[0][2],
         f"mol_metrics_charts_{fb}/Novelty": rdkit_metrics[0][3],
         f"mol_metrics_charts_{fb}/Connectivity": rdkit_metrics[0][4],
-        f"mol_metrics_charts_{fb}/SA Score Success Rate (<4)": float(rdkit_metrics[0][5]),
+        f"mol_metrics_charts_{fb}/SA Score Success Rate (<3)": float(rdkit_metrics[0][5]),
         f"mol_metrics_charts_{fb}/SA Average Value": float(rdkit_metrics[0][6]),
         f"mol_metrics_charts_{fb}/train_SA Average Value": float(rdkit_metrics[0][7]),
-        f"mol_metrics_charts_{fb}/train_SA Score Success Rate (<4)": float(rdkit_metrics[0][8]),
+        f"mol_metrics_charts_{fb}/train_SA Score Success Rate (<3)": float(rdkit_metrics[0][8]),
         f"mol_metrics_charts_{fb}/test_SA Average Value": float(rdkit_metrics[0][9]),
-        f"mol_metrics_charts_{fb}/test_SA Score Success Rate (<4)": float(rdkit_metrics[0][10]),
+        f"mol_metrics_charts_{fb}/test_SA Score Success Rate (<3)": float(rdkit_metrics[0][10]),
         f"mol_metrics_charts_{fb}/coverage except training": float(rdkit_metrics[0][11]),
         f"mol_metrics_charts_{fb}/SA.V.U.N.": float(rdkit_metrics[0][-1]),
         f"mol_metrics_charts_{fb}/SA Average Value": float(rdkit_metrics[0][6]),

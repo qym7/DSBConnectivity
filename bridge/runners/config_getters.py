@@ -33,6 +33,12 @@ def get_graph_models(args, dataset_infos):
 
     net_f, net_b = GraphTransformer(**kwargs), GraphTransformer(**kwargs)
 
+    import pdb; pdb
+    if args.forward_path is not None:
+        net_f.load_state_dict(torch.load(args.forward_path))
+    if args.backward_path is not None:
+        net_b.load_state_dict(torch.load(args.backward_path))
+
     return net_f, net_b
 
 
