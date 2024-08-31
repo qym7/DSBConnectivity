@@ -374,16 +374,23 @@ class GraphTransformer(nn.Module):
 
         # print(0, 'max', E.max(), 'min', E.min(), 'nan', torch.isnan(E).sum(), 'inf', torch.isinf(E).sum())
 
+        if torch.isnan(E).sum() > 0 or torch.isinf(E).sum() > 0:
+            import pdb; pdb.set_trace()
         time_emb = timestep_embedding(y[:, -1].unsqueeze(-1), self.hidden_dims["dy"])
         new_y = self.mlp_in_y(model_input.y) + time_emb
         new_E = self.mlp_in_E(model_input.E)
         
         # print(1, 'max', new_E.max(), 'min', new_E.min(), 'nan', torch.isnan(new_E).sum(), 'inf', torch.isinf(new_E).sum())
+        if torch.isnan(new_E).sum() > 0 or torch.isinf(new_E).sum() > 0:
+            import pdb; pdb.set_trace()
+        
         
         new_E = (new_E + new_E.transpose(1, 2)) / 2
 
         # print(2, 'max', new_E.max(), 'min', new_E.min(), 'nan', torch.isnan(new_E).sum(), 'inf', torch.isinf(new_E).sum())
 
+        if torch.isnan(new_E).sum() > 0 or torch.isinf(new_E).sum() > 0:
+            import pdb; pdb.set_trace()
         features = utils.PlaceHolder(
             X=self.mlp_in_X(X),
             E=new_E,
@@ -396,11 +403,15 @@ class GraphTransformer(nn.Module):
             features = layer(features)
             # print('inside', i, 'max', features.E.max(), 'min', features.E.min(), 'nan', torch.isnan(features.E).sum(), 'inf', torch.isinf(features.E).sum())
 
+            if torch.isnan(new_E).sum() > 0 or torch.isinf(new_E).sum() > 0:
+                import pdb; pdb.set_trace()
         X = self.mlp_out_X(features.X)
         E = self.mlp_out_E(features.E)
 
         # print(3, 'max', E.max(), 'min', E.min(), 'nan', torch.isnan(E).sum(), 'inf', torch.isinf(E).sum())
 
+        if torch.isnan(new_E).sum() > 0 or torch.isinf(new_E).sum() > 0:
+            import pdb; pdb.set_trace()
         # X = X + X_to_out
         # E = E + E_to_out
         E = 1 / 2 * (E + torch.transpose(E, 1, 2))  # symmetrize E

@@ -148,7 +148,10 @@ class BasicMolecularMetrics(object):
         sa_values = []
         for smiles in all_smiles:
             mol = MolFromSmiles(smiles)
-            sa_score = sascorer.calculateScore(mol)
+            try:
+                sa_score = sascorer.calculateScore(mol)
+            except:
+                continue
             sa_values.append(sa_score)
             if sa_score <= 3:
                 count_true_sa += 1

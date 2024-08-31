@@ -663,8 +663,10 @@ class IPFBase(torch.nn.Module):
         Step for sampling and for saving
         """
         if not self.args.test:
+            samples_to_save = self.args.samples_to_save
             chains_to_save = self.args.chains_to_save
         else:
+            samples_to_save = self.args.final_samples_to_save
             chains_to_save = self.args.final_chains_to_save
 
         if self.accelerator.is_local_main_process:
@@ -735,8 +737,8 @@ class IPFBase(torch.nn.Module):
 
             self.visualization_tools.visualize(
                 result_path,
-                graph_list=generated_list,
-                num_graphs_to_visualize=self.args.final_samples_to_save,
+                graph_list=generated_list[:samples_to_save],
+                num_graphs_to_visualize=min(len(generated_list), samples_to_save),
                 fb=fb,
             )
 
@@ -752,12 +754,13 @@ class IPFBase(torch.nn.Module):
             chains.E = torch.concatenate(
                 (batch.E.unsqueeze(1)[:chains_to_save], chains.E), dim=1
             )
+            chains_to_save = min(chains_to_save, chains.X.shape[1])
             _ = self.visualization_tools.visualize_chains(
                 result_path,
                 chains=chains,
                 num_nodes=n_nodes,
                 local_rank=0,
-                num_chains_to_visualize=self.args.final_chains_to_save,
+                num_chains_to_visualize=chains_to_save,
                 fb=fb,
                 transfer=self.args.transfer,
                 virtual_node=self.args.virtual_node
@@ -799,9 +802,9 @@ class IPFBase(torch.nn.Module):
                     f"val_{fb}_{n}.txt",
                 )
 
-                for k in val_to_log:
+                for k in test_to_log:
                     with open(res_path, "a") as file:
-                        file.write(f"{k}: {val_to_log[k]}\n")
+                        file.write(f"{k}: {test_to_log[k]}\n")
 
             elif val_sampling_metrics is not None:
                 val_to_log = val_sampling_metrics.compute_all_metrics(
