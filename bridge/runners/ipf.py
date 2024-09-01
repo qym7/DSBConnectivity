@@ -748,7 +748,8 @@ class IPFBase(torch.nn.Module):
                 edge_types = E[l, cur_mask][:, cur_mask].cpu()
                 generated_list.append([atom_types, edge_types])
 
-            if self.args.transfer:
+            if self.args.transfer and self.args.test:
+            # if self.args.transfer:
                 if self.args.virtual_node:
                     init_samples.X -= 1
                     print("virtual node for source graphs", init_samples.X.min())
