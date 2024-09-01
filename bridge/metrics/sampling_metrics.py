@@ -95,39 +95,9 @@ class SamplingMetrics(nn.Module):
             self.domain_metrics.reset()
 
     def compute_all_metrics(
-        self, generated_graphs: list, current_epoch, local_rank, fb, i
+        self, generated_graphs: list, current_epoch, local_rank, fb, i, source_graphs
     ):
         """Compare statistics of the generated data with statistics of the val/test set"""
-        # stat = (
-        #     self.dataset_infos.statistics["test"]
-        #     if self.test
-        #     else self.dataset_infos.statistics["val"]
-        # )
-
-        # # Number of nodes
-        # self.num_nodes_w1(number_nodes_distance(generated_graphs, stat.num_nodes))
-
-        # # Node types
-        # node_type_tv, node_tv_per_class = node_types_distance(
-        #     generated_graphs, stat.node_types, save_histogram=True
-        # )
-        # self.node_types_tv(node_type_tv)
-
-        # # Edge types
-        # edge_types_tv, edge_tv_per_class = bond_types_distance(
-        #     generated_graphs, stat.bond_types, save_histogram=True
-        # )
-        # self.edge_types_tv(edge_types_tv)
-
-        # # Components
-        # device = self.disconnected.device
-        # connected_comp = connected_components(generated_graphs).to(device)
-        # self.disconnected(connected_comp > 1)
-        # self.mean_components(connected_comp)
-        # self.max_components(connected_comp)
-
-        # import pdb; pdb.set_trace()
-
         self.reset()
         key = f"val_{fb}" if not self.test else f"test_{fb}"
         to_log = {
@@ -149,7 +119,7 @@ class SamplingMetrics(nn.Module):
             if self.dataset_infos.is_molecular:
                 domain_key = f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
                 do_metrics = self.domain_metrics.forward(
-                    generated_graphs, current_epoch, local_rank, fb, test=self.test
+                    generated_graphs, current_epoch, local_rank, fb, test=self.test, source_graphs=source_graphs
                 )
                 do_metrics = {f"{domain_key}/{k}": do_metrics[k] for k in do_metrics}
                 to_log.update(do_metrics)

@@ -146,25 +146,37 @@ class BasicMolecularMetrics(object):
     def compute_sascore(self, all_smiles):
         count_true_sa = 0
         sa_values = []
+        all_sa_values = []
         for smiles in all_smiles:
             mol = MolFromSmiles(smiles)
             try:
                 sa_score = sascorer.calculateScore(mol)
             except:
-                continue
+                all_as_values = -1
             sa_values.append(sa_score)
+            all_sa_values.append(sa_score)
             if sa_score <= 3:
                 count_true_sa += 1
 
         sa_avg = sum(sa_values) / float(len(sa_values))
-        return sa_values, sa_avg, count_true_sa / len(all_smiles)
+        return all_sa_values, sa_avg, count_true_sa / len(all_smiles)
 
-    def evaluate(self, generated):
+    def evaluate(self, generated, source):
         """generated: list of pairs (positions: n x 3, atom_types: n [int])
         the positions and atom types should already be masked."""
         
         print(f"Number of generated molecules: {len(generated)}")
         valid, validity, num_components, all_smiles = self.compute_validity(generated)
+
+        if source is not None:
+            _, _, _, all_smiles_source = self.compute_validity(source)
+            all_sa_values, _, _ = self.compute_sascore(all_smiles)
+            all_sa_values_source, _, _ = self.compute_sascore(all_smiles_source)
+        else:
+            all_sa_values = None
+            all_sa_values_source = None
+            all_smiles_source = None
+        
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
         nc_max = num_components.max() if len(num_components) > 0 else 0
@@ -197,15 +209,10 @@ class BasicMolecularMetrics(object):
             else:
                 novelty = -1.0
 
-            # print((num_components==1).sum())
-            existing_smiles = [smiles for smiles in all_smiles if smiles is not None]
-            # print(len(existing_smiles))
-            # unique = all_smiles[num_components == 1]
-            # unique = list(set(unique_connected))
             _, sa_avg, sa_success = self.compute_sascore(unique)
             _, _, vun_sa = self.compute_sascore(list(set(unique)))
             vun_sa = vun_sa * len(list(set(unique))) / len(generated)
-            
+
             print(f"SA Score Success Rate (<3) over {len(unique)} unique valid molecules: {sa_success * 100 :.2f}%")
             print(f"SA Average Value over {len(unique)} unique valid molecules: {sa_avg :.2f}")
             print(f"SA.V.U.N. over {len(unique)} unique valid molecules: {vun_sa :.2f}")
@@ -222,7 +229,8 @@ class BasicMolecularMetrics(object):
             [validity, relaxed_validity, uniqueness, novelty, connectivity, sa_success, sa_avg, self.train_sa_avg, self.train_sa_success, self.test_sa_avg, self.test_sa_success, coverage, vun_sa],
             unique,
             dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
-            all_smiles,
+            (all_smiles_source, all_smiles),
+            (all_sa_values_source, all_sa_values),
         )
 
 
@@ -424,7 +432,7 @@ def check_stability(
     return molecule_stable, n_stable_bonds, len(atom_types)
 
 
-def compute_molecular_metrics(molecule_list, test_smiles, train_smiles, dataset_info, fb):
+def compute_molecular_metrics(molecule_list, test_smiles, train_smiles, dataset_info, fb, source_molecule_list):
     """molecule_list: (dict)"""
 
     if not dataset_info.remove_h:
@@ -457,10 +465,12 @@ def compute_molecular_metrics(molecule_list, test_smiles, train_smiles, dataset_
         validity_dict = {f"mol_metrics_charts_{fb}/mol_stable": -1, f"mol_metrics_charts_{fb}/atm_stable": -1}
 
     metrics = BasicMolecularMetrics(dataset_info, test_smiles, train_smiles)
-    rdkit_metrics = metrics.evaluate(molecule_list)
+    rdkit_metrics = metrics.evaluate(molecule_list, source_molecule_list)
     all_smiles = rdkit_metrics[-1]
 
-    nc = rdkit_metrics[-2]
+    nc = rdkit_metrics[-3]
+    all_sa_values_source = rdkit_metrics[-1][0]
+    all_sa_values = rdkit_metrics[-1][1]
     dic = {
         f"mol_metrics_charts_{fb}/Validity": rdkit_metrics[0][0],
         f"mol_metrics_charts_{fb}/Relaxed Validity": rdkit_metrics[0][1],
@@ -474,7 +484,7 @@ def compute_molecular_metrics(molecule_list, test_smiles, train_smiles, dataset_
         f"mol_metrics_charts_{fb}/test_SA Average Value": float(rdkit_metrics[0][9]),
         f"mol_metrics_charts_{fb}/test_SA Score Success Rate (<3)": float(rdkit_metrics[0][10]),
         f"mol_metrics_charts_{fb}/coverage except training": float(rdkit_metrics[0][11]),
-        f"mol_metrics_charts_{fb}/SA.V.U.N.": float(rdkit_metrics[0][-1]),
+        f"mol_metrics_charts_{fb}/SA.V.U.N.": float(rdkit_metrics[0][-2]),
         f"mol_metrics_charts_{fb}/SA Average Value": float(rdkit_metrics[0][6]),
         f"mol_metrics_charts_{fb}/nc_max": nc["nc_max"],
         f"mol_metrics_charts_{fb}/nc_mu": nc["nc_mu"],
@@ -483,4 +493,4 @@ def compute_molecular_metrics(molecule_list, test_smiles, train_smiles, dataset_
         dic = dic
         wandb.log(dic)
 
-    return validity_dict, rdkit_metrics, all_smiles, dic
+    return validity_dict, rdkit_metrics, all_smiles, dic, (all_sa_values_source, all_sa_values)

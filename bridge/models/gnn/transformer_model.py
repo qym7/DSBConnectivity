@@ -405,6 +405,7 @@ class GraphTransformer(nn.Module):
 
             if torch.isnan(new_E).sum() > 0 or torch.isinf(new_E).sum() > 0:
                 import pdb; pdb.set_trace()
+
         X = self.mlp_out_X(features.X)
         E = self.mlp_out_E(features.E)
 

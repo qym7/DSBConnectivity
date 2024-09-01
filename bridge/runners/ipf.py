@@ -26,6 +26,7 @@ from ..langevin import Langevin
 from ..metrics.sampling_metrics import SamplingMetrics
 from ..analysis.visualization import Visualizer
 from ..diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
+from ..analysis.trajectory_metrics import ce_trajectory, abs_trajectory, accumulated_abs_trajectory
 
 
 def setup_wandb(cfg):
@@ -567,9 +568,15 @@ class IPFBase(torch.nn.Module):
             chains_to_save = self.args.final_chains_to_save
 
         samples = []
+        init_samples = []
         batches = []
         all_n_nodes = []
-        # all_node_masks = []
+
+        X_nbr_changes = 0
+        E_nbr_changes = 0
+        X_ratio_changes = 0
+        E_ratio_changes = 0
+
         i = 0
         samples_to_return = samples_to_generate
 
@@ -622,6 +629,13 @@ class IPFBase(torch.nn.Module):
                 sample_net, batch, node_mask=node_mask, ipf_it=n, sample=True
             )
 
+            X_accumulated_abs, E_accumulated_abs, X_accumulated_ratio, E_accumulated_ratio = accumulated_abs_trajectory(x_tot, n_nodes, virtual=False)
+            X_nbr_changes += X_accumulated_abs
+            E_nbr_changes += E_accumulated_abs
+            X_ratio_changes += X_accumulated_ratio
+            E_ratio_changes += E_accumulated_ratio
+
+            init_samples.append(x_tot.get_data(0, dim=1).collapse())
             samples.append(x_tot.get_data(-1, dim=1).collapse())
             batches.append(batch)
 
@@ -630,7 +644,7 @@ class IPFBase(torch.nn.Module):
                 n_nodes = node_mask.sum(-1)
 
             all_n_nodes.append(n_nodes)
-            # all_node_masks.append(node_mask)
+            
             chains = utils.PlaceHolder(
                 X=x_tot.X[:chains_to_save],
                 E=x_tot.E[:chains_to_save],
@@ -647,6 +661,12 @@ class IPFBase(torch.nn.Module):
             charge=None,
             y=None,
         )
+        init_samples = utils.PlaceHolder(
+            X=torch.cat([s.X for s in init_samples], dim=0)[:samples_to_return],
+            E=torch.cat([s.E for s in init_samples], dim=0)[:samples_to_return],
+            charge=None,
+            y=None,
+        )
         batches = utils.PlaceHolder(
             X=torch.cat([b.X for b in batches], dim=0)[:samples_to_return],
             E=torch.cat([b.E for b in batches], dim=0)[:samples_to_return],
@@ -656,7 +676,7 @@ class IPFBase(torch.nn.Module):
         all_n_nodes = torch.cat(all_n_nodes, dim=0)[:samples_to_return]
 
         # return batch, samples, chains, all_n_nodes, all_node_masks
-        return batch, samples, chains, all_n_nodes
+        return batch, samples, chains, all_n_nodes, init_samples, (X_nbr_changes, E_nbr_changes, X_ratio_changes/i, E_ratio_changes/i)
 
     def save_step(self, i, n, fb):
         """
@@ -699,7 +719,7 @@ class IPFBase(torch.nn.Module):
             # generation
             self.set_seed(seed=0 + self.accelerator.process_index)
             # batch, samples, chains, n_nodes, node_masks = self.generate_graphs(
-            batch, samples, chains, n_nodes = self.generate_graphs(
+            batch, samples, chains, n_nodes, init_samples, acc_metrics = self.generate_graphs(
                 fb, sample_net, n, test=self.args.test
             )
 
@@ -716,8 +736,8 @@ class IPFBase(torch.nn.Module):
 
             X = to_plot.X
             E = to_plot.E
-            generated_list = []
 
+            generated_list = []
             for l in range(X.shape[0]):
                 if self.args.virtual_node:
                     cur_mask = X[l] >= 0
@@ -727,6 +747,23 @@ class IPFBase(torch.nn.Module):
                 atom_types = X[l, cur_mask].cpu()
                 edge_types = E[l, cur_mask][:, cur_mask].cpu()
                 generated_list.append([atom_types, edge_types])
+
+            if self.args.transfer:
+                if self.args.virtual_node:
+                    init_samples.X -= 1
+                    print("virtual node for source graphs", init_samples.X.min())
+                init_list = []
+                for l in range(init_samples.X.shape[0]):
+                    if self.args.virtual_node:
+                        cur_mask = init_samples.X[l] >= 0
+                    else:
+                        cur_mask = torch.arange(init_samples.X.size(-1), device=self.device) < n_nodes[l]
+
+                    atom_types = init_samples.X[l, cur_mask].cpu()
+                    edge_types = init_samples.E[l, cur_mask][:, cur_mask].cpu()
+                    init_list.append([atom_types, edge_types])
+            else:
+                init_list = None
 
             print("visualizing graphs...")
             current_path = os.getcwd()
@@ -777,6 +814,12 @@ class IPFBase(torch.nn.Module):
                 self.val_sampling_metrics if fb == "b" else self.tf_val_sampling_metrics
             )
 
+            # X_ce_traj, E_ce_traj = ce_trajectory(init_samples, samples, n_nodes)
+            # using the absolute trajectory for discrete data with one-hot encoding is more intuitive
+            X_abs, E_abs, node_mask, edge_mask = abs_trajectory(init_samples, samples, n_nodes, virtual=self.args.virtual_node)
+            X_acc_abs, E_acc_abs, X_acc_ratio, E_acc_ratio = acc_metrics
+            # accumulated_abs_trajectory = accumulated_abs_trajectory(init_samples, samples)
+
             if test_sampling_metrics is not None:
                 test_to_log = test_sampling_metrics.compute_all_metrics(
                     generated_list,
@@ -784,7 +827,19 @@ class IPFBase(torch.nn.Module):
                     local_rank=0,
                     fb=fb,
                     i=np.round(i / (self.num_iter + 1), 2),
+                    source_graphs=init_list,
                 )
+
+                test_to_log["X_abs"] = X_abs.item()
+                test_to_log["E_abs"] = E_abs.item()
+                test_to_log["change_abs"] = (X_abs + E_abs).item()
+                test_to_log["X_ratio"] = (X_abs / node_mask.sum()).item()
+                test_to_log["E_ratio"] = (E_abs / edge_mask.sum()).item()
+                test_to_log["change_ratio"] = ((X_abs + E_abs) / (node_mask.sum() + edge_mask.sum())).item()
+                test_to_log["X_acc_abs"] = X_acc_abs.item()
+                test_to_log["E_acc_abs"] = E_acc_abs.item()
+                test_to_log["X_acc_ratio"] = X_acc_ratio.item()
+                test_to_log["E_acc_ratio"] = E_acc_ratio.item()
 
                 # save results for testing
                 print("saving results for testing")
@@ -814,6 +869,18 @@ class IPFBase(torch.nn.Module):
                     fb=fb,
                     i=np.round(i / (self.num_iter + 1), 2),
                 )
+
+                val_to_log["X_abs"] = X_abs.item()
+                val_to_log["E_abs"] = E_abs.item()
+                val_to_log["change_abs"] = (X_abs + E_abs).item()
+                val_to_log["X_ratio"] = (X_abs / node_mask.sum()).item()
+                val_to_log["E_ratio"] = (E_abs / edge_mask.sum()).item()
+                val_to_log["change_ratio"] = ((X_abs + E_abs) / (node_mask.sum() + edge_mask.sum())).item()
+                val_to_log["X_acc_abs"] = X_acc_abs.item()
+                val_to_log["E_acc_abs"] = E_acc_abs.item()
+                val_to_log["X_acc_ratio"] = X_acc_ratio.item()
+                val_to_log["E_acc_ratio"] = E_acc_ratio.item()
+
                 # save results for testing
                 print("saving results for testing")
                 current_path = os.getcwd()
@@ -824,7 +891,7 @@ class IPFBase(torch.nn.Module):
 
                 with open(res_path, "w") as file:
                     json.dump(val_to_log, file)
-                
+
                 res_path = os.path.join(
                     current_path,
                     f"val_{fb}_{n}.txt",
