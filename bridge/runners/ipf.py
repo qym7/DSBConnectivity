@@ -831,16 +831,16 @@ class IPFBase(torch.nn.Module):
                     source_graphs=init_list,
                 )
 
-                test_to_log["X_abs"] = X_abs.item()
-                test_to_log["E_abs"] = E_abs.item()
-                test_to_log["change_abs"] = (X_abs + E_abs).item()
-                test_to_log["X_ratio"] = (X_abs / node_mask.sum()).item()
-                test_to_log["E_ratio"] = (E_abs / edge_mask.sum()).item()
-                test_to_log["change_ratio"] = ((X_abs + E_abs) / (node_mask.sum() + edge_mask.sum())).item()
-                test_to_log["X_acc_abs"] = X_acc_abs.item()
-                test_to_log["E_acc_abs"] = E_acc_abs.item()
-                test_to_log["X_acc_ratio"] = X_acc_ratio.item()
-                test_to_log["E_acc_ratio"] = E_acc_ratio.item()
+                test_to_log["X_change"] = X_abs.item()  # the nbr of nodes changed
+                test_to_log["E_change"] = E_abs.item()  # the nbr of edges changed
+                test_to_log["graph_change"] = (X_abs + E_abs).item() # the nbr of nodes changed + the nbr of edges changed
+                test_to_log["X_change_ratio"] = (X_abs / node_mask.sum()).item()  # the ratio of nodes changed
+                test_to_log["E_change_ratio"] = (E_abs / edge_mask.sum()).item()  # the ratio of edges changed
+                test_to_log["change_ratio"] = ((X_abs + E_abs) / (node_mask.sum() + edge_mask.sum())).item() # the ratio of nodes changed + the ratio of edges changed
+                test_to_log["X_acc_change"] = X_acc_abs.item()  # the nbr of nodes changed along the trajectory
+                test_to_log["E_acc_change"] = E_acc_abs.item()  # the nbr of edges changed along the trajectory
+                test_to_log["X_acc_change_ratio"] = X_acc_ratio.item() # the ratio of nodes changed along the trajectory
+                test_to_log["E_acc_change_ratio"] = E_acc_ratio.item() # the ratio of edges changed along the trajectory
 
                 # save results for testing
                 print("saving results for testing")
@@ -871,19 +871,19 @@ class IPFBase(torch.nn.Module):
                     i=np.round(i / (self.num_iter + 1), 2),
                 )
 
-                val_to_log["X_abs"] = X_abs.item()
-                val_to_log["E_abs"] = E_abs.item()
-                val_to_log["change_abs"] = (X_abs + E_abs).item()
-                val_to_log["X_ratio"] = (X_abs / node_mask.sum()).item()
-                val_to_log["E_ratio"] = (E_abs / edge_mask.sum()).item()
-                val_to_log["change_ratio"] = ((X_abs + E_abs) / (node_mask.sum() + edge_mask.sum())).item()
-                val_to_log["X_acc_abs"] = X_acc_abs.item()
-                val_to_log["E_acc_abs"] = E_acc_abs.item()
-                val_to_log["X_acc_ratio"] = X_acc_ratio.item()
-                val_to_log["E_acc_ratio"] = E_acc_ratio.item()
+                val_to_log["X_change"] = X_abs.item()  # the nbr of nodes changed
+                val_to_log["E_change"] = E_abs.item()  # the nbr of edges changed
+                val_to_log["graph_change"] = (X_abs + E_abs).item() # the nbr of nodes changed + the nbr of edges changed
+                val_to_log["X_change_ratio"] = (X_abs / node_mask.sum()).item()  # the ratio of nodes changed
+                val_to_log["E_change_ratio"] = (E_abs / edge_mask.sum()).item()  # the ratio of edges changed
+                val_to_log["change_ratio"] = ((X_abs + E_abs) / (node_mask.sum() + edge_mask.sum())).item() # the ratio of nodes changed + the ratio of edges changed
+                val_to_log["X_acc_change"] = X_acc_abs.item()  # the nbr of nodes changed along the trajectory
+                val_to_log["E_acc_change"] = E_acc_abs.item()  # the nbr of edges changed along the trajectory
+                val_to_log["X_acc_change_ratio"] = X_acc_ratio.item() # the ratio of nodes changed along the trajectory
+                val_to_log["E_acc_change_ratio"] = E_acc_ratio.item() # the ratio of edges changed along the trajectory
 
-                # save results for testing
-                print("saving results for testing")
+                # save results for valing
+                print("saving results for valing")
                 current_path = os.getcwd()
                 res_path = os.path.join(
                     current_path,

@@ -18,8 +18,8 @@ def abs_trajectory(source, target, n_nodes, virtual=False):
         # virtual_n_nodes = (source.X > 0).sum(-1)
         # _, edge_mask = utils.get_masks(virtual_n_nodes, max_n_nodes, bs, device)
     
-    X_abs = ((source.X != target.X) * node_mask).sum()
-    E_abs = ((source.E != target.E) * edge_mask).sum()
+    X_abs = ((source.X != target.X) * node_mask).sum() / 2
+    E_abs = ((source.E != target.E) * edge_mask).sum() / 2
 
     return X_abs.sum(), E_abs.sum(), node_mask, edge_mask
 
