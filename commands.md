@@ -1,4 +1,4 @@
-## Molecular debug 0830
+## 0803 Molecular debug
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=debug num_steps=10 num_iter=10 n_ipf=10 virtual_node=False
 
@@ -18,7 +18,6 @@ CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=qm9_005noise_2
 
 CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=qm9_01noise_5k_clip2 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=2
 
-
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_01noise_5k_clip05 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_01noise_5k_3e5clean num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 clean_loss_weight=0.00003
@@ -26,6 +25,27 @@ CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_01noise_5k
 CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=qm9_01noise_5k_3e4clean num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 clean_loss_weight=0.0003
 
 CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=qm9_01noise_5k_virtual_clip num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=True noise_level=0.1
+
+## 0902 initial results
+
+(*) CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True virtual_node=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip1_virtual/sample_net_f_73_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip1_virtual_ipf73_10k
+
+(*) CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles num_steps=50 virtual_node=False  test=True  forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip05/sample_net_f_41_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip05_ipf41_10k
+
+
+(*) CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles num_steps=50 virtual_node=False  test=True  forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip05/sample_net_f_68_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip05_ipf68_10k
+
+
+
+
+
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True num_iter=10 n_ipf=10 virtual_node=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip1_virtual/net_f_73_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip1_virtual_10k
+
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles num_steps=50 num_iter=10 n_ipf=10 virtual_node=False test=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip05/sample_net_f_68_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip05_ipf68_10k
+
+
 
 ## QM9
 
@@ -77,7 +97,6 @@ CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_01noise_vi
 
 CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=qm9_01noise_3e5clean num_steps=50 num_iter=2000 n_ipf=1000 virtual_node=False noise_level=0.1 clean_loss_weight=0.00003
 
-
 CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=debug num_steps=50 num_iter=20 n_ipf=1000 virtual_node=False noise_level=0.1 clean_loss_weight=0.00003
 
 ## SBM
@@ -93,14 +112,11 @@ CUDA_VISIBLE_DEVICES=3 python main.py main.py dataset=sbm_large_to_small model=g
 # test
 CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles wandb=disabled test=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/noise_01_5k_clipping/sample_net_f_51_4999.ckpt dataset.batch_size=2048 final_samples_to_generate=10000 name=qm9_01noise_test_1k
 
-
-
-
 <!-- # comm20
 
 CUDA_VISIBLE_DEVICES=3 python main.py dataset=comm20 model=gnn num_iter=5000 num_steps=50 n_ipf=30
 
-CUDA_VISIBLE_DEVICES=3 python main.py dataset=comm20 model=gnn num_iter=10000 project_name=comm20 project_name=100steps num_steps=
+CUDA_VISIBLE_DEVICES=3 python main.py dataset=comm20 model=gnn num_iter=10000 project_name=comm20 project_name=100steps num_steps
 
 
 CUDA_VISIBLE_DEVICES=1 python main.py dataset=comm20 model=gnn num_iter=10000 project_name=comm20 project_name=marginal

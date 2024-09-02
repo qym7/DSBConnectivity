@@ -466,8 +466,8 @@ def compute_molecular_metrics(molecule_list, test_smiles, train_smiles, dataset_
 
     metrics = BasicMolecularMetrics(dataset_info, test_smiles, train_smiles)
     rdkit_metrics = metrics.evaluate(molecule_list, source_molecule_list)
-    all_smiles = rdkit_metrics[-1]
 
+    all_smiles = rdkit_metrics[-2]
     nc = rdkit_metrics[-3]
     all_sa_values_source = rdkit_metrics[-1][0]
     all_sa_values = rdkit_metrics[-1][1]
