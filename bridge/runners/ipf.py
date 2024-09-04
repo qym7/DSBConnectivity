@@ -961,6 +961,8 @@ class IPFSequential(IPFBase):
             eval_steps = self.T - times_expanded
             pred = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
 
+            pred_R = pred.copy()
+
             # dp = r * dt
             pred_clean = pred.copy()
             pred_clean.X = pred_clean.X * times_expanded[:, None, :]
@@ -1007,7 +1009,7 @@ class IPFSequential(IPFBase):
             pred.E = pred.E / pred.E.sum(-1, keepdim=True)
 
             # node and edge losses are not specifically used here
-            _, _, loss = self.compute_loss(pred, out, pred_clean, clean, times_expanded)
+            _, _, loss = self.compute_loss(pred, out, pred_clean, clean, times_expanded, pred_R)
 
             num_log = 5000
             if self.num_steps <= num_log:
@@ -1047,7 +1049,7 @@ class IPFSequential(IPFBase):
         new_dl = None
         self.clear()
 
-    def compute_loss(self, pred, out, pred_clean, clean, t):
+    def compute_loss(self, pred, out, pred_clean, clean, t, pred_R):
         use_edge_loss = True
         clean_node_count = clean.node_mask.sum(-1)
         node_count = out.node_mask.sum(-1)
@@ -1076,8 +1078,8 @@ class IPFSequential(IPFBase):
         loss = (loss.X/node_count).sum() + (loss.E/edge_count).sum()
 
         # sparsity
-        weight = 1e-3
-        loss = loss + torch.norm(pred.X, p=1) * weight + torch.norm(pred.E, p=1) * weight
+        weight = self.args.r1_weight
+        loss = loss + torch.norm(pred_R.X, p=1) * weight / node_count.sum() + torch.norm(pred_R.E, p=1) * weight / edge_count.sum()
 
         ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
         pred_clean.X = torch.log(pred_clean.X + 1e-6)
