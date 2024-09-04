@@ -253,11 +253,13 @@ class QM9SmilesInfos(AbstractDatasetInfos):
             )
 
 
-def SA_score_data_separation(path, path_greater, path_less, remove_h):
+def SA_score_data_separation(path, path_greater, path_greater_more, path_greater_less, path_less, remove_h):
     RDLogger.DisableLog('rdApp.*')
     h = 'noh' if remove_h else 'h'
     list_file = [f'train_smiles_qm9_{h}', f'test_smiles_qm9_{h}', f'val_smiles_qm9_{h}']
     os.makedirs(path_greater, exist_ok=True)
+    os.makedirs(path_greater_more, exist_ok=True)
+    os.makedirs(path_greater_less, exist_ok=True)
     os.makedirs(path_less, exist_ok=True)
 
     all_data = []
@@ -311,11 +313,48 @@ def SA_score_data_separation(path, path_greater, path_less, remove_h):
             for point in selected_greater:
                 writer.writerow([point])
 
+    ecart = int(2 * split1_less)
+    cur_split1_less = split1_less + ecart
+    cur_split2_less = split2_less + ecart
+    train_greater = sa_greater_3[:cur_split1_less]
+    val_greater = sa_greater_3[cur_split1_less:cur_split2_less]
+    test_greater = sa_greater_3[cur_split2_less:]
+
+    greater_lists = [train_greater, test_greater, val_greater]
+
+    for dataset, selected_greater in zip(list_file, greater_lists):
+        file_path = os.path.join(path_greater_more, dataset + '.csv')
+        with open(file_path, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['SMILES'])
+            for point in selected_greater:
+                writer.writerow([point])
+
+    ecart = int(0.5 * split1_less)
+    cur_split1_less = split1_less - ecart
+    cur_split2_less = split2_less - ecart
+    train_greater = sa_greater_3[:cur_split1_less]
+    val_greater = sa_greater_3[cur_split1_less:cur_split2_less]
+    test_greater = sa_greater_3[cur_split2_less:]
+
+    greater_lists = [train_greater, test_greater, val_greater]
+
+    for dataset, selected_greater in zip(list_file, greater_lists):
+        file_path = os.path.join(path_greater_less, dataset + '.csv')
+        with open(file_path, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['SMILES'])
+            for point in selected_greater:
+                writer.writerow([point])
+
+
 
 if __name__ == "__main__":
     path = './data/qm9/qm9_pyg/processed'
     path_greater = './data/qm9_greater/qm9_pyg_greater/raw'
+    path_greater_more = './data/qm9_greater/qm9_pyg_greater_more/raw'
+    path_greater_less = './data/qm9_greater/qm9_pyg_greater_less/raw'
     path_less = './data/qm9_less/qm9_pyg_less/raw'
     remove_h = True
 
-    SA_score_data_separation(path, path_greater, path_less, remove_h)
+    SA_score_data_separation(path, path_greater, path_greater_more, path_greater_less, path_less, remove_h)

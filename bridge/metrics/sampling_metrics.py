@@ -131,8 +131,8 @@ class SamplingMetrics(nn.Module):
                 do_metrics = {f"{domain_key}/{k}": do_metrics[k] for k in do_metrics}
                 to_log.update(do_metrics)
 
-        if wandb.run:
-            wandb.log(to_log, commit=False)
+        # if wandb.run:
+        #     wandb.log(to_log, commit=False)
         to_log = {k: float(to_log[k]) for k in to_log}
         print(to_log)
 

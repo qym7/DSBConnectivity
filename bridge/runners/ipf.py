@@ -386,6 +386,8 @@ class IPFBase(torch.nn.Module):
 
         # for test graphs
         init_ds_test = self.datamodule.dataloaders["test"].dataset
+
+        print("creating the test dataloader with", len(init_ds_test), "graphs")
         self.save_init_dl_test = pygloader.DataLoader(
             init_ds_test, batch_size=self.args.batch_size, shuffle=True
         )  # , **self.kwargs)
@@ -400,6 +402,7 @@ class IPFBase(torch.nn.Module):
 
         # for validation graphs
         init_ds_val = self.datamodule.dataloaders["val"].dataset
+        print("creating the validation dataloader with", len(init_ds_val), "graphs")
         self.save_init_dl_val = pygloader.DataLoader(
             init_ds_val, batch_size=self.args.batch_size, shuffle=True
         )  # , **self.kwargs)
@@ -748,7 +751,8 @@ class IPFBase(torch.nn.Module):
                 edge_types = E[l, cur_mask][:, cur_mask].cpu()
                 generated_list.append([atom_types, edge_types])
 
-            if self.args.transfer and self.args.test:
+            # if self.args.transfer and self.args.test:
+            if self.args.transfer:
             # if self.args.transfer:
                 if self.args.virtual_node:
                     init_samples.X -= 1
@@ -831,16 +835,16 @@ class IPFBase(torch.nn.Module):
                     source_graphs=init_list,
                 )
 
-                test_to_log["X_change"] = X_abs.item()  # the nbr of nodes changed
-                test_to_log["E_change"] = E_abs.item()  # the nbr of edges changed
-                test_to_log["graph_change"] = (X_abs + E_abs).item() # the nbr of nodes changed + the nbr of edges changed
-                test_to_log["X_change_ratio"] = (X_abs / node_mask.sum()).item()  # the ratio of nodes changed
-                test_to_log["E_change_ratio"] = (E_abs / edge_mask.sum()).item()  # the ratio of edges changed
-                test_to_log["change_ratio"] = ((X_abs + E_abs) / (node_mask.sum() + edge_mask.sum())).item() # the ratio of nodes changed + the ratio of edges changed
-                test_to_log["X_acc_change"] = X_acc_abs.item()  # the nbr of nodes changed along the trajectory
-                test_to_log["E_acc_change"] = E_acc_abs.item()  # the nbr of edges changed along the trajectory
-                test_to_log["X_acc_change_ratio"] = X_acc_ratio.item() # the ratio of nodes changed along the trajectory
-                test_to_log["E_acc_change_ratio"] = E_acc_ratio.item() # the ratio of edges changed along the trajectory
+                test_to_log[f"{fb}_X_change"] = X_abs.item()  # the nbr of nodes changed
+                test_to_log[f"{fb}_E_change"] = E_abs.item()  # the nbr of edges changed
+                test_to_log[f"{fb}_graph_change"] = (X_abs + E_abs).item() # the nbr of nodes changed + the nbr of edges changed
+                test_to_log[f"{fb}_X_change_ratio"] = (X_abs / node_mask.sum()).item()  # the ratio of nodes changed
+                test_to_log[f"{fb}_E_change_ratio"] = (E_abs / edge_mask.sum()).item()  # the ratio of edges changed
+                test_to_log[f"{fb}_change_ratio"] = ((X_abs + E_abs) / (node_mask.sum() + edge_mask.sum())).item() # the ratio of nodes changed + the ratio of edges changed
+                test_to_log[f"{fb}_X_acc_change"] = X_acc_abs.item()  # the nbr of nodes changed along the trajectory
+                test_to_log[f"{fb}_E_acc_change"] = E_acc_abs.item()  # the nbr of edges changed along the trajectory
+                test_to_log[f"{fb}_X_acc_change_ratio"] = X_acc_ratio.item() # the ratio of nodes changed along the trajectory
+                test_to_log[f"{fb}_E_acc_change_ratio"] = E_acc_ratio.item() # the ratio of edges changed along the trajectory
 
                 # save results for testing
                 print("saving results for testing")
@@ -862,6 +866,9 @@ class IPFBase(torch.nn.Module):
                     with open(res_path, "a") as file:
                         file.write(f"{k}: {test_to_log[k]}\n")
 
+                if wandb.run:
+                    wandb.log(test_to_log, commit=False)
+
             elif val_sampling_metrics is not None:
                 val_to_log = val_sampling_metrics.compute_all_metrics(
                     generated_list,
@@ -871,16 +878,16 @@ class IPFBase(torch.nn.Module):
                     i=np.round(i / (self.num_iter + 1), 2),
                 )
 
-                val_to_log["X_change"] = X_abs.item()  # the nbr of nodes changed
-                val_to_log["E_change"] = E_abs.item()  # the nbr of edges changed
-                val_to_log["graph_change"] = (X_abs + E_abs).item() # the nbr of nodes changed + the nbr of edges changed
-                val_to_log["X_change_ratio"] = (X_abs / node_mask.sum()).item()  # the ratio of nodes changed
-                val_to_log["E_change_ratio"] = (E_abs / edge_mask.sum()).item()  # the ratio of edges changed
-                val_to_log["change_ratio"] = ((X_abs + E_abs) / (node_mask.sum() + edge_mask.sum())).item() # the ratio of nodes changed + the ratio of edges changed
-                val_to_log["X_acc_change"] = X_acc_abs.item()  # the nbr of nodes changed along the trajectory
-                val_to_log["E_acc_change"] = E_acc_abs.item()  # the nbr of edges changed along the trajectory
-                val_to_log["X_acc_change_ratio"] = X_acc_ratio.item() # the ratio of nodes changed along the trajectory
-                val_to_log["E_acc_change_ratio"] = E_acc_ratio.item() # the ratio of edges changed along the trajectory
+                val_to_log[f"{fb}_X_change"] = X_abs.item()  # the nbr of nodes changed
+                val_to_log[f"{fb}_E_change"] = E_abs.item()  # the nbr of edges changed
+                val_to_log[f"{fb}_graph_change"] = (X_abs + E_abs).item() # the nbr of nodes changed + the nbr of edges changed
+                val_to_log[f"{fb}_X_change_ratio"] = (X_abs / node_mask.sum()).item()  # the ratio of nodes changed
+                val_to_log[f"{fb}_E_change_ratio"] = (E_abs / edge_mask.sum()).item()  # the ratio of edges changed
+                val_to_log[f"{fb}_change_ratio"] = ((X_abs + E_abs) / (node_mask.sum() + edge_mask.sum())).item() # the ratio of nodes changed + the ratio of edges changed
+                val_to_log[f"{fb}_X_acc_change"] = X_acc_abs.item()  # the nbr of nodes changed along the trajectory
+                val_to_log[f"{fb}_E_acc_change"] = E_acc_abs.item()  # the nbr of edges changed along the trajectory
+                val_to_log[f"{fb}_X_acc_change_ratio"] = X_acc_ratio.item() # the ratio of nodes changed along the trajectory
+                val_to_log[f"{fb}_E_acc_change_ratio"] = E_acc_ratio.item() # the ratio of edges changed along the trajectory
 
                 # save results for valing
                 print("saving results for valing")
@@ -901,6 +908,9 @@ class IPFBase(torch.nn.Module):
                 for k in val_to_log:
                     with open(res_path, "a") as file:
                         file.write(f"{k}: {val_to_log[k]}\n")
+
+                if wandb.run:
+                    wandb.log(val_to_log, commit=False)
 
     def set_seed(self, seed=0):
         torch.manual_seed(seed)

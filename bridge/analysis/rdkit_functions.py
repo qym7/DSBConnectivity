@@ -484,7 +484,7 @@ def compute_molecular_metrics(molecule_list, test_smiles, train_smiles, dataset_
         f"mol_metrics_charts_{fb}/test_SA Average Value": float(rdkit_metrics[0][9]),
         f"mol_metrics_charts_{fb}/test_SA Score Success Rate (<3)": float(rdkit_metrics[0][10]),
         f"mol_metrics_charts_{fb}/coverage except training": float(rdkit_metrics[0][11]),
-        f"mol_metrics_charts_{fb}/SA.V.U.N.": float(rdkit_metrics[0][-2]),
+        f"mol_metrics_charts_{fb}/SA.V.U.N.": float(rdkit_metrics[0][-1]),
         f"mol_metrics_charts_{fb}/SA Average Value": float(rdkit_metrics[0][6]),
         f"mol_metrics_charts_{fb}/nc_max": nc["nc_max"],
         f"mol_metrics_charts_{fb}/nc_mu": nc["nc_mu"],

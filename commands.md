@@ -2,7 +2,16 @@
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=debug num_steps=10 num_iter=10 n_ipf=10 virtual_node=False
 
-CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_005noise_5k num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.05
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles_less_transfer name=qm9less_01noise_5k_clip05_virtual num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=True noise_level=0.1 grad_clip=0.5
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles_less_transfer name=qm9less_005noise_5k_clip05_virtual num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.05 grad_clip=1.0 virtual_node=True
+
+
+(TORUN) CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=qm9_005noise_5k_clip05_virtual num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.05 grad_clip=1.0 virtual_node=True
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=qm9_002noise_5k_clip05_3e4clean num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.02 grad_clip=0.5 clean_loss_weight=0.0003
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_002noise_5k_clip05_3e4clean_virtual num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=True noise_level=0.02 grad_clip=0.5 clean_loss_weight=0.0003
 
 CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=qm9_01noise_5k num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1
 
@@ -28,6 +37,10 @@ CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=qm9_01noise_5k
 
 ## 0902 initial results
 
+(*) CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True virtual_node=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip1_virtual/net_f_92_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip1_virtual_ipf92_10k_noema
+
+(*) CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True virtual_node=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip1_virtual/sample_net_f_92_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip1_virtual_ipf92_10k
+
 (*) CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True virtual_node=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip1_virtual/sample_net_f_73_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip1_virtual_ipf73_10k
 
 (*) CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles num_steps=50 virtual_node=False  test=True  forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip05/sample_net_f_41_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip05_ipf41_10k
@@ -44,6 +57,17 @@ CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles test=true num_steps
 
 
 CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles num_steps=50 num_iter=10 n_ipf=10 virtual_node=False test=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip05/sample_net_f_68_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip05_ipf68_10k
+
+## 0904 other results
+
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles num_steps=50 num_iter=10 n_ipf=10 virtual_node=False test=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/005noise_5k_clip05_virtual/sample_net_f_32_4999.ckpt final_samples_to_generate=30000 name=test32_005noise_5k_clip05_virtual_30k wandb=disabled virtual_node=True
+
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles num_steps=50 num_iter=10 n_ipf=10 virtual_node=False test=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/005noise_5k_clip1/sample_net_f_40_4999.ckpt final_samples_to_generate=30000 name=test40_005noise_5k_clip1_30k wandb=disabled
+
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles num_steps=50 num_iter=10 n_ipf=10 virtual_node=False test=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/005noise_5k_clip1/sample_net_f_57_4999.ckpt final_samples_to_generate=30000 name=test57_005noise_5k_clip1_30k wandb=disabled
 
 
 
