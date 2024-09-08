@@ -1075,11 +1075,15 @@ class IPFSequential(IPFBase):
         else:
             if not use_edge_loss:
                 loss = loss.mask(mask_node=not self.args.virtual_node, node_mask=(out.X.argmax(-1) > 0))
-        loss = (loss.X/node_count).sum() + (loss.E/edge_count).sum()
+        loss = (loss.X/node_count).sum() + (loss.E/edge_count).sum() * self.args.edge_weight
 
         # sparsity
-        weight = self.args.r1_weight
-        loss = loss + torch.norm(pred_R.X, p=1) * weight / node_count.sum() + torch.norm(pred_R.E, p=1) * weight / edge_count.sum()
+        weight = self.args.reg_weight
+        # loss = loss + pred_R.X.abs().sum() * weight / node_count.sum() + pred_R.E.abs().sum() * weight / edge_count.sum()
+        # pred.X = pred.X.abs().sqrt()
+        # pred.E = pred.E.abs().sqrt()
+        loss = loss + torch.norm(pred.X, p=1) * weight / node_count.sum() + torch.norm(pred.E, p=1) * weight / edge_count.sum() * self.args.edge_weight
+        # loss = loss + torch.norm(pred.X, p=1) * weight + torch.norm(pred.E, p=1) * weight
 
         ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
         pred_clean.X = torch.log(pred_clean.X + 1e-6)
@@ -1099,7 +1103,7 @@ class IPFSequential(IPFBase):
         else:
             if not use_edge_loss:
                 clean_loss = clean_loss.mask(mask_node=not self.args.virtual_node, node_mask=(clean.X.argmax(-1) > 0))
-        clean_loss = (clean_loss.X/clean_node_count).sum() + (clean_loss.E/clean_edge_count).sum()
+        clean_loss = (clean_loss.X/clean_node_count).sum() + (clean_loss.E/clean_edge_count).sum() * self.args.edge_weight
 
         loss = loss + self.args.clean_loss_weight * clean_loss
 

@@ -91,7 +91,38 @@ CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=noise01_clip05
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=noise01_clip05_reg1e2 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 r1_weight=0.01
 
+## 0905 
 
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=noise01_clip05_regpredwithnorm1e2 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 r1_weight=0.01
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=noise01_clip05_regpredwithnorm1e4 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 r1_weight=0.0001
+
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg0 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 r1_weight=0.0
+
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg01 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 r1_weight=0.1
+
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg10 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 r1_weight=10
+
+## 0908
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg01_edgeweight5 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=5.0
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg01_edgeweight3 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=3.0
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg01_edgeweight03 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=0.3
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg01_edgeweight3_virtual num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=True noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=3.0
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=noise01_clip05_l05reg01_edgeweight3 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=3.0
+
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg02_edgeweight3 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.2 grad_clip=0.5 reg_weight=0.1 edge_weight=3.0
+
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=noise01_clip05_l1_5reg03_edgeweight3 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.2 grad_clip=0.5 reg_weight=0.1 edge_weight=3.0
+
+## initial noise (should we use the marginal distribution or sth else? marginal should be better based on the algorithm given by Clement)
+
+##
 
 ## QM9
 
