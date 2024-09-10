@@ -1,11 +1,19 @@
+import pickle
+import random
+import csv
+import sys
 import os
 import os.path as osp
 import pathlib
 
+from rdkit import Chem, DataStructs, RDLogger
+print("Found rdkit, all good")
+from rdkit.Chem import RDConfig, QED, MolFromSmiles, MolToSmiles
+sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+import sascorer
 
 import torch
 import torch.nn.functional as F
-from rdkit import Chem, RDLogger
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -23,7 +31,6 @@ from ..datasets.dataset_utils import (
     load_pickle,
     Statistics,
 )
-from ..metrics.molecular_metrics import SparseMolecule
 from ..metrics.metrics_utils import compute_all_statistics
 
 
@@ -146,7 +153,7 @@ class MosesDataset(InMemoryDataset):
 class MosesDataModule(MolecularDataModule):
     def __init__(self, cfg):
         self.cfg = cfg
-        self.datadir = cfg.dataset.datadir
+        self.datadir = cfg.datadir
         base_path = pathlib.Path(get_original_cwd())
         root_path = os.path.join(base_path, self.datadir)
 
@@ -202,3 +209,73 @@ class MosesInfos(AbstractDatasetInfos):
         self.atom_weights = [12, 14, 32, 16, 19, 35.4, 79.9]
 
         self.max_weight = 9 * 80  # Quite arbitrary
+
+
+def SA_score_data_separation(path, path_greater, path_less):
+    RDLogger.DisableLog('rdApp.*')
+    list_file = ['train_moses.csv', 'test_moses.csv', 'val_moses.csv']
+    os.makedirs(path_greater, exist_ok=True)
+    os.makedirs(path_less, exist_ok=True)
+
+    list_file_paths = [os.path.join(path, 'train_moses.csv'),
+                os.path.join(path, 'test_moses.csv'),
+                os.path.join(path, 'val_moses.csv')]
+
+    all_data = []
+    for file in list_file_paths:
+        smile_list = pd.read_csv(file)
+        smiles_values = smile_list["SMILES"].values.tolist()
+        all_data.extend(smiles_values)
+    random.shuffle(all_data)
+
+    sa_greater_3 = []
+    sa_less_3 = []
+
+    for smiles in all_data:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            sa_score = sascorer.calculateScore(mol)
+            if sa_score <= 3:
+                sa_less_3.append(smiles)
+            elif sa_score > 3:
+                sa_greater_3.append(smiles)
+
+    # Split sizes for the SA <= 3 (favourable and smaller dataset)
+    less_3_size = len(sa_less_3)
+    split1_less = int(less_3_size * 0.8)
+    split2_less = int(less_3_size * 0.9)
+
+    train_less = sa_less_3[:split1_less]
+    val_less = sa_less_3[split1_less:split2_less]
+    test_less = sa_less_3[split2_less:]
+
+    train_greater = sa_greater_3[:split1_less]
+    val_greater = sa_greater_3[split1_less:split2_less]
+    test_greater = sa_greater_3[split2_less:]
+
+    less_lists = [train_less, test_less, val_less]
+    greater_lists = [train_greater, test_greater, val_greater]
+
+    for dataset, selected_less in zip(list_file, less_lists):
+        file_path = os.path.join(path_less, dataset)
+        with open(file_path, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['SMILES'])
+            for point in selected_less:
+                writer.writerow([point])
+
+    for dataset, selected_greater in zip(list_file, greater_lists):
+        file_path = os.path.join(path_greater, dataset)
+        with open(file_path, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['SMILES'])
+            for point in selected_greater:
+                writer.writerow([point])
+
+
+if __name__ == "__main__":
+    path = './data/moses/moses_pyg/raw'
+    path_greater = './data/moses_greater/moses_pyg_greater/raw'
+    path_less = './data/moses_less/moses_pyg_less/raw'
+
+    SA_score_data_separation(path, path_greater, path_less)

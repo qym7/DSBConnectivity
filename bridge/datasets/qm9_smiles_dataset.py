@@ -6,6 +6,8 @@ import os
 import os.path as osp
 import pathlib
 
+from rdkit.Chem import AllChem
+from rdkit.DataStructs import TanimotoSimilarity
 from rdkit import Chem, DataStructs, RDLogger
 print("Found rdkit, all good")
 from rdkit.Chem import RDConfig, QED, MolFromSmiles, MolToSmiles
@@ -311,6 +313,101 @@ def SA_score_data_separation(path, path_greater, path_less, remove_h):
             for point in selected_greater:
                 writer.writerow([point])
 
+def compute_tanimoto_distance(smiles1, smiles2):
+    """
+    Computes the Tanimoto distance between two lists of SMILES strings.
+
+    Args:
+        smiles1 (list): List of SMILES strings (data1).
+        smiles2 (list): List of SMILES strings (data2).
+
+    Returns:
+        np.ndarray: Matrix of Tanimoto distances between all pairs from data1 and data2.
+    """
+    # Convert SMILES to RDKit molecules and compute fingerprints
+    mols1 = [Chem.MolFromSmiles(smile) for smile in smiles1]
+    mols2 = [Chem.MolFromSmiles(smile) for smile in smiles2]
+
+    fps1 = [AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024) for mol in mols1 if mol is not None]
+    fps2 = [AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024) for mol in mols2 if mol is not None]
+
+    # Initialize a distance matrix
+    tanimoto_distances = np.zeros((len(fps1), len(fps2)))
+
+    # Compute the Tanimoto distance for each pair
+    for i, fp1 in enumerate(fps1):
+        for j, fp2 in enumerate(fps2):
+            similarity = TanimotoSimilarity(fp1, fp2)
+            distance = 1 - similarity  # Tanimoto distance
+            tanimoto_distances[i, j] = distance
+
+    return tanimoto_distances
+
+
+def tanimoto_data_separation(path, path_greater, path_less, threshold, remove_h):
+    RDLogger.DisableLog('rdApp.*')
+    h = 'noh' if remove_h else 'h'
+    list_file = [f'train_smiles_qm9_{h}', f'test_smiles_qm9_{h}', f'val_smiles_qm9_{h}']
+    os.makedirs(path_greater, exist_ok=True)
+    os.makedirs(path_less, exist_ok=True)
+
+    all_data = []
+    for dataset in list_file:
+        with open(os.path.join(path, dataset + '.pickle'), 'rb') as file:
+            data = pickle.load(file)
+            all_data.extend(data)
+    random.shuffle(all_data)
+
+    sa_greater_3 = []
+    sa_less_3 = []
+
+    for smiles in all_data:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            sa_score = sascorer.calculateScore(mol)
+            if sa_score <= 3:
+                sa_less_3.append(smiles)
+            elif sa_score > 3:
+                sa_greater_3.append(smiles)
+
+    tanimoto_matrix = compute_tanimoto_distance(sa_less_3, sa_greater_3)
+    min_distances = np.min(tanimoto_matrix, axis=0)
+    selected_mask = min_distances < threshold
+
+    filtered_greater = [sa_greater_3[i] for i, keep in enumerate(selected_mask) if keep]
+
+    # Split sizes for the SA <= 3 (favourable and smaller dataset)
+    less_3_size = len(sa_less_3)
+    split1_less = int(less_3_size * 0.8)
+    split2_less = int(less_3_size * 0.9)
+
+    train_less = sa_less_3[:split1_less]
+    val_less = sa_less_3[split1_less:split2_less]
+    test_less = sa_less_3[split2_less:]
+
+    train_greater = filtered_greater[:split1_less]
+    val_greater = filtered_greater[split1_less:split2_less]
+    test_greater = filtered_greater[split2_less:]
+
+    less_lists = [train_less, test_less, val_less]
+    greater_lists = [train_greater, test_greater, val_greater]
+
+    for dataset, selected_less in zip(list_file, less_lists):
+        file_path = os.path.join(path_less, dataset + '.csv')
+        with open(file_path, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['SMILES'])
+            for point in selected_less:
+                writer.writerow([point])
+
+    for dataset, selected_greater in zip(list_file, greater_lists):
+        file_path = os.path.join(path_greater, dataset + '.csv')
+        with open(file_path, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['SMILES'])
+            for point in selected_greater:
+                writer.writerow([point])
+
 
 if __name__ == "__main__":
     path = './data/qm9/qm9_pyg/processed'
@@ -318,4 +415,6 @@ if __name__ == "__main__":
     path_less = './data/qm9_less/qm9_pyg_less/raw'
     remove_h = True
 
-    SA_score_data_separation(path, path_greater, path_less, remove_h)
+    threshold = 0.5
+    tanimoto_data_separation(path, path_greater, path_less, threshold, remove_h)
+    # SA_score_data_separation(path, path_greater, path_less, remove_h)
