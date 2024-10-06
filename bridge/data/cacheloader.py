@@ -44,14 +44,14 @@ class CacheLoader(Dataset):
             X=torch.Tensor(
                 num_batches,
                 batch_size * self.num_steps,
-                3,
+                4,
                 self.max_n_nodes,
                 len(dataset_infos.node_types) + 1 if virtual_node else len(dataset_infos.node_types),
             ).to(self.device),
             E=torch.Tensor(
                 num_batches,
                 batch_size * self.num_steps,
-                3,
+                4,
                 self.max_n_nodes,
                 self.max_n_nodes,
                 len(dataset_infos.edge_types),
@@ -125,10 +125,18 @@ class CacheLoader(Dataset):
                     )
 
                 batch_X = torch.cat(
-                    (x.X.unsqueeze(2), out.X.unsqueeze(2), batch.X.unsqueeze(1).repeat(1, x.X.shape[1], 1, 1).unsqueeze(2)), dim=2
+                    (x.X.unsqueeze(2),
+                     out.X.unsqueeze(2),
+                     batch.X.unsqueeze(1).repeat(1, x.X.shape[1], 1, 1).unsqueeze(2),
+                     x.X[:,-1,:,:].unsqueeze(1).repeat(1, x.X.shape[1], 1, 1).unsqueeze(2),
+                     ), dim=2
                 ).flatten(start_dim=0, end_dim=1)
                 batch_E = torch.cat(
-                    (x.E.unsqueeze(2), out.E.unsqueeze(2), batch.E.unsqueeze(1).repeat(1, x.E.shape[1], 1, 1, 1).unsqueeze(2)), dim=2
+                    (x.E.unsqueeze(2),
+                     out.E.unsqueeze(2),
+                     batch.E.unsqueeze(1).repeat(1, x.E.shape[1], 1, 1, 1).unsqueeze(2),
+                     x.E[:,-1,:,:].unsqueeze(1).repeat(1, x.E.shape[1], 1, 1, 1).unsqueeze(2),
+                     ), dim=2
                 ).flatten(start_dim=0, end_dim=1)
 
                 try:
@@ -168,6 +176,7 @@ class CacheLoader(Dataset):
         x = item.get_data(0, dim=0)  # X -> (max_n_node, dx)
         out = item.get_data(1, dim=0)
         clean = item.get_data(2, dim=0)
+        origin = item.get_data(3, dim=0)
 
         if x.charge is None:
             x.charge = torch.zeros(
@@ -183,14 +192,15 @@ class CacheLoader(Dataset):
             out.y = torch.zeros((0), device=self.device, dtype=torch.long)
         if clean.y is None:
             clean.y = torch.zeros((0), device=self.device, dtype=torch.long)
-        if clean.y is None:
-            clean.y = torch.zeros((0), device=self.device, dtype=torch.long)
+        if origin.y is None:
+            origin.y = torch.zeros((0), device=self.device, dtype=torch.long)
 
         clean = (clean.X, clean.E, x.y, x.charge, n_nodes)
+        origin = (origin.X, origin.E, x.y, x.charge, n_nodes)
         x = (x.X, x.E, x.y, x.charge, n_nodes)
         out = (out.X, out.E, out.y, out.charge, n_nodes)
 
-        return x, out, clean, gammas, times
+        return x, out, clean, origin, gammas, times
 
     def __len__(self):
         return self.data.X.shape[0]

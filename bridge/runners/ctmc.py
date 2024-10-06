@@ -4,38 +4,37 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from src.utils import sample
+from ..utils import sample
 
 def compute_graph_rate_matrix(
-    self,
-    pred_X,
-    pred_E,
+    pred_X_to_softmax,
+    pred_E_to_softmax,
     X_t,
     E_t,
-    dt,
-    limit_x,
-    limit_e,
     node_mask,
     t,
-    eta,
-    rdb,
-    rdb_crit,
+    # eta,
+    # rdb,
+    # rdb_crit,
+    limit_dist,
     cfg
 ):
-    device = pred_X.device
-    # Zero-out non-existing states
-    dx = limit_x.shape[-1]
-    de = limit_e.shape[-1]
+    device = X_t.device
+    eta = cfg.sample.eta
+    rdb = cfg.sample.rdb
+    rdb_crit = cfg.sample.rdb_crit
 
     X_t_label = X_t.argmax(-1, keepdim=True)
     E_t_label = E_t.argmax(-1, keepdim=True)
+
+    pred_X = F.softmax(pred_X_to_softmax, dim=-1)  # bs, n, d0
+    pred_E = F.softmax(pred_E_to_softmax, dim=-1)  # bs, n, n, d0
 
     if not cfg.sample.x1_parameterization:
         sampled_1 = sample(pred_X, pred_E, onehot=True, node_mask=node_mask)
         X_1_pred = sampled_1.X
         E_1_pred = sampled_1.E
 
-        pc_dt = dt * cfg.sample.guided_weight
         R_t_X, R_t_E, Rstar_t_X, Rstar_t_E, Rdb_t_X, Rdb_t_E, X_mask, E_mask = (
             compute_rate_matrix(
                 t,
@@ -49,8 +48,12 @@ def compute_graph_rate_matrix(
                 pred_X,
                 pred_E,
                 node_mask,
+                limit_dist,
+                return_rdb=False,
+                return_rstar=False,
                 return_both=True,
-                pc_dt=pc_dt,
+                func="relu",
+                cfg=cfg,
             )
         )
     else:
@@ -79,6 +82,12 @@ def compute_graph_rate_matrix(
                 pred_X,
                 pred_E,
                 node_mask,
+                limit_dist,
+                return_rdb=False,
+                return_rstar=False,
+                return_both=True,
+                func="relu",
+                cfg=cfg,
             )
             R_t_X_list.append(R_t_X)
         R_t_X_stacked = torch.stack(R_t_X_list, dim=-1)
@@ -103,6 +112,12 @@ def compute_graph_rate_matrix(
                 pred_X,
                 pred_E,
                 node_mask,
+                limit_dist,
+                return_rdb=False,
+                return_rstar=False,
+                return_both=True,
+                func="relu",
+                cfg=cfg,
             )
             R_t_E_list.append(R_t_E)
         R_t_E_stacked = torch.stack(R_t_E_list, dim=-1)
@@ -131,6 +146,7 @@ def compute_rate_matrix(
     return_rstar=False,
     return_both=False,
     func="relu",
+    cfg=None,
 ):
 
     (
@@ -159,6 +175,7 @@ def compute_rate_matrix(
         dt_p_vals_at_Xt,
         dt_p_vals_at_Et,
         func,
+        cfg,
     )
 
     X_mask, E_mask = compute_RDB(
@@ -172,8 +189,8 @@ def compute_rate_matrix(
         E_1_pred,
         rdb,
         rdb_crit,
+        limit_dist,
         node_mask,
-        t,
     )
 
     # stochastic rate matrix
@@ -188,8 +205,7 @@ def compute_rate_matrix(
         pt_vals_at_Xt,
         pt_vals_at_Et,
         pt_vals_X,
-        pt_vals_E,
-        node_mask,
+        pt_vals_E
     )
 
     if return_rstar:
@@ -204,7 +220,6 @@ def compute_rate_matrix(
     return R_t_X, R_t_E, X_mask, E_mask
 
 def compute_Rstar(
-    self,
     X_1_pred,
     E_1_pred,
     X_t_label,
@@ -218,7 +233,10 @@ def compute_Rstar(
     dt_p_vals_at_Xt,
     dt_p_vals_at_Et,
     func,
+    cfg
 ):
+    device = X_1_pred.device
+
     # Numerator of R_t^*
     if func == "relu":
         inner_X = dt_p_vals_X - dt_p_vals_at_Xt[:, :, None]
@@ -229,8 +247,8 @@ def compute_Rstar(
 
         # compensate
         limit_dist = limit_dist.to_device(device)
-        X1_onehot = F.one_hot(X_1_pred, num_classes=len(limit_dist.X)).float()
-        E1_onehot = F.one_hot(E_1_pred, num_classes=len(limit_dist.E)).float()
+        X1_onehot = F.one_hot(X_1_pred, num_classes=limit_dist.X.shape[-1]).float()
+        E1_onehot = F.one_hot(E_1_pred, num_classes=limit_dist.E.shape[-1]).float()
         mask_X = X_1_pred.unsqueeze(-1) != X_t_label
         mask_E = E_1_pred.unsqueeze(-1) != E_t_label
 
@@ -261,7 +279,6 @@ def compute_Rstar(
     return Rstar_t_X, Rstar_t_E
 
 def compute_RDB(
-    self,
     pt_vals_X,
     pt_vals_E,
     X_t_label,
@@ -272,9 +289,11 @@ def compute_RDB(
     E_1_pred,
     rdb,
     rdb_crit,
-    node_mask,
-    t,
+    limit_dist,
+    node_mask
 ):
+    device = pt_vals_X.device
+    
     dx = pt_vals_X.shape[-1]
     de = pt_vals_E.shape[-1]
     # Masking Rdb
@@ -296,17 +315,16 @@ def compute_RDB(
         x_mask = x_mask > Xt_marginal
         e_mask = e_mask > Et_marginal
 
+    # nor supported for now - but useless for now as well
     elif rdb == "column":
         # Get column idx to pick
         if rdb_crit == "max_marginal":
             x_column_idxs = (
-                noise_dist.get_limit_dist()
-                .X.argmax(keepdim=True)
+                limit_dist.X.argmax(keepdim=True)
                 .expand(X_t_label.shape)
             )
             e_column_idxs = (
-                noise_dist.get_limit_dist()
-                .E.argmax(keepdim=True)
+                limit_dist.E.argmax(keepdim=True)
                 .expand(E_t_label.shape)
             )
         elif rdb_crit == "x_t":
@@ -332,7 +350,7 @@ def compute_RDB(
             sampled_1_hat = sample(
                 pt_vals_X,
                 pt_vals_E,
-                onehot=True
+                onehot=True,
                 node_mask=node_mask,
             )
             x_column_idxs = sampled_1_hat.X.unsqueeze(-1)
@@ -397,7 +415,6 @@ def compute_RDB(
     return x_mask, e_mask
 
 def compute_R(
-    self,
     Rstar_t_X,
     Rstar_t_E,
     Rdb_t_X,
@@ -406,7 +423,6 @@ def compute_R(
     pt_vals_at_Et,
     pt_vals_X,
     pt_vals_E,
-    node_mask,
 ):
     # sum to get the final R_t_X and R_t_E
     R_t_X = Rstar_t_X + Rdb_t_X
@@ -431,11 +447,11 @@ def dt_p_xt_g_x1(X1, E1, limit_dist):
     device = X1.device
     
     limit_dist = limit_dist.to_device(device)
-    X1_onehot = F.one_hot(X1, num_classes=len(limit_dist.X)).float()
-    E1_onehot = F.one_hot(E1, num_classes=len(limit_dist.E)).float()
+    X1_onehot = F.one_hot(X1, num_classes=limit_dist.X.shape[-1]).float()
+    E1_onehot = F.one_hot(E1, num_classes=limit_dist.E.shape[-1]).float()
 
-    dX = X1_onehot - limit_dist.X[None, None, :]
-    dE = E1_onehot - limit_dist.E[None, None, None, :]
+    dX = X1_onehot - limit_dist.X
+    dE = E1_onehot - limit_dist.E
 
     assert (dX.sum(-1).abs() < 1e-4).all() and (dE.sum(-1).abs() < 1e-4).all()
 
@@ -452,13 +468,13 @@ def p_xt_g_x1(X1, E1, t):
     device = X1.device
     t_time = t.squeeze(-1)[:, None, None]
     limit_dist = limit_dist.to_device(device)
-    X1_onehot = F.one_hot(X1, num_classes=len(limit_dist.X)).float()
-    E1_onehot = F.one_hot(E1, num_classes=len(limit_dist.E)).float()
+    X1_onehot = F.one_hot(X1, num_classes=limit_dist.X.shape[-1]).float()
+    E1_onehot = F.one_hot(E1, num_classes=limit_dist.E.shape[-1]).float()
 
-    Xt = t_time * X1_onehot + (1 - t_time) * limit_dist.X[None, None, :]
+    Xt = t_time * X1_onehot + (1 - t_time) * limit_dist.X
     Et = (
         t_time[:, None] * E1_onehot
-        + (1 - t_time[:, None]) * limit_dist.E[None, None, None, :]
+        + (1 - t_time[:, None]) * limit_dist.E
     )
 
     assert ((Xt.sum(-1) - 1).abs() < 1e-4).all() and (
@@ -498,3 +514,32 @@ def compute_pt_vals(t, X_t_label, E_t_label, X_1_pred, E_1_pred, limit_dist):
         dt_p_vals_at_Xt,
         dt_p_vals_at_Et,
     )
+
+
+def compute_step_probs(R_t_X, R_t_E, X_t, E_t, dt):
+    import pdb; pdb.set_trace()
+    step_probs_X = R_t_X * dt  # type: ignore # (B, D, S)
+    step_probs_E = R_t_E * dt  # (B, D, S)
+
+    # Calculate the on-diagnoal step probabilities
+    # 1) Zero out the diagonal entries
+    step_probs_X.scatter_(-1, X_t.argmax(-1)[:, :, None], 0.0)
+    step_probs_E.scatter_(-1, E_t.argmax(-1)[:, :, :, None], 0.0)
+
+    # 2) Calculate the diagonal entries such that the probability row sums to 1
+    step_probs_X.scatter_(
+        -1,
+        X_t.argmax(-1)[:, :, None],
+        (1.0 - step_probs_X.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+    )
+    step_probs_E.scatter_(
+        -1,
+        E_t.argmax(-1)[:, :, :, None],
+        (1.0 - step_probs_E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+    )
+
+    # step 2 - merge to the original formulation
+    prob_X = step_probs_X.clone()
+    prob_E = step_probs_E.clone()
+
+    return prob_X, prob_E

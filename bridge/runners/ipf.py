@@ -27,7 +27,7 @@ from ..metrics.sampling_metrics import SamplingMetrics
 from ..analysis.visualization import Visualizer
 from ..diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
 from ..analysis.trajectory_metrics import ce_trajectory, abs_trajectory, accumulated_abs_trajectory
-
+from ..runners.ctmc import compute_graph_rate_matrix, compute_step_probs
 
 def setup_wandb(cfg):
     kwargs = {
@@ -942,7 +942,7 @@ class IPFSequential(IPFBase):
             """
             self.set_seed(seed=n * self.num_iter + i)
 
-            x, out, clean, gammas_expanded, times_expanded = next(new_dl)
+            x, out, clean, origin, gammas_expanded, times_expanded = next(new_dl)
 
             if self.args.virtual_node:
                 # we do not consider node mask when using virtual nodes
@@ -963,32 +963,23 @@ class IPFSequential(IPFBase):
             pred_clean = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
 
             # compute the rate matrices based on the clean data
-            pred_clean.X = F.softmax(pred_clean.X, dim=-1)  # bs, n, d0
-            pred_clean.E = F.softmax(pred_clean.E, dim=-1)  # bs, n, n, d0
-            rate_matrices = self.compute_rate_matrices(pred_clean)
+            R_t_X, R_t_E = compute_graph_rate_matrix(
+                                            pred_clean.X,
+                                            pred_clean.E,
+                                            x.X,
+                                            x.E,
+                                            # gammas_expanded,  # dt
+                                            x.node_mask,
+                                            eval_steps,  # t
+                                            limit_dist=origin,
+                                            cfg=self.args
+            )
 
-            # dp = r * dt
-            pred_next = pred_clean.copy()
-            pred_next.X = rate_matrices.X * gammas_expanded[:, None, :]
-            pred_next.E = rate_matrices.E * gammas_expanded[:, None, None, :]
-            # change the value for the diagonal
-            pred_next.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
-            pred_next.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
-            pred_next.X.scatter_(
-                -1,
-                x.X.argmax(-1)[:, :, None],
-                (1.0 - pred_next.X.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+            prob_X, prob_E = compute_step_probs(
+                R_t_X, R_t_E, x.X, x.E, gammas_expanded, self.limit_dist.X, self.limit_dist.E
             )
-            pred_next.E.scatter_(
-                -1,
-                x.E.argmax(-1)[:, :, :, None],
-                (1.0 - pred_next.E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
-            )
-            # normalization
-            pred_next.X = pred_next.X + 1e-6
-            pred_next.E = pred_next.E + 1e-6
-            pred_next.X = pred_next.X / pred_next.X.sum(-1, keepdim=True)
-            pred_next.E = pred_next.E / pred_next.E.sum(-1, keepdim=True)
+            
+            pred_next = PlaceHolder(X=prob_X, E=prob_E)
 
             # node and edge losses are not specifically used here
             _, _, loss = self.compute_loss(pred_next, out, pred_clean, clean, times_expanded)
@@ -1030,9 +1021,6 @@ class IPFSequential(IPFBase):
 
         new_dl = None
         self.clear()
-        
-    def compute_rate_matrices(self, clean_data):
-        pass
 
     def compute_loss(self, pred, out, pred_clean, clean, t):
         use_edge_loss = True
@@ -1047,40 +1035,10 @@ class IPFSequential(IPFBase):
         clean_edge_count = (clean_node_count - 1) * clean_node_count
         edge_count = (node_count - 1) * node_count
 
-        # Calculate the losses
+        # Calculate clean loss
         ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
-        pred.X = torch.log(pred.X + 1e-6)
-        pred.E = torch.log(pred.E + 1e-6)
-        node_loss = self.args.model.lambda_train[0] * ce_loss(pred.X.permute((0, 2, 1)), out.X.permute((0, 2, 1)))
-        edge_loss = self.args.model.lambda_train[1] * ce_loss(pred.E.permute((0, 3, 1, 2)), out.E.permute((0, 3, 1, 2)))
-
-        loss = PlaceHolder(X=node_loss.unsqueeze(-1), E=edge_loss.unsqueeze(-1), y=None)
-        if not self.args.virtual_node:
-            loss = loss.mask(out.node_mask)
-        else:
-            if not use_edge_loss:
-                loss = loss.mask(mask_node=not self.args.virtual_node, node_mask=(out.X.argmax(-1) > 0))
-        loss = (loss.X/node_count).sum() + (loss.E/edge_count).sum() * self.args.edge_weight
-
-        # sparsity
-        weight = self.args.reg_weight
-        # loss = loss + pred_R.X.abs().sum() * weight / node_count.sum() + pred_R.E.abs().sum() * weight / edge_count.sum()
-        # pred.X = pred.X.abs().sqrt()
-        # pred.E = pred.E.abs().sqrt()
-        loss = loss + torch.norm(pred.X, p=1) * weight / node_count.sum() + torch.norm(pred.E, p=1) * weight / edge_count.sum() * self.args.edge_weight
-        # loss = loss + torch.norm(pred.X, p=1) * weight + torch.norm(pred.E, p=1) * weight
-
-        ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
-        pred_clean.X = torch.log(pred_clean.X + 1e-6)
-        pred_clean.E = torch.log(pred_clean.E + 1e-6)
         clean_node_loss = self.args.model.lambda_train[0] * ce_loss(pred_clean.X.permute((0, 2, 1)), clean.X.permute((0, 2, 1)))
         clean_edge_loss = self.args.model.lambda_train[1] * ce_loss(pred_clean.E.permute((0, 3, 1, 2)), clean.E.permute((0, 3, 1, 2)))
-        # clean_node_loss = clean_node_loss / t[:]
-        # clean_edge_loss = clean_edge_loss / t[:, None]
-        clean_node_loss = clean_node_loss / torch.exp(t[:])
-        clean_edge_loss = clean_edge_loss / torch.exp(t[:, None])
-        # clean_node_loss = clean_node_loss / t[:] / t[:] / self.num_steps
-        # clean_edge_loss = clean_edge_loss / t[:, None] / t[:, None] / self.num_steps
 
         clean_loss = PlaceHolder(X=clean_node_loss.unsqueeze(-1), E=clean_edge_loss.unsqueeze(-1), y=None)    
         if not self.args.virtual_node:
@@ -1090,12 +1048,32 @@ class IPFSequential(IPFBase):
                 clean_loss = clean_loss.mask(mask_node=not self.args.virtual_node, node_mask=(clean.X.argmax(-1) > 0))
         clean_loss = (clean_loss.X/clean_node_count).sum() + (clean_loss.E/clean_edge_count).sum() * self.args.edge_weight
 
-        loss = loss + self.args.clean_loss_weight * clean_loss
+        # Calculate trajectory loss
+        ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
+        pred.X = torch.log(pred.X + 1e-6)
+        pred.E = torch.log(pred.E + 1e-6)
+        node_loss = self.args.model.lambda_train[0] * ce_loss(pred.X.permute((0, 2, 1)), out.X.permute((0, 2, 1)))
+        edge_loss = self.args.model.lambda_train[1] * ce_loss(pred.E.permute((0, 3, 1, 2)), out.E.permute((0, 3, 1, 2)))
+
+        traj_loss = PlaceHolder(X=node_loss.unsqueeze(-1), E=edge_loss.unsqueeze(-1), y=None)
+        if not self.args.virtual_node:
+            traj_loss = traj_loss.mask(out.node_mask)
+        else:
+            if not use_edge_loss:
+                traj_loss = loss.mask(mask_node=not self.args.virtual_node, node_mask=(out.X.argmax(-1) > 0))
+        traj_loss = (traj_loss.X/node_count).sum() + (traj_loss.E/edge_count).sum() * self.args.edge_weight
+
+        # Sparsity
+        weight = self.args.reg_weight
+        reg_loss = torch.norm(pred.X, p=1) * weight / node_count.sum() + torch.norm(pred.E, p=1) * weight / edge_count.sum() * self.args.edge_weight
+
+        # Merge loss
+        loss = clean_loss + self.args.next_loss_weight * traj_loss + self.args.reg_weight * reg_loss
 
         if pred.charge.numel() > 0:
             loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)
 
-        return node_loss, edge_loss, loss
+        return clean_node_loss, clean_edge_loss, loss
 
     def forward_graph(self, net, z_t, t):
         # step 1: calculate extra features

@@ -37,7 +37,7 @@ dataset:
 
 # training
 batch_size: 128
-clean_loss_weight: 0.0
+next_loss_weight: 0.0
 
 # settings for evaluations
 samples_to_generate: 40
