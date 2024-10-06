@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 from . import utils
-
+from .runners.ctmc import compute_graph_rate_matrix, compute_step_probs
 
 def get_noise(limit_dist, x_k, node_mask):
     batch_size = x_k.X.shape[0]
@@ -27,7 +27,6 @@ def get_noise(limit_dist, x_k, node_mask):
     )
 
     return batch.mask(node_mask)
-
 
 def ornstein_ulhenbeck(x, gradx, gamma, graph=False):
     z = torch.randn(x.shape, device=x.device)
@@ -159,7 +158,7 @@ class Langevin(torch.nn.Module):
         return x_tot, out, gammas_expanded, times_expanded
 
     def record_langevin_seq(
-        self, net, init_samples, node_mask, t_batch=None, ipf_it=0, sample=False
+        self, net, init_samples, node_mask, t_batch=None, ipf_it=0, sample=False, time=None, gammas=None
     ):
         bs = init_samples.X.shape[0]
         dx = init_samples.X.shape[-1]  # for virtual nodes, there is an extra dimension
@@ -182,8 +181,20 @@ class Langevin(torch.nn.Module):
             y=None,
             node_mask=node_mask,
         )
-        times_expanded = self.time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
-        gammas_expanded = self.gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+        if time is None:
+            time = self.time
+        if gammas is None:
+            gammas = self.gammas
+
+        times_expanded = time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+        gammas_expanded = gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+
+        origin = utils.PlaceHolder(
+            X=init_samples.X.unsqueeze(1).repeat(1, x.X.shape[1], 1, 1),
+            E=init_samples.E.unsqueeze(1).repeat(1, x.X.shape[1], 1,1, 1),
+            y=init_samples.y,
+            charge=init_samples.charge,
+        )
 
         x = init_samples.copy()
         # for k in range(self.num_steps):
@@ -196,34 +207,29 @@ class Langevin(torch.nn.Module):
             if out_save:
                 out = out.place(x, k)
 
-            # t = times_expanded[:, k, :]
-            # gamma = gammas_expanded[:, k, :]
             t = torch.ones_like(times_expanded[:, k, :], device=self.device) * i / self.num_steps / num_repeat
             gamma = gammas_expanded[:, k, :] / num_repeat
-            # / k * i / self.num_steps*num_repeat
             with torch.no_grad():
-                pred = self.forward_graph(net, x, t)
+                pred_clean = self.forward_graph(net, x, t)
 
-            pred.X = pred.X * gamma[:, None, :]
-            pred.E = pred.E * gamma[:, None, None, :]
+            # compute the rate matrices based on the clean data
+            R_t_X, R_t_E = compute_graph_rate_matrix(
+                                            pred_clean.X,
+                                            pred_clean.E,
+                                            x.X,
+                                            x.E,
+                                            # gammas_expanded,  # dt
+                                            x.node_mask,
+                                            t,  # t
+                                            limit_dist=origin,
+                                            cfg=self.args
+            )
 
-            # change the value for the diagonal
-            pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
-            pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
-            pred.X.scatter_(
-                -1,
-                x.X.argmax(-1)[:, :, None],
-                (1.0 - pred.X.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+            prob_X, prob_E = compute_step_probs(
+                R_t_X, R_t_E, x.X, x.E, gammas_expanded
             )
-            pred.E.scatter_(
-                -1,
-                x.E.argmax(-1)[:, :, :, None],
-                (1.0 - pred.E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
-            )
-            # The normalization should be automatic here
-            # Added to be consistent the the training process
-            pred.X = (pred.X / pred.X.sum(-1, keepdim=True)).float()
-            pred.E = (pred.E / pred.E.sum(-1, keepdim=True)).float()
+            
+            pred = utils.PlaceHolder(X=prob_X, E=prob_E)
 
             if self.virtual_node:
                 x = pred.sample(onehot=True, node_mask=torch.ones(x.X.shape[:-1]).to(x.X.device).bool())

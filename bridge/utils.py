@@ -250,7 +250,7 @@ def encode_no_edge(E):
 
 class PlaceHolder:
     def __init__(
-        self, X, E, y, charge=None, t_int=None, t=None, node_mask=None, n_nodes=None
+        self, X, E, y=None, charge=None, t_int=None, t=None, node_mask=None, n_nodes=None
     ):
         self.X = X
         self.charge = charge
@@ -265,6 +265,9 @@ class PlaceHolder:
             if type(self.X) == torch.Tensor:
                 shape = self.X.shape[:-2]
                 self.y = torch.zeros((*shape, 0), device=self.X.device)
+        if charge is None:
+            shape = self.X.shape[:-2]
+            self.charge = torch.zeros((*shape, 0), device=self.X.device)
 
         if self.n_nodes is not None and self.node_mask is None:
             bs = len(n_nodes)
@@ -485,15 +488,26 @@ class PlaceHolder:
         if node_mask is None:
             node_mask = self.node_mask
         bs, n = node_mask.shape
-        x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
-        e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1, 1
-        e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n, 1
-        diag_mask = (
-            ~torch.eye(n, dtype=torch.bool, device=node_mask.device)
-            .unsqueeze(0)
-            .expand(bs, -1, -1)
-            .unsqueeze(-1)
-        )  # bs, n, n, 1
+        if len(self.X.shape) == 3:
+            x_mask = node_mask.unsqueeze(-1)  # bs, n, 1
+            e_mask1 = x_mask.unsqueeze(2)  # bs, n, 1, 1
+            e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n, 1
+            diag_mask = (
+                ~torch.eye(n, dtype=torch.bool, device=node_mask.device)
+                .unsqueeze(0)
+                .expand(bs, -1, -1)
+                .unsqueeze(-1)
+            )  # bs, n, n, 1
+        else:
+            x_mask = node_mask  # bs, n
+            e_mask1 = x_mask.unsqueeze(-1)  # bs, n, 1
+            e_mask2 = x_mask.unsqueeze(1)  # bs, 1, n
+            diag_mask = (
+                ~torch.eye(n, dtype=torch.bool, device=node_mask.device)
+                .unsqueeze(0)
+                .expand(bs, -1, -1)
+            )  # bs, n, n
+
         X = self.X.clone()
         E = self.E.clone()
 
@@ -513,12 +527,6 @@ class PlaceHolder:
             if self.E is not None:
                 self.E = self.E * e_mask1 * e_mask2 * diag_mask
         assert torch.allclose(self.E, torch.transpose(self.E, 1, 2), atol=1e-5)
-        # except:
-        #     import pdb
-
-        #     pdb.set_trace()
-
-        # assert torch.allclose(self.E, torch.transpose(self.E, 1, 2), atol=1e-5)
 
         if self.node_mask is None:
             self.node_mask = node_mask

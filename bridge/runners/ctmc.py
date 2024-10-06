@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from ..utils import sample
+from ..utils import sample, get_masks
 
 def compute_graph_rate_matrix(
     pred_X_to_softmax,
@@ -31,7 +31,7 @@ def compute_graph_rate_matrix(
     pred_E = F.softmax(pred_E_to_softmax, dim=-1)  # bs, n, n, d0
 
     if not cfg.sample.x1_parameterization:
-        sampled_1 = sample(pred_X, pred_E, onehot=True, node_mask=node_mask)
+        sampled_1 = sample(pred_X, pred_E, onehot=False, node_mask=node_mask)
         X_1_pred = sampled_1.X
         E_1_pred = sampled_1.E
 
@@ -158,7 +158,7 @@ def compute_rate_matrix(
         dt_p_vals_E,
         dt_p_vals_at_Xt,
         dt_p_vals_at_Et,
-    ) = compute_pt_vals(t, X_t_label, E_t_label, X_1_pred, E_1_pred, limit_dist)
+    ) = compute_pt_vals(t, X_t_label, E_t_label, X_1_pred, E_1_pred, limit_dist, node_mask)
     # ) = compute_pt_vals(t, X_column_to_keep, E_column_to_keep, X_1_pred, E_1_pred)
 
     Rstar_t_X, Rstar_t_E = compute_Rstar(
@@ -175,6 +175,7 @@ def compute_rate_matrix(
         dt_p_vals_at_Xt,
         dt_p_vals_at_Et,
         func,
+        limit_dist,
         cfg,
     )
 
@@ -233,6 +234,7 @@ def compute_Rstar(
     dt_p_vals_at_Xt,
     dt_p_vals_at_Et,
     func,
+    limit_dist,
     cfg
 ):
     device = X_1_pred.device
@@ -350,7 +352,7 @@ def compute_RDB(
             sampled_1_hat = sample(
                 pt_vals_X,
                 pt_vals_E,
-                onehot=True,
+                onehot=False,
                 node_mask=node_mask,
             )
             x_column_idxs = sampled_1_hat.X.unsqueeze(-1)
@@ -440,7 +442,7 @@ def compute_R(
 
     return R_t_X, R_t_E
 
-def dt_p_xt_g_x1(X1, E1, limit_dist):
+def dt_p_xt_g_x1(X1, E1, limit_dist, node_mask):
     # x1 (B, D)
     # t float
     # returns (B, D, S) for varying x_t value
@@ -449,6 +451,9 @@ def dt_p_xt_g_x1(X1, E1, limit_dist):
     limit_dist = limit_dist.to_device(device)
     X1_onehot = F.one_hot(X1, num_classes=limit_dist.X.shape[-1]).float()
     E1_onehot = F.one_hot(E1, num_classes=limit_dist.E.shape[-1]).float()
+    node_mask, edge_mask = get_masks(node_mask.sum(-1), X1.shape[1], X1.shape[0], device)
+    X1_onehot = X1_onehot * node_mask.unsqueeze(-1)
+    E1_onehot = E1_onehot * edge_mask.unsqueeze(-1)
 
     dX = X1_onehot - limit_dist.X
     dE = E1_onehot - limit_dist.E
@@ -461,7 +466,7 @@ def dt_p_xt_g_x1(X1, E1, limit_dist):
 
     return dX, dE
 
-def p_xt_g_x1(X1, E1, t):
+def p_xt_g_x1(X1, E1, t, limit_dist, node_mask):
     # x1 (B, D)
     # t float
     # returns (B, D, S) for varying x_t value
@@ -470,22 +475,21 @@ def p_xt_g_x1(X1, E1, t):
     limit_dist = limit_dist.to_device(device)
     X1_onehot = F.one_hot(X1, num_classes=limit_dist.X.shape[-1]).float()
     E1_onehot = F.one_hot(E1, num_classes=limit_dist.E.shape[-1]).float()
+    _, edge_mask = get_masks(node_mask.sum(-1), X1.shape[1], X1.shape[0], device)
+    X1_onehot = X1_onehot * node_mask.unsqueeze(-1)
+    E1_onehot = E1_onehot * edge_mask.unsqueeze(-1)
 
     Xt = t_time * X1_onehot + (1 - t_time) * limit_dist.X
-    Et = (
-        t_time[:, None] * E1_onehot
-        + (1 - t_time[:, None]) * limit_dist.E
-    )
+    Et = t_time[:, None] * E1_onehot+ (1 - t_time[:, None]) * limit_dist.E
 
-    assert ((Xt.sum(-1) - 1).abs() < 1e-4).all() and (
-        (Et.sum(-1) - 1).abs() < 1e-4
-    ).all()
+    assert ((Xt.sum(-1) - 1).abs() * node_mask < 1e-4).all() and (
+        (Et.sum(-1) - 1).abs() * edge_mask < 1e-4).all()
 
     return Xt.clamp(min=0.0, max=1.0), Et.clamp(min=0.0, max=1.0)
 
-def compute_pt_vals(t, X_t_label, E_t_label, X_1_pred, E_1_pred, limit_dist):
+def compute_pt_vals(t, X_t_label, E_t_label, X_1_pred, E_1_pred, limit_dist, node_mask):
     dt_p_vals_X, dt_p_vals_E = dt_p_xt_g_x1(
-        X_1_pred, E_1_pred, limit_dist
+        X_1_pred, E_1_pred, limit_dist, node_mask
     )  #  (bs, n, dx), (bs, n, n, de)
 
     dt_p_vals_at_Xt = dt_p_vals_X.gather(-1, X_t_label).squeeze(-1)  # (bs, n, )
@@ -496,6 +500,8 @@ def compute_pt_vals(t, X_t_label, E_t_label, X_1_pred, E_1_pred, limit_dist):
         X_1_pred,
         E_1_pred,
         t,
+        limit_dist=limit_dist,
+        node_mask=node_mask
     )  # (bs, n, dx), (bs, n, n, de)
 
     pt_vals_at_Xt = pt_vals_X.gather(-1, X_t_label).squeeze(-1)  # (bs, n, )
@@ -517,9 +523,8 @@ def compute_pt_vals(t, X_t_label, E_t_label, X_1_pred, E_1_pred, limit_dist):
 
 
 def compute_step_probs(R_t_X, R_t_E, X_t, E_t, dt):
-    import pdb; pdb.set_trace()
-    step_probs_X = R_t_X * dt  # type: ignore # (B, D, S)
-    step_probs_E = R_t_E * dt  # (B, D, S)
+    step_probs_X = R_t_X * dt.unsqueeze(-1)  # type: ignore # (B, D, S)
+    step_probs_E = R_t_E * dt.unsqueeze(-1).unsqueeze(-1)  # (B, D, S)
 
     # Calculate the on-diagnoal step probabilities
     # 1) Zero out the diagonal entries

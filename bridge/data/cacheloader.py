@@ -115,13 +115,20 @@ class CacheLoader(Dataset):
                         times_expanded,
                     ) = langevin.record_init_langevin(batch, node_mask)
                 else:
+                    import pdb; pdb.set_trace()
+                    rand_time = torch.rand(self.num_steps-1)
+                    rand_time = torch.sort(rand_time)
+                    rand_time = torch.hstack(torch.Tensor([0]), rand_time, torch.Tensor([1])).to(device)
+                    rand_gammas = rand_time.diff()
+                    rand_time = rand_time[:-1]
                     (
                         x,
                         out,
                         gammas_expanded,
                         times_expanded,
                     ) = langevin.record_langevin_seq(
-                        sample_net, batch, node_mask=batch.node_mask, ipf_it=n
+                        sample_net, batch, node_mask=batch.node_mask, ipf_it=n,
+                        time=rand_time, gammas=rand_gammas
                     )
 
                 batch_X = torch.cat(

@@ -61,17 +61,23 @@ class IPFBase(torch.nn.Module):
         self.fast_sampling = self.args.fast_sampling
         self.lr = self.args.lr
 
-        if self.args.gamma_space != "linear":
-            n = self.num_steps // 2
-            if self.args.gamma_space == "linspace":
-                gamma_half = np.linspace(self.args.gamma_min, args.gamma_max, n)
-            elif self.args.gamma_space == "geomspace":
-                gamma_half = np.geomspace(self.args.gamma_min, self.args.gamma_max, n)
-            gammas = np.concatenate([gamma_half, np.flip(gamma_half)])
-            gammas = torch.tensor(gammas).to(self.device)
-        else:
-            gammas = torch.ones(self.num_steps).to(self.device)
-            gammas = gammas / torch.sum(gammas)
+        # if self.args.gamma_space != "linear":
+        #     n = self.num_steps // 2
+        #     if self.args.gamma_space == "linspace":
+        #         gamma_half = np.linspace(self.args.gamma_min, args.gamma_max, n)
+        #     elif self.args.gamma_space == "geomspace":
+        #         gamma_half = np.geomspace(self.args.gamma_min, self.args.gamma_max, n)
+        #     gammas = np.concatenate([gamma_half, np.flip(gamma_half)])
+        #     gammas = torch.tensor(gammas).to(self.device)
+        # else:
+        gammas = torch.ones(self.num_steps).to(self.device)
+
+        if self.args.gamma_space == "polydec":
+            gammas = gammas * 2 - gammas**2
+
+        gammas = gammas / torch.sum(gammas)
+        
+        
         self.T = torch.sum(gammas)  # T is one in our setting
         self.current_epoch = 0  # TODO: this need to be changed learning
 
@@ -949,14 +955,17 @@ class IPFSequential(IPFBase):
                 n_nodes_x = torch.ones_like(x[4]).to(self.device) * self.max_n_nodes
                 n_nodes_out = torch.ones_like(out[4]).to(self.device) * self.max_n_nodes
                 n_nodes_clean = torch.ones_like(clean[4]).to(self.device) * self.max_n_nodes
+                n_nodes_origin = torch.ones_like(origin[4]).to(self.device) * self.max_n_nodes
             else:
                 n_nodes_x = x[4]
                 n_nodes_out = out[4]
                 n_nodes_clean = clean[4]
+                n_nodes_origin = origin[4]
 
             x = PlaceHolder(X=x[0], E=x[1], y=x[2], charge=x[3], n_nodes=n_nodes_x)
             out = PlaceHolder(X=out[0], E=out[1], y=out[2], charge=out[3], n_nodes=n_nodes_out)
             clean = PlaceHolder(X=clean[0], E=clean[1], y=clean[2], charge=clean[3], n_nodes=n_nodes_clean)
+            origin = PlaceHolder(X=origin[0], E=origin[1], y=origin[2], charge=origin[3], n_nodes=n_nodes_origin)
 
             # predict the clean data based on the noisy data
             eval_steps = self.T - times_expanded
@@ -976,10 +985,10 @@ class IPFSequential(IPFBase):
             )
 
             prob_X, prob_E = compute_step_probs(
-                R_t_X, R_t_E, x.X, x.E, gammas_expanded, self.limit_dist.X, self.limit_dist.E
+                R_t_X, R_t_E, x.X, x.E, gammas_expanded
             )
-            
-            pred_next = PlaceHolder(X=prob_X, E=prob_E)
+
+            pred_next = PlaceHolder(X=prob_X, E=prob_E, y=None)
 
             # node and edge losses are not specifically used here
             _, _, loss = self.compute_loss(pred_next, out, pred_clean, clean, times_expanded)

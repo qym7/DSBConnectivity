@@ -5,6 +5,7 @@ defaults:
   - launcher: local
   - job
   - model: gnn
+  - sample: sample
 
 # data
 virtual_node: False

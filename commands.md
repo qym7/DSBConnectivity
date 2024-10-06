@@ -1,7 +1,11 @@
 # debug
 
-CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=debug wandb=disabled reg_weight=0.0 next_loss_weight=0.0
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=debug wandb=disabled reg_weight=0.0 next_loss_weight=0.0 num_steps=10 num_iter=10
 
+
+
+
+<!-- 
 ## 0803 Molecular debug
 
 
@@ -339,4 +343,4 @@ CUDA_VISIBLE_DEVICES=3 python3 main.py dataset=sbm_split model=gnn num_steps=50 
 
 CUDA_VISIBLE_DEVICES=3 python3 main.py dataset=planar_edge_remove model=gnn num_steps=50 num_iter=5000 n_ipf=30 project_name=fixed_degree_clw0.0001_lr0.001 limit_dist=marginal_tf next_loss_weight=0.0001 lr=0.001
 
-CUDA_VISIBLE_DEVICES=7 python3 main.py dataset=planar_edge_add model=gnn num_steps=50 num_iter=5000 n_ipf=30 project_name=fixed_shortest_path_clw0.0001_lr0.001 limit_dist=marginal_tf next_loss_weight=0.0001 lr=0.001
+CUDA_VISIBLE_DEVICES=7 python3 main.py dataset=planar_edge_add model=gnn num_steps=50 num_iter=5000 n_ipf=30 project_name=fixed_shortest_path_clw0.0001_lr0.001 limit_dist=marginal_tf next_loss_weight=0.0001 lr=0.001 -->
