@@ -6,7 +6,14 @@ CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=debug wandb=di
 CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=baseline wandb=disabled reg_weight=0.0 next_loss_weight=0.0
 
 
-CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9 name=qm9_baseline wandb=disabled reg_weight=0.0 next_loss_weight=0.0  num_steps=10 num_iter=10
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9 name=qm9_baseline
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9 name=qm9_baseline_next01 next_loss_weight=0.01
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9 name=qm9_baseline_randtime rand_time=True
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=qm9_smiles_baseline
+
 
 
 
