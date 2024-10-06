@@ -80,6 +80,7 @@ gamma_space: linear
 weight_distrib: False
 weight_distrib_alpha: 100
 fast_sampling: True
+rand_time: False
 
 # device
 device: cuda

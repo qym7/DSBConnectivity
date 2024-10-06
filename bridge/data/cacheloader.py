@@ -18,6 +18,7 @@ class CacheLoader(Dataset):
         langevin,
         n,
         batch_size,
+        rand_time=False,
         device="cpu",
         limit_dist=None,
         dataloader_f=None,
@@ -37,6 +38,7 @@ class CacheLoader(Dataset):
         self.visualization_tools = visualization_tools
         self.visualize = visualize
         self.virtual_node = virtual_node
+        self.rand_time = rand_time
 
         self.limit_dist = limit_dist
 
@@ -58,6 +60,7 @@ class CacheLoader(Dataset):
             ).to(self.device),
             y=None,
         )
+
         self.times_data = torch.zeros((num_batches, batch_size * self.num_steps, 1)).to(
             device
         )  # .cpu() # steps
@@ -115,12 +118,14 @@ class CacheLoader(Dataset):
                         times_expanded,
                     ) = langevin.record_init_langevin(batch, node_mask)
                 else:
-                    import pdb; pdb.set_trace()
-                    rand_time = torch.rand(self.num_steps-1)
-                    rand_time = torch.sort(rand_time)
-                    rand_time = torch.hstack(torch.Tensor([0]), rand_time, torch.Tensor([1])).to(device)
-                    rand_gammas = rand_time.diff()
-                    rand_time = rand_time[:-1]
+                    if self.rand_time:
+                        rand_time = torch.rand(self.num_steps-1)
+                        rand_time = torch.sort(rand_time)[0]
+                        rand_time = torch.hstack([torch.Tensor([0]), rand_time, torch.Tensor([1])]).to(device)
+                        rand_gammas = rand_time.diff()
+                        rand_time = rand_time[1:]
+                    else:
+                        rand_time = rand_gammas = None
                     (
                         x,
                         out,
