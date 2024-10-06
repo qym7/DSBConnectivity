@@ -147,6 +147,7 @@ class BasicMolecularMetrics(object):
         count_true_sa = 0
         sa_values = []
         all_sa_values = []
+        sa_smiles = []
         for smiles in all_smiles:
             try:
                 mol = MolFromSmiles(smiles)
@@ -157,9 +158,10 @@ class BasicMolecularMetrics(object):
             all_sa_values.append(sa_score)
             if sa_score <= 3:
                 count_true_sa += 1
+                sa_smiles.append(smiles)
 
         sa_avg = sum(sa_values) / float(len(sa_values))
-        return all_sa_values, sa_avg, count_true_sa / len(all_smiles)
+        return all_sa_values, sa_avg, count_true_sa / len(all_smiles), sa_smiles
 
     def evaluate(self, generated, source):
         """generated: list of pairs (positions: n x 3, atom_types: n [int])
@@ -170,8 +172,8 @@ class BasicMolecularMetrics(object):
 
         if source is not None:
             _, _, _, all_smiles_source = self.compute_validity(source)
-            all_sa_values, _, _ = self.compute_sascore(all_smiles)
-            all_sa_values_source, _, _ = self.compute_sascore(all_smiles_source)
+            all_sa_values, _, _, _ = self.compute_sascore(all_smiles)
+            all_sa_values_source, _, _, _ = self.compute_sascore(all_smiles_source)
         else:
             all_sa_values = None
             all_sa_values_source = None
@@ -209,12 +211,15 @@ class BasicMolecularMetrics(object):
             else:
                 novelty = -1.0
 
-            _, sa_avg, sa_success = self.compute_sascore(unique)
-            _, _, vun_sa = self.compute_sascore(list(set(unique)))
-            vun_sa = vun_sa * len(list(set(unique))) / len(generated)
+            _, sa_avg, sa_success, _ = self.compute_sascore(unique)
+            _, _, vu_sa, sa_smiles = self.compute_sascore(list(set(unique)))
+            vu_sa = vu_sa * len(list(set(unique))) / len(generated)
+            _, sa_novelty, _, _ = self.compute_novelty(sa_smiles)
+            vun_sa = vu_sa * sa_novelty
 
             print(f"SA Score Success Rate (<3) over {len(unique)} unique valid molecules: {sa_success * 100 :.2f}%")
             print(f"SA Average Value over {len(unique)} unique valid molecules: {sa_avg :.2f}")
+            print(f"SA.V.U. over {len(unique)} unique valid molecules: {vu_sa :.2f}")
             print(f"SA.V.U.N. over {len(unique)} unique valid molecules: {vun_sa :.2f}")
 
         else:
@@ -226,7 +231,7 @@ class BasicMolecularMetrics(object):
             coverage = 0.0
             unique = []
         return (
-            [validity, relaxed_validity, uniqueness, novelty, connectivity, sa_success, sa_avg, self.train_sa_avg, self.train_sa_success, self.test_sa_avg, self.test_sa_success, coverage, vun_sa],
+            [validity, relaxed_validity, uniqueness, novelty, connectivity, sa_success, sa_avg, self.train_sa_avg, self.train_sa_success, self.test_sa_avg, self.test_sa_success, coverage, vu_sa, vun_sa],
             unique,
             dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
             (all_smiles_source, all_smiles),
@@ -484,6 +489,7 @@ def compute_molecular_metrics(molecule_list, test_smiles, train_smiles, dataset_
         f"mol_metrics_charts_{fb}/test_SA Average Value": float(rdkit_metrics[0][9]),
         f"mol_metrics_charts_{fb}/test_SA Score Success Rate (<3)": float(rdkit_metrics[0][10]),
         f"mol_metrics_charts_{fb}/coverage except training": float(rdkit_metrics[0][11]),
+        f"mol_metrics_charts_{fb}/SA.V.U.": float(rdkit_metrics[0][-2]),
         f"mol_metrics_charts_{fb}/SA.V.U.N.": float(rdkit_metrics[0][-1]),
         f"mol_metrics_charts_{fb}/SA Average Value": float(rdkit_metrics[0][6]),
         f"mol_metrics_charts_{fb}/nc_max": nc["nc_max"],

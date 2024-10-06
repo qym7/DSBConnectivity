@@ -1051,3 +1051,43 @@ def add_virtual_node(batch, node_mask):
     batch.X = F.one_hot(batch.X, dx + 1).float()
 
     return batch
+
+def sample(X, E, onehot=False, node_mask=None):
+    bs, n, _ = X.shape
+    probX = X
+    probE = E
+
+    # Noise X
+    # The masked rows should define probability distributions as well
+    probX[~node_mask] = 1 / probX.shape[-1]
+
+    # Flatten the probability tensor to sample with multinomial
+    probX = probX.reshape(bs * n, -1)  # (bs * n, dx_out)
+
+    # Sample X
+    X_t = probX.multinomial(1, replacement=True)  # (bs * n, 1)
+    # X_t = Categorical(probs=probX).sample()  # (bs * n, 1)
+    X_t = X_t.reshape(bs, n)  # (bs, n)
+
+    # Noise E
+    # The masked rows should define probability distributions as well
+    inverse_edge_mask = ~(node_mask.unsqueeze(1) * node_mask.unsqueeze(2))
+    diag_mask = torch.eye(n).unsqueeze(0).expand(bs, -1, -1)
+
+    probE[inverse_edge_mask] = 1 / probE.shape[-1]
+    probE[diag_mask.bool()] = 1 / probE.shape[-1]
+
+    probE = probE.reshape(bs * n * n, -1)  # (bs * n * n, de_out)
+
+    # Sample E
+    E_t = probE.multinomial(1, replacement=True).reshape(bs, n, n)  # (bs, n, n)
+    E_t = torch.triu(E_t, diagonal=1)
+    E_t = E_t + torch.transpose(E_t, 1, 2)
+
+    if onehot:
+        X_t = F.one_hot(X_t, X.shape[-1])
+        E_t = F.one_hot(E_t, E.shape[-1])
+
+    return PlaceHolder(
+        X=X_t, E=E_t, y=torch.zeros(bs, 0).type_as(X_t), node_mask=node_mask
+    ).mask()

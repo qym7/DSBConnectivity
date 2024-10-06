@@ -15,12 +15,12 @@ dataset:
   pin_memory: False
 
 # transfer
-transfer: False
+transfer: True
 virtual_node: False
 dataset_transfer:
   batch_size: ${batch_size}
   num_workers: 8
-  use_charge: False
+  use_charge: False 
   extra_features: 'molecule'
 
   name: "qm9_smiles"

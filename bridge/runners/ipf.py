@@ -958,58 +958,40 @@ class IPFSequential(IPFBase):
             out = PlaceHolder(X=out[0], E=out[1], y=out[2], charge=out[3], n_nodes=n_nodes_out)
             clean = PlaceHolder(X=clean[0], E=clean[1], y=clean[2], charge=clean[3], n_nodes=n_nodes_clean)
 
+            # predict the clean data based on the noisy data
             eval_steps = self.T - times_expanded
-            pred = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
+            pred_clean = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
 
-            pred_R = pred.copy()
-
-            # dp = r * dt
-            pred_clean = pred.copy()
-            pred_clean.X = pred_clean.X * times_expanded[:, None, :]
-            pred_clean.E = pred_clean.E * times_expanded[:, None, None, :]
-            # change the value for the diagonal
-            pred_clean.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
-            pred_clean.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
-            pred_clean.X.scatter_(
-                -1,
-                x.X.argmax(-1)[:, :, None],
-                (1.0 - pred_clean.X.sum(dim=-1, keepdim=True)).clamp(min=0.0),
-            )
-            pred.E.scatter_(
-                -1,
-                x.E.argmax(-1)[:, :, :, None],
-                (1.0 - pred_clean.E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
-            )
-            # normalization
-            pred_clean.X = pred_clean.X + 1e-6
-            pred_clean.E = pred_clean.E + 1e-6
-            pred_clean.X = pred_clean.X / pred_clean.X.sum(-1, keepdim=True)
-            pred_clean.E = pred_clean.E / pred_clean.E.sum(-1, keepdim=True)
+            # compute the rate matrices based on the clean data
+            pred_clean.X = F.softmax(pred_clean.X, dim=-1)  # bs, n, d0
+            pred_clean.E = F.softmax(pred_clean.E, dim=-1)  # bs, n, n, d0
+            rate_matrices = self.compute_rate_matrices(pred_clean)
 
             # dp = r * dt
-            pred.X = pred.X * gammas_expanded[:, None, :]
-            pred.E = pred.E * gammas_expanded[:, None, None, :]
+            pred_next = pred_clean.copy()
+            pred_next.X = rate_matrices.X * gammas_expanded[:, None, :]
+            pred_next.E = rate_matrices.E * gammas_expanded[:, None, None, :]
             # change the value for the diagonal
-            pred.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
-            pred.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
-            pred.X.scatter_(
+            pred_next.X.scatter_(-1, x.X.argmax(-1)[:, :, None], 0.0)
+            pred_next.E.scatter_(-1, x.E.argmax(-1)[:, :, :, None], 0.0)
+            pred_next.X.scatter_(
                 -1,
                 x.X.argmax(-1)[:, :, None],
-                (1.0 - pred.X.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+                (1.0 - pred_next.X.sum(dim=-1, keepdim=True)).clamp(min=0.0),
             )
-            pred.E.scatter_(
+            pred_next.E.scatter_(
                 -1,
                 x.E.argmax(-1)[:, :, :, None],
-                (1.0 - pred.E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
+                (1.0 - pred_next.E.sum(dim=-1, keepdim=True)).clamp(min=0.0),
             )
             # normalization
-            pred.X = pred.X + 1e-6
-            pred.E = pred.E + 1e-6
-            pred.X = pred.X / pred.X.sum(-1, keepdim=True)
-            pred.E = pred.E / pred.E.sum(-1, keepdim=True)
+            pred_next.X = pred_next.X + 1e-6
+            pred_next.E = pred_next.E + 1e-6
+            pred_next.X = pred_next.X / pred_next.X.sum(-1, keepdim=True)
+            pred_next.E = pred_next.E / pred_next.E.sum(-1, keepdim=True)
 
             # node and edge losses are not specifically used here
-            _, _, loss = self.compute_loss(pred, out, pred_clean, clean, times_expanded, pred_R)
+            _, _, loss = self.compute_loss(pred_next, out, pred_clean, clean, times_expanded)
 
             num_log = 5000
             if self.num_steps <= num_log:
@@ -1048,8 +1030,11 @@ class IPFSequential(IPFBase):
 
         new_dl = None
         self.clear()
+        
+    def compute_rate_matrices(self, clean_data):
+        pass
 
-    def compute_loss(self, pred, out, pred_clean, clean, t, pred_R):
+    def compute_loss(self, pred, out, pred_clean, clean, t):
         use_edge_loss = True
         clean_node_count = clean.node_mask.sum(-1)
         node_count = out.node_mask.sum(-1)

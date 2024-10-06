@@ -436,9 +436,10 @@ class GraphTransformer(nn.Module):
         # final_charge = torch.square(final_charge)
         # E = torch.square(E)
 
-        final_X = torch.exp(final_X)
-        final_charge = torch.exp(final_charge)
-        E = torch.exp(E)
+        # # previously best settings
+        # final_X = torch.exp(final_X)
+        # final_charge = torch.exp(final_charge)
+        # E = torch.exp(E)
 
         # print(4, 'max', E.max(), 'min', E.min(), 'nan', torch.isnan(E).sum(), 'inf', torch.isinf(E).sum())
 
