@@ -66,11 +66,13 @@ class Langevin(torch.nn.Module):
         tf_domain_features=None,
         virtual_node=False,
         noise_level=1.0,
+        cfg=None
     ):
         super().__init__()
         # self.std_final = utils.PlaceHolder(
         #     X=torch.sqrt(self.var_final.X), E=torch.sqrt(self.var_final.E), y=None
         # )
+        self.cfg = cfg
         self.graph = graph
         self.limit_dist = limit_dist
         self.virtual_node = virtual_node
@@ -189,13 +191,6 @@ class Langevin(torch.nn.Module):
         times_expanded = time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
         gammas_expanded = gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
 
-        origin = utils.PlaceHolder(
-            X=init_samples.X.unsqueeze(1).repeat(1, x.X.shape[1], 1, 1),
-            E=init_samples.E.unsqueeze(1).repeat(1, x.X.shape[1], 1,1, 1),
-            y=init_samples.y,
-            charge=init_samples.charge,
-        )
-
         x = init_samples.copy()
         # for k in range(self.num_steps):
         num_repeat = 1
@@ -221,13 +216,11 @@ class Langevin(torch.nn.Module):
                                             # gammas_expanded,  # dt
                                             x.node_mask,
                                             t,  # t
-                                            limit_dist=origin,
-                                            cfg=self.args
+                                            limit_dist=init_samples,
+                                            cfg=self.cfg
             )
 
-            prob_X, prob_E = compute_step_probs(
-                R_t_X, R_t_E, x.X, x.E, gammas_expanded
-            )
+            prob_X, prob_E = compute_step_probs(R_t_X, R_t_E, x.X, x.E, gamma)
             
             pred = utils.PlaceHolder(X=prob_X, E=prob_E)
 

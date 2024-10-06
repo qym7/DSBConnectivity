@@ -56,8 +56,8 @@ class BasicMolecularMetrics(object):
         # Retrieve dataset smiles only for qm9 currently.
         self.test_smiles = test_smiles
         self.dataset_smiles_list = train_smiles
-        _, self.test_sa_avg, self.test_sa_success = self.compute_sascore(test_smiles)
-        _, self.train_sa_avg, self.train_sa_success = self.compute_sascore(train_smiles)
+        _, self.test_sa_avg, self.test_sa_success, _ = self.compute_sascore(test_smiles)
+        _, self.train_sa_avg, self.train_sa_success, _ = self.compute_sascore(train_smiles)
 
     def compute_validity(self, generated):
         """generated: list of couples (positions, atom_types)"""
@@ -228,6 +228,7 @@ class BasicMolecularMetrics(object):
             sa_success = 0.0
             sa_avg = 0.0
             vun_sa = 0.0
+            vu_sa = 0.0
             coverage = 0.0
             unique = []
         return (

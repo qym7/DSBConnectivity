@@ -71,12 +71,9 @@ class IPFBase(torch.nn.Module):
         #     gammas = torch.tensor(gammas).to(self.device)
         # else:
         gammas = torch.ones(self.num_steps).to(self.device)
-
-        if self.args.gamma_space == "polydec":
+        if self.args.sample.time_distortion == "polydec":
             gammas = gammas * 2 - gammas**2
-
         gammas = gammas / torch.sum(gammas)
-        
         
         self.T = torch.sum(gammas)  # T is one in our setting
         self.current_epoch = 0  # TODO: this need to be changed learning
@@ -180,6 +177,7 @@ class IPFBase(torch.nn.Module):
             tf_domain_features=self.tf_domain_features,
             virtual_node=self.args.virtual_node,
             noise_level=self.args.noise_level,
+            cfg=self.args
         )
 
         # checkpoint
@@ -1020,13 +1018,13 @@ class IPFSequential(IPFBase):
                     self.net[forward_or_backward]
                 )
 
-            if i == self.num_iter - 1:
-                self.save_step(i, n, forward_or_backward)
 
             if (i % self.args.cache_refresh_stride == 0) and (i > 0):
                 new_dl = None
                 torch.cuda.empty_cache()
                 new_dl = self.new_cacheloader(forward_or_backward, n, self.args.ema)
+
+        self.save_step(i, n, forward_or_backward)
 
         new_dl = None
         self.clear()
