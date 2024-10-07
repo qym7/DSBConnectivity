@@ -2,17 +2,33 @@
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=debug wandb=disabled reg_weight=0.0 next_loss_weight=0.0 num_steps=10 num_iter=10
 
-
-CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=baseline wandb=disabled reg_weight=0.0 next_loss_weight=0.0
-
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=debug wandb=disabled reg_weight=0.0 next_loss_weight=0.0 num_steps=10 num_iter=10
 
 CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9 name=qm9_baseline
 
-CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9 name=qm9_baseline_next01 next_loss_weight=0.01
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9 name=qm9_baseline_noise01 noise_level=0.1
+
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9 name=qm9_baseline_noise005 noise_level=0.05
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9 name=qm9_baseline_noise01_polydec noise_level=0.1 sample.time_distortion=polydec
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9 name=qm9_baseline_next01 next_loss_weight=0.1
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9 name=qm9_baseline_randtime rand_time=True
 
 CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=qm9_smiles_baseline
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=qm9_smiles_noise01 noise_level=0.1
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=qm9_smiles_noise005 noise_level=0.05
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_smiles_next1 next_loss_weight=1.0
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=qm9_smiles_randtime rand_time=True
+
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=qm9_smiles_noise01_reg01 reg_weight=0.1 noise_level=0.1
+
 
 
 

@@ -221,7 +221,7 @@ class Langevin(torch.nn.Module):
             )
 
             prob_X, prob_E = compute_step_probs(R_t_X, R_t_E, x.X, x.E, gamma)
-            
+
             pred = utils.PlaceHolder(X=prob_X, E=prob_E)
 
             if self.virtual_node:

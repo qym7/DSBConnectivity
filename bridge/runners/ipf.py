@@ -70,11 +70,13 @@ class IPFBase(torch.nn.Module):
         #     gammas = np.concatenate([gamma_half, np.flip(gamma_half)])
         #     gammas = torch.tensor(gammas).to(self.device)
         # else:
-        gammas = torch.ones(self.num_steps).to(self.device)
+        # gammas = torch.ones(self.num_steps).to(self.device)
+        # gammas = gammas / torch.sum(gammas)
+        time_series = torch.linspace(0, 1, self.num_steps + 1).to(self.device)
         if self.args.sample.time_distortion == "polydec":
-            gammas = gammas * 2 - gammas**2
-        gammas = gammas / torch.sum(gammas)
-        
+            time_series =  time_series * 2 -  time_series**2
+        gammas = time_series.diff()
+
         self.T = torch.sum(gammas)  # T is one in our setting
         self.current_epoch = 0  # TODO: this need to be changed learning
 
@@ -991,7 +993,7 @@ class IPFSequential(IPFBase):
             pred_next = PlaceHolder(X=prob_X, E=prob_E, y=None)
 
             # node and edge losses are not specifically used here
-            _, _, loss = self.compute_loss(pred_next, out, pred_clean, clean, times_expanded)
+            _, _, loss = self.compute_loss(pred_next, out, pred_clean, clean, R_t_X, R_t_E)
 
             num_log = 5000
             if self.num_steps <= num_log:
@@ -1020,7 +1022,6 @@ class IPFSequential(IPFBase):
                     self.net[forward_or_backward]
                 )
 
-
             if (i % self.args.cache_refresh_stride == 0) and (i > 0):
                 new_dl = None
                 torch.cuda.empty_cache()
@@ -1031,7 +1032,7 @@ class IPFSequential(IPFBase):
         new_dl = None
         self.clear()
 
-    def compute_loss(self, pred, out, pred_clean, clean, t):
+    def compute_loss(self, pred, out, pred_clean, clean, R_t_X, R_t_E):
         use_edge_loss = True
         clean_node_count = clean.node_mask.sum(-1)
         node_count = out.node_mask.sum(-1)
@@ -1046,6 +1047,9 @@ class IPFSequential(IPFBase):
 
         # Calculate clean loss
         ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
+        # import pdb; pdb.set_trace()
+        # clean_node_loss = self.args.model.lambda_train[0] * ce_loss(pred_clean.X.permute((0, 2, 1)), clean.X.permute((0, 2, 1)))
+        # clean_edge_loss = self.args.model.lambda_train[1] * ce_loss(pred_clean.E.permute((0, 3, 1, 2)), clean.E.permute((0, 3, 1, 2)))
         clean_node_loss = self.args.model.lambda_train[0] * ce_loss(pred_clean.X.permute((0, 2, 1)), clean.X.permute((0, 2, 1)))
         clean_edge_loss = self.args.model.lambda_train[1] * ce_loss(pred_clean.E.permute((0, 3, 1, 2)), clean.E.permute((0, 3, 1, 2)))
 
@@ -1074,10 +1078,10 @@ class IPFSequential(IPFBase):
 
         # Sparsity
         weight = self.args.reg_weight
-        reg_loss = torch.norm(pred.X, p=1) * weight / node_count.sum() + torch.norm(pred.E, p=1) * weight / edge_count.sum() * self.args.edge_weight
+        reg_loss = torch.norm(R_t_X, p=1) * weight / node_count.sum() + torch.norm(R_t_E, p=1) * weight / edge_count.sum() * self.args.edge_weight
 
         # Merge loss
-        loss = clean_loss + self.args.next_loss_weight * traj_loss + self.args.reg_weight * reg_loss
+        loss = self.args.clean_loss_weight * clean_loss + self.args.next_loss_weight * traj_loss + self.args.reg_weight * reg_loss
 
         if pred.charge.numel() > 0:
             loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)

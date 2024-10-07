@@ -68,6 +68,7 @@ n_ipf: 100
 lr: 0.001
 limit_dist: marginal_tf            # uniform | marginal | marginal_tf,  ame with marginal when without transfer data
 next_loss_weight: 0.0
+clean_loss_weight: 1.0
 noise_level: 1.0
 reg_weight: 0.0
 edge_weight: 1.0
