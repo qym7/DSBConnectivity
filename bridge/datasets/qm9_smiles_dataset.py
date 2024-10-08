@@ -348,7 +348,6 @@ def SA_score_data_separation(path, path_greater, path_greater_more, path_greater
                 writer.writerow([point])
 
 
-
 if __name__ == "__main__":
     path = './data/qm9/qm9_pyg/processed'
     path_greater = './data/qm9_greater/qm9_pyg_greater/raw'

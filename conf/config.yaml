@@ -5,6 +5,7 @@ defaults:
   - launcher: local
   - job
   - model: gnn
+  - sample: sample
 
 # data
 virtual_node: False
@@ -70,6 +71,7 @@ clean_loss_weight: 0.0001
 noise_level: 1.0
 reg_weight: 0.0
 edge_weight: 1.0
+rand_time: False
 
 # diffusion schedule
 num_steps : 50
