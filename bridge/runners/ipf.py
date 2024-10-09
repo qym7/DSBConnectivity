@@ -1061,70 +1061,6 @@ class IPFSequential(IPFBase):
         new_dl = None
         self.clear()
 
-    # def compute_loss(self, pred, out, pred_clean, clean, t, pred_R):
-    #     use_edge_loss = True
-    #     clean_node_count = clean.node_mask.sum(-1)
-    #     node_count = out.node_mask.sum(-1)
-
-    #     if not use_edge_loss and self.args.virtual_node:
-    #         # import pdb; pdb.set_trace()
-    #         node_count = (out.X.argmax(-1) > 0).sum(-1)
-    #         clean_node_count = (clean.X.argmax(-1) > 0).sum(-1)
-
-    #     clean_edge_count = (clean_node_count - 1) * clean_node_count
-    #     edge_count = (node_count - 1) * node_count
-
-    #     # Calculate the losses
-    #     ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
-    #     pred.X = torch.log(pred.X + 1e-6)
-    #     pred.E = torch.log(pred.E + 1e-6)
-    #     node_loss = self.args.model.lambda_train[0] * ce_loss(pred.X.permute((0, 2, 1)), out.X.permute((0, 2, 1)))
-    #     edge_loss = self.args.model.lambda_train[1] * ce_loss(pred.E.permute((0, 3, 1, 2)), out.E.permute((0, 3, 1, 2)))
-
-    #     loss = PlaceHolder(X=node_loss.unsqueeze(-1), E=edge_loss.unsqueeze(-1), y=None)
-    #     if not self.args.virtual_node:
-    #         loss = loss.mask(out.node_mask)
-    #     else:
-    #         if not use_edge_loss:
-    #             loss = loss.mask(mask_node=not self.args.virtual_node, node_mask=(out.X.argmax(-1) > 0))
-    #     loss = (loss.X/node_count).sum() + (loss.E/edge_count).sum() * self.args.edge_weight
-
-    #     # # new sparsity loss
-    #     # weight = self.args.reg_weight
-    #     # # loss = loss + ((pred_R.X+1e6)**0.5).sum() * weight / node_count.sum() + ((pred_R.E+1e6)**0.5).sum() * weight / edge_count.sum() * self.args.edge_weight
-    #     # loss = loss + torch.norm(pred_R.X, 0.5) * weight / node_count.sum() + torch.norm(pred_R.E, 0.5) * weight / edge_count.sum() * self.args.edge_weight
-
-    #     # sparsity loss - V2
-    #     weight = self.args.reg_weight
-    #     loss = loss + ((pred_R.X+1e6)**0.1).sum() * weight / node_count.sum() + ((pred_R.E+1e6)**0.1).sum() * weight / edge_count.sum() * self.args.edge_weight
-
-    #     ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
-    #     pred_clean.X = torch.log(pred_clean.X + 1e-6)
-    #     pred_clean.E = torch.log(pred_clean.E + 1e-6)
-    #     clean_node_loss = self.args.model.lambda_train[0] * ce_loss(pred_clean.X.permute((0, 2, 1)), clean.X.permute((0, 2, 1)))
-    #     clean_edge_loss = self.args.model.lambda_train[1] * ce_loss(pred_clean.E.permute((0, 3, 1, 2)), clean.E.permute((0, 3, 1, 2)))
-    #     clean_node_loss = clean_node_loss / t[:]
-    #     clean_edge_loss = clean_edge_loss / t[:, None]
-    #     # clean_node_loss = clean_node_loss / torch.exp(t[:])
-    #     # clean_edge_loss = clean_edge_loss / torch.exp(t[:, None])
-    #     # clean_node_loss = clean_node_loss / t[:] / t[:] / self.num_steps
-    #     # clean_edge_loss = clean_edge_loss / t[:, None] / t[:, None] / self.num_steps
-
-    #     clean_loss = PlaceHolder(X=clean_node_loss.unsqueeze(-1), E=clean_edge_loss.unsqueeze(-1), y=None)    
-    #     if not self.args.virtual_node:
-    #         clean_loss = clean_loss.mask(clean.node_mask)
-    #     else:
-    #         if not use_edge_loss:
-    #             clean_loss = clean_loss.mask(mask_node=not self.args.virtual_node, node_mask=(clean.X.argmax(-1) > 0))
-    #     clean_loss = (clean_loss.X/clean_node_count).sum() + (clean_loss.E/clean_edge_count).sum() * self.args.edge_weight
-
-    #     loss = loss + self.args.clean_loss_weight * clean_loss
-
-    #     if pred.charge.numel() > 0:
-    #         loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)
-
-    #     return node_loss, edge_loss, loss
-    
     def compute_loss(self, pred, out, pred_clean, clean, t, pred_R):
         use_edge_loss = True
         clean_node_count = clean.node_mask.sum(-1)
@@ -1151,19 +1087,29 @@ class IPFSequential(IPFBase):
         else:
             if not use_edge_loss:
                 loss = loss.mask(mask_node=not self.args.virtual_node, node_mask=(out.X.argmax(-1) > 0))
-        loss = (loss.X/node_count).sum() + (loss.E/edge_count).sum()
+        loss = (loss.X/node_count).sum() + (loss.E/edge_count).sum() * self.args.edge_weight
 
-        # sparsity
+        # # new sparsity loss
+        # weight = self.args.reg_weight
+        # # loss = loss + ((pred_R.X+1e6)**0.5).sum() * weight / node_count.sum() + ((pred_R.E+1e6)**0.5).sum() * weight / edge_count.sum() * self.args.edge_weight
+        # loss = loss + torch.norm(pred_R.X, 0.5) * weight / node_count.sum() + torch.norm(pred_R.E, 0.5) * weight / edge_count.sum() * self.args.edge_weight
+
+        # sparsity loss - V2
         weight = self.args.reg_weight
-        loss = loss + torch.norm(pred_R.X, p=1) * weight / node_count.sum() + torch.norm(pred_R.E, p=1) * weight / edge_count.sum()
+        # loss = loss + ((pred_R.X+1e6)**0.1).sum() * weight / node_count.sum() + ((pred_R.E+1e6)**0.1).sum() * weight / edge_count.sum() * self.args.edge_weight
+        loss = loss + torch.norm(pred_R.X, 1.0) * weight / node_count.sum() + torch.norm(pred_R.E, 1.0) * weight / edge_count.sum() * self.args.edge_weight
 
         ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
         pred_clean.X = torch.log(pred_clean.X + 1e-6)
         pred_clean.E = torch.log(pred_clean.E + 1e-6)
         clean_node_loss = self.args.model.lambda_train[0] * ce_loss(pred_clean.X.permute((0, 2, 1)), clean.X.permute((0, 2, 1)))
         clean_edge_loss = self.args.model.lambda_train[1] * ce_loss(pred_clean.E.permute((0, 3, 1, 2)), clean.E.permute((0, 3, 1, 2)))
-        clean_node_loss = clean_node_loss / torch.exp(t[:])
-        clean_edge_loss = clean_edge_loss / torch.exp(t[:, None])
+        clean_node_loss = clean_node_loss / t[:]
+        clean_edge_loss = clean_edge_loss / t[:, None]
+        # clean_node_loss = clean_node_loss / torch.exp(t[:])
+        # clean_edge_loss = clean_edge_loss / torch.exp(t[:, None])
+        # clean_node_loss = clean_node_loss / t[:] / t[:] / self.num_steps
+        # clean_edge_loss = clean_edge_loss / t[:, None] / t[:, None] / self.num_steps
 
         clean_loss = PlaceHolder(X=clean_node_loss.unsqueeze(-1), E=clean_edge_loss.unsqueeze(-1), y=None)    
         if not self.args.virtual_node:
@@ -1171,7 +1117,7 @@ class IPFSequential(IPFBase):
         else:
             if not use_edge_loss:
                 clean_loss = clean_loss.mask(mask_node=not self.args.virtual_node, node_mask=(clean.X.argmax(-1) > 0))
-        clean_loss = (clean_loss.X/clean_node_count).sum() + (clean_loss.E/clean_edge_count).sum()
+        clean_loss = (clean_loss.X/clean_node_count).sum() + (clean_loss.E/clean_edge_count).sum() * self.args.edge_weight
 
         loss = loss + self.args.clean_loss_weight * clean_loss
 
@@ -1179,6 +1125,61 @@ class IPFSequential(IPFBase):
             loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)
 
         return node_loss, edge_loss, loss
+    
+    # def compute_loss(self, pred, out, pred_clean, clean, t, pred_R):
+    #     use_edge_loss = True
+    #     clean_node_count = clean.node_mask.sum(-1)
+    #     node_count = out.node_mask.sum(-1)
+
+    #     if not use_edge_loss and self.args.virtual_node:
+    #         # import pdb; pdb.set_trace()
+    #         node_count = (out.X.argmax(-1) > 0).sum(-1)
+    #         clean_node_count = (clean.X.argmax(-1) > 0).sum(-1)
+
+    #     clean_edge_count = (clean_node_count - 1) * clean_node_count
+    #     edge_count = (node_count - 1) * node_count
+
+    #     # Calculate the losses
+    #     ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
+    #     pred.X = torch.log(pred.X + 1e-6)
+    #     pred.E = torch.log(pred.E + 1e-6)
+    #     node_loss = self.args.model.lambda_train[0] * ce_loss(pred.X.permute((0, 2, 1)), out.X.permute((0, 2, 1)))
+    #     edge_loss = self.args.model.lambda_train[1] * ce_loss(pred.E.permute((0, 3, 1, 2)), out.E.permute((0, 3, 1, 2)))
+
+    #     loss = PlaceHolder(X=node_loss.unsqueeze(-1), E=edge_loss.unsqueeze(-1), y=None)
+    #     if not self.args.virtual_node:
+    #         loss = loss.mask(out.node_mask)
+    #     else:
+    #         if not use_edge_loss:
+    #             loss = loss.mask(mask_node=not self.args.virtual_node, node_mask=(out.X.argmax(-1) > 0))
+    #     loss = (loss.X/node_count).sum() + (loss.E/edge_count).sum()
+
+    #     # sparsity
+    #     weight = self.args.reg_weight
+    #     loss = loss + torch.norm(pred_R.X, p=1) * weight / node_count.sum() + torch.norm(pred_R.E, p=1) * weight / edge_count.sum()
+
+    #     ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
+    #     pred_clean.X = torch.log(pred_clean.X + 1e-6)
+    #     pred_clean.E = torch.log(pred_clean.E + 1e-6)
+    #     clean_node_loss = self.args.model.lambda_train[0] * ce_loss(pred_clean.X.permute((0, 2, 1)), clean.X.permute((0, 2, 1)))
+    #     clean_edge_loss = self.args.model.lambda_train[1] * ce_loss(pred_clean.E.permute((0, 3, 1, 2)), clean.E.permute((0, 3, 1, 2)))
+    #     clean_node_loss = clean_node_loss / torch.exp(t[:])
+    #     clean_edge_loss = clean_edge_loss / torch.exp(t[:, None])
+
+    #     clean_loss = PlaceHolder(X=clean_node_loss.unsqueeze(-1), E=clean_edge_loss.unsqueeze(-1), y=None)    
+    #     if not self.args.virtual_node:
+    #         clean_loss = clean_loss.mask(clean.node_mask)
+    #     else:
+    #         if not use_edge_loss:
+    #             clean_loss = clean_loss.mask(mask_node=not self.args.virtual_node, node_mask=(clean.X.argmax(-1) > 0))
+    #     clean_loss = (clean_loss.X/clean_node_count).sum() + (clean_loss.E/clean_edge_count).sum()
+
+    #     loss = loss + self.args.clean_loss_weight * clean_loss
+
+    #     if pred.charge.numel() > 0:
+    #         loss = loss + self.args.model.lambda_train[0] * F.mse_loss(pred.E, out.E)
+
+    #     return node_loss, edge_loss, loss
 
     def forward_graph(self, net, z_t, t):
         # step 1: calculate extra features
