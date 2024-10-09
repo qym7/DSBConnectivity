@@ -1096,8 +1096,8 @@ class IPFSequential(IPFBase):
 
         # sparsity loss - V2
         weight = self.args.reg_weight
-        # loss = loss + ((pred_R.X+1e6)**0.1).sum() * weight / node_count.sum() + ((pred_R.E+1e6)**0.1).sum() * weight / edge_count.sum() * self.args.edge_weight
-        loss = loss + torch.norm(pred_R.X, 1.0) * weight / node_count.sum() + torch.norm(pred_R.E, 1.0) * weight / edge_count.sum() * self.args.edge_weight
+        loss = loss + ((pred_R.X+1e6)**0.1).sum() * weight / node_count.sum() + ((pred_R.E+1e6)**0.1).sum() * weight / edge_count.sum() * self.args.edge_weight
+        # loss = loss + torch.norm(pred_R.X, 1.0) * weight / node_count.sum() + torch.norm(pred_R.E, 1.0) * weight / edge_count.sum() * self.args.edge_weight
 
         ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
         pred_clean.X = torch.log(pred_clean.X + 1e-6)
