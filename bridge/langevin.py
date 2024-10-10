@@ -94,6 +94,7 @@ class Langevin(torch.nn.Module):
 
         self.steps = torch.arange(self.num_steps).to(self.device)
         self.time = torch.cumsum(self.gammas, 0).to(self.device).float()
+        self.time = torch.hstack([torch.zeros(1).to(self.device), self.time])
         self.time_sampler = time_sampler
 
     def record_init_langevin(self, x, node_mask):
@@ -117,7 +118,7 @@ class Langevin(torch.nn.Module):
             y=None,
         )
 
-        times_expanded = self.time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+        times_expanded = self.time.reshape((1, self.num_steps+1, 1)).repeat((bs, 1, 1))
         gammas_expanded = self.gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
 
         x_k = x.copy()
@@ -156,7 +157,7 @@ class Langevin(torch.nn.Module):
 
             x_tot = x_tot.place(x_k, k)
 
-        return x_tot, out, gammas_expanded, times_expanded
+        return x_tot, out, gammas_expanded, times_expanded[:, 1:, :]
 
     def record_langevin_seq(
         self, net, init_samples, node_mask, t_batch=None, ipf_it=0, sample=False, time=None, gammas=None
@@ -188,8 +189,12 @@ class Langevin(torch.nn.Module):
         if gammas is None:
             gammas = self.gammas
         
-        times_expanded = time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
-        gammas_expanded = gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+        if len(time.shape) == 1:
+            times_expanded = time.reshape((1, self.num_steps+1, 1)).repeat((bs, 1, 1))
+            gammas_expanded = gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+        else:
+            times_expanded = time.unsqueeze(-1)
+            gammas_expanded = gammas.unsqueeze(-1)
 
         x = init_samples.copy()
         # for k in range(self.num_steps):
@@ -240,7 +245,7 @@ class Langevin(torch.nn.Module):
             if i % num_repeat == num_repeat - 1:
                 x_tot = x_tot.place(x, k)
 
-        return x_tot, out, gammas_expanded, times_expanded
+        return x_tot, out, gammas_expanded, times_expanded[:, 1:, :]
 
     def forward_graph(self, net, z_t, t):
         # step 1: calculate extra features

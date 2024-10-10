@@ -116,11 +116,11 @@ class CacheLoader(Dataset):
                     ) = langevin.record_init_langevin(batch, node_mask)
                 else:
                     if self.rand_time:
-                        rand_time = torch.rand(self.num_steps-1)
+                        rand_time = torch.rand((batch_size, self.num_steps-1))
                         rand_time = torch.sort(rand_time)[0]
-                        rand_time = torch.hstack([torch.Tensor([0]), rand_time, torch.Tensor([1])]).to(device)
+                        rand_time = torch.hstack([torch.zeros(batch_size, 1), rand_time, torch.ones(batch_size, 1)]).to(device)
                         rand_gammas = rand_time.diff()
-                        rand_time = rand_time[1:]
+                        # rand_time = rand_time[:, :-1]
                     else:
                         rand_time = rand_gammas = None
                     
