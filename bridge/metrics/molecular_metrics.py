@@ -1,6 +1,7 @@
 import os
 from collections import Counter
 import pandas as pd
+import csv
 
 # from fcd import get_fcd, load_ref_model
 from rdkit import Chem
@@ -308,9 +309,11 @@ class SamplingMolecularMetrics(nn.Module):
 
         all_smiles = all_smiles[1]
         if test and local_rank == 0:
-            with open(r'final_smiles.txt', 'w') as fp:
+            with open(r'final_smiles.csv', 'w', newline='') as fp:
+                writer = csv.writer(fp)
+                writer.writerow(['SMILES'])
                 for smiles in all_smiles:
-                    fp.write("%s\n" % smiles)
+                    writer.writerow([smiles])
                 print('All smiles saved')
 
         print("Starting custom metrics")

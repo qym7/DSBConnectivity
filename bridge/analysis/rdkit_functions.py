@@ -97,6 +97,42 @@ class BasicMolecularMetrics(object):
 
         return valid, len(valid) / len(generated), np.array(num_components), all_smiles
 
+
+    def compute_validity_smiles(self, generated):
+        valid = []
+        num_components = []
+        all_smiles = []
+        valid_indices = []  # To store indices of valid molecules
+
+        for idx, smiles in enumerate(generated):
+            mol = MolFromSmiles(smiles)
+            smiles = mol2smiles(mol)
+            try:
+                mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True, sanitizeFrags=True)
+                num_components.append(len(mol_frags))
+            except:
+                pass
+
+            if smiles is not None:
+                try:
+                    mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True, sanitizeFrags=True)
+                    largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())
+                    smiles = mol2smiles(largest_mol)
+                    valid.append(smiles)
+                    all_smiles.append(smiles)
+                    valid_indices.append(idx)  # Record index of valid molecule
+                except Chem.rdchem.AtomValenceException:
+                    print("Valence error in GetMolFrags")
+                    all_smiles.append(None)
+                except Chem.rdchem.KekulizeException:
+                    print("Can't kekulize molecule")
+                    all_smiles.append(None)
+            else:
+                all_smiles.append(None)
+
+        return valid, len(valid) / len(generated), np.array(num_components), all_smiles, valid_indices
+
+
     def compute_uniqueness(self, valid):
         """valid: list of SMILES strings."""
         return list(set(valid)), len(set(valid)) / len(valid)
@@ -126,6 +162,27 @@ class BasicMolecularMetrics(object):
             mol = build_molecule_with_partial_charges(
                 atom_types, edge_types, self.dataset_info.atom_decoder
             )
+            smiles = mol2smiles(mol)
+            if smiles is not None:
+                try:
+                    mol_frags = Chem.rdmolops.GetMolFrags(
+                        mol, asMols=True, sanitizeFrags=True
+                    )
+                    largest_mol = max(
+                        mol_frags, default=mol, key=lambda m: m.GetNumAtoms()
+                    )
+                    smiles = mol2smiles(largest_mol)
+                    valid.append(smiles)
+                except Chem.rdchem.AtomValenceException:
+                    print("Valence error in GetmolFrags")
+                except Chem.rdchem.KekulizeException:
+                    print("Can't kekulize molecule")
+        return valid, len(valid) / len(generated)
+
+    def compute_relaxed_validity_smiles(self, generated):
+        valid = []
+        for smiles in generated:
+            mol = MolFromSmiles(smiles)
             smiles = mol2smiles(mol)
             if smiles is not None:
                 try:
@@ -232,6 +289,50 @@ class BasicMolecularMetrics(object):
             (all_smiles_source, all_smiles),
             (all_sa_values_source, all_sa_values),
         )
+
+    def evaluate_baselines(self, generated):
+        """generated: list of pairs (positions: n x 3, atom_types: n [int])
+        the positions and atom types should already be masked."""
+
+        print(f"Number of molecules to evaluate: {len(generated)}")
+        valid, validity, num_components, all_smiles, valid_indices = self.compute_validity_smiles(generated)
+
+        nc_mu = num_components.mean() if len(num_components) > 0 else 0
+        nc_min = num_components.min() if len(num_components) > 0 else 0
+        nc_max = num_components.max() if len(num_components) > 0 else 0
+        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(
+            f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}")
+
+        connectivity = (num_components == 1).sum() / len(num_components)
+        print(f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%")
+
+        relaxed_valid, relaxed_validity = self.compute_relaxed_validity_smiles(generated)
+        print(f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%")
+        if relaxed_validity > 0:
+            unique, uniqueness = self.compute_uniqueness(relaxed_valid)
+            print(f"Uniqueness over {len(relaxed_valid)} valid molecules: {uniqueness * 100 :.2f}%")
+
+            if self.dataset_smiles_list is not None:
+                novel, novelty, _, coverage = self.compute_novelty(unique)
+                print(f"Novelty over {len(unique)} unique valid molecules: {novelty * 100 :.2f}%")
+                print(f"Coverage over {len(unique)} unique valid molecules: {coverage * 100 :.2f}%")
+
+            _, sav_avg, sav_success = self.compute_sascore(relaxed_valid)
+            _, savu_avg, savu_success = self.compute_sascore(unique)
+            _, savun_avg, savun_success = self.compute_sascore(novel)
+
+            print(
+                f"SA Score Success Rate (<3) over {len(relaxed_valid)} relaxed valid molecules: {sav_success * 100 :.2f}%")
+            print(f"SA Score Success Rate (<3) over {len(unique)} unique valid molecules: {savu_success * 100 :.2f}%")
+            print(
+                f"SA Score Success Rate (<3) over {len(novel)} novel unique valid molecules: {savun_success * 100 :.2f}%")
+
+            print(f"SA Average Value over {len(relaxed_valid)} relaxed valid molecules: {sav_avg :.2f}")
+            print(f"SA Average Value over {len(unique)} unique valid molecules: {savu_avg :.2f}")
+            print(f"SA Average Value over {len(novel)} novel unique valid molecules: {savun_avg :.2f}")
+
+        return relaxed_valid, unique, novel, valid, valid_indices
 
 
 def mol2smiles(mol):

@@ -9,8 +9,8 @@ dataset:
   extra_features: 'molecule'
 
   name: "qm9_smiles"
-  datadir: 'data/qm9_greater/qm9_pyg_greater/'
-  remove_h: True
+  datadir: 'data/qm9_h_greater_3/qm9_pyg_greater/'
+  remove_h: False
   random_subset: null
   pin_memory: False
 
@@ -24,13 +24,13 @@ dataset_transfer:
   extra_features: 'molecule'
 
   name: "qm9_smiles"
-  datadir: 'data/qm9_less/qm9_pyg_less/'
-  remove_h: True
+  datadir: 'data/qm9_h_less_3/qm9_pyg_less/'
+  remove_h: False
   random_subset: null
   pin_memory: False
 
 # settings for evaluations
-forward_path: null
+forward_path: null #'/scratch/uceeosm/DSBConnectivity/experiments/2024-09-10/qm9_tanimoto/01-25-41/checkpoints/sample_net_f_44_1999.ckpt'
 backward_path: null
 samples_to_generate: 1024
 samples_to_save: 20
