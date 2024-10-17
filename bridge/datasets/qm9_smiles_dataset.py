@@ -315,6 +315,7 @@ def SA_score_data_separation(path, path_greater, path_greater_more, path_greater
             for point in selected_greater:
                 writer.writerow([point])
 
+<<<<<<< HEAD
     ecart = int(2 * split1_less)
     cur_split1_less = split1_less + ecart
     cur_split2_less = split2_less + ecart
@@ -400,6 +401,8 @@ def QED_SA_score_data_separation(path, path_less, remove_h):
                 writer.writerow([point])
 
 
+=======
+>>>>>>> origin/nagham_dev
 def compute_tanimoto_distance(smiles1, smiles2):
     """
     Computes the Tanimoto distance between two lists of SMILES strings.
@@ -459,6 +462,7 @@ def tanimoto_data_separation(path, path_greater, path_less, threshold, remove_h)
 
     tanimoto_matrix = compute_tanimoto_distance(sa_less_3, sa_greater_3)
     min_distances = np.min(tanimoto_matrix, axis=0)
+<<<<<<< HEAD
     min_indices = np.argmin(tanimoto_matrix, axis=0)
 
     used_indices = set()
@@ -478,6 +482,14 @@ def tanimoto_data_separation(path, path_greater, path_less, threshold, remove_h)
         smaller_set = filtered_greater
 
     less_3_size = len(smaller_set)
+=======
+    selected_mask = min_distances < threshold
+
+    filtered_greater = [sa_greater_3[i] for i, keep in enumerate(selected_mask) if keep]
+
+    # Split sizes for the SA <= 3 (favourable and smaller dataset)
+    less_3_size = len(sa_less_3)
+>>>>>>> origin/nagham_dev
     split1_less = int(less_3_size * 0.8)
     split2_less = int(less_3_size * 0.9)
 
@@ -517,6 +529,12 @@ if __name__ == "__main__":
     path_less = './data/qm9_h_less_3/qm9_pyg_less/raw'
     remove_h = False
 
+<<<<<<< HEAD
     # threshold = 0.5
     # tanimoto_data_separation(path, path_greater, path_less, threshold, remove_h)
     SA_score_data_separation(path, path_greater, path_greater_more, path_greater_less, path_less, remove_h)
+=======
+    threshold = 0.5
+    tanimoto_data_separation(path, path_greater, path_less, threshold, remove_h)
+    # SA_score_data_separation(path, path_greater, path_less, remove_h)
+>>>>>>> origin/nagham_dev
