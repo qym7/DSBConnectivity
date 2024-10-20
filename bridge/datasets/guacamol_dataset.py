@@ -46,7 +46,20 @@ atom_encoder = {
     "Se": 10,
     "Si": 11,
 }
-atom_decoder = ["C", "N", "O", "F", "B", "Br", "Cl", "I", "P", "S", "Se", "Si"]
+atom_decoder = [
+    "C",
+    "N",
+    "O",
+    "F",
+    "B",
+    "Br",
+    "Cl",
+    "I",
+    "P",
+    "S",
+    "Se",
+    "Si",
+]
 
 
 def compare_hash(output_file: str, correct_hash: str) -> bool:
@@ -98,9 +111,15 @@ class GuacamolDataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
-            charge_types=torch.from_numpy(np.load(self.processed_paths[4])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
+            charge_types=torch.from_numpy(
+                np.load(self.processed_paths[4])
+            ).float(),
             valencies=load_pickle(self.processed_paths[5]),
         )
         self.smiles = load_pickle(self.processed_paths[6])
@@ -127,15 +146,24 @@ class GuacamolDataset(InMemoryDataset):
 
     def download(self):
         train_path = download_url(self.train_url, self.raw_dir)
-        os.rename(train_path, osp.join(self.raw_dir, "guacamol_v1_train.smiles"))
+        os.rename(
+            train_path,
+            osp.join(self.raw_dir, "guacamol_v1_train.smiles"),
+        )
         train_path = osp.join(self.raw_dir, "guacamol_v1_train.smiles")
 
         test_path = download_url(self.test_url, self.raw_dir)
-        os.rename(test_path, osp.join(self.raw_dir, "guacamol_v1_test.smiles"))
+        os.rename(
+            test_path,
+            osp.join(self.raw_dir, "guacamol_v1_test.smiles"),
+        )
         test_path = osp.join(self.raw_dir, "guacamol_v1_test.smiles")
 
         valid_path = download_url(self.valid_url, self.raw_dir)
-        os.rename(valid_path, osp.join(self.raw_dir, "guacamol_v1_valid.smiles"))
+        os.rename(
+            valid_path,
+            osp.join(self.raw_dir, "guacamol_v1_valid.smiles"),
+        )
         valid_path = osp.join(self.raw_dir, "guacamol_v1_valid.smiles")
 
         # check the hashes
@@ -177,7 +205,9 @@ class GuacamolDataset(InMemoryDataset):
                 smiles_kept.append(smile)
 
         statistics = compute_all_statistics(
-            data_list, self.atom_encoder, charge_dic={-1: 0, 0: 1, 1: 2, 2: 3, 3: 4}
+            data_list,
+            self.atom_encoder,
+            charge_dic={-1: 0, 0: 1, 1: 2, 2: 3, 3: 4},
         )
         save_pickle(statistics.num_nodes, self.processed_paths[1])
         np.save(self.processed_paths[2], statistics.node_types)
@@ -202,13 +232,19 @@ class GuacamolDataModule(MolecularDataModule):
 
         datasets = {
             "train": GuacamolDataset(
-                split="train", root=root_path, pre_transform=RemoveYTransform()
+                split="train",
+                root=root_path,
+                pre_transform=RemoveYTransform(),
             ),
             "val": GuacamolDataset(
-                split="val", root=root_path, pre_transform=RemoveYTransform()
+                split="val",
+                root=root_path,
+                pre_transform=RemoveYTransform(),
             ),
             "test": GuacamolDataset(
-                split="test", root=root_path, pre_transform=RemoveYTransform()
+                split="test",
+                root=root_path,
+                pre_transform=RemoveYTransform(),
             ),
         }
 
@@ -238,7 +274,10 @@ class GuacamolInfos(AbstractDatasetInfos):
 
         # dimensions, input_dims is calculated later
         self.output_dims = PlaceHolder(
-            X=self.num_node_types, charge=self.num_charge_types, E=5, y=0
+            X=self.num_node_types,
+            charge=self.num_charge_types,
+            E=5,
+            y=0,
         )
 
         # dataset specific settings

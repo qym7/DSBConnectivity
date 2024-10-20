@@ -5,15 +5,15 @@ project_name: planar_edge_remove
 # data
 graph: True
 
-dataset_transfer:
+dataset:
   batch_size: ${batch_size}
   num_workers: 8
 
-  name: planar_edge_remove
+  name: planar
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/planar_edge/'
+  datadir: 'data/planar/planar_edge/'
 
   num_graphs: 200
   num_nodes: 35
@@ -22,15 +22,15 @@ dataset_transfer:
 # transfer
 transfer: True
 
-dataset:
+dataset_transfer:
   batch_size: ${batch_size}
   num_workers: 8
 
-  name: planar_edge_remove
+  name: planar
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/planar_edge_remove_10/'
+  datadir: 'data/planar/planar_edge_remove_10/'
 
   num_graphs: 200
   num_nodes: 35

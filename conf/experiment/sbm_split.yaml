@@ -11,7 +11,7 @@ dataset_transfer:
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/sbm_split4/'
+  datadir: 'data/sbm/sbm_3clusters/'
 
   num_graphs: 200
   num_nodes: 35
@@ -30,7 +30,7 @@ dataset:
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/sbm_split5/'
+  datadir: 'data/sbm/sbm_2clusters/'
 
   num_graphs: 200
   num_nodes: 35
@@ -44,7 +44,5 @@ samples_to_save: 20
 chains_to_save: 4
 final_samples_to_generate: 40
 final_samples_to_save: 30
-final_chains_to_save: 20
 clean_loss_weight: 0.0
 final_chains_to_save: 8
-final_samples_to_generate: 40

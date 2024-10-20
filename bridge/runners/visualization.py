@@ -37,7 +37,12 @@ class Visualizer:
         graph.X = graph.X.cpu().numpy()
 
         for i in range(len(graph.X)):
-            nx_graph.add_node(i, number=i, symbol=graph.X[i], color_val=graph.X[i])
+            nx_graph.add_node(
+                i,
+                number=i,
+                symbol=graph.X[i],
+                color_val=graph.X[i],
+            )
 
         adj = graph.E.cpu().numpy()
         if len(adj.shape) == 3:
@@ -52,12 +57,17 @@ class Visualizer:
             # if edge_type > 100:
             #     import pdb; pdb.set_trace()
             nx_graph.add_edge(
-                edge[0], edge[1], color=float(edge_type), weight=3 * edge_type
+                edge[0],
+                edge[1],
+                color=float(edge_type),
+                weight=3 * edge_type,
             )
 
         return nx_graph.to_undirected()
 
-    def visualize_non_molecule(self, graph, pos, path, iterations=100, node_size=100):
+    def visualize_non_molecule(
+        self, graph, pos, path, iterations=100, node_size=100
+    ):
         if pos is None:
             pos = nx.spring_layout(graph, iterations=iterations)
 
@@ -102,7 +112,9 @@ class Visualizer:
         num_graphs = graphs.X.shape[0]
         num_graphs_to_visualize = min(num_graphs_to_visualize, num_graphs)
         if num_graphs_to_visualize > 0:
-            print(f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}")
+            print(
+                f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}"
+            )
 
         import pdb
 
@@ -119,12 +131,17 @@ class Visualizer:
                     print("Can't kekulize molecule")
             else:
                 nx_graph = self.to_networkx_graph(graph_list[i])
-                self.visualize_non_molecule(graph=nx_graph, pos=None, path=file_path)
+                self.visualize_non_molecule(
+                    graph=nx_graph, pos=None, path=file_path
+                )
 
             if wandb.run and log is not None:
                 if i < 3:
                     print(f"Saving {file_path} to wandb")
-                wandb.log({log: [wandb.Image(file_path)]}, commit=False)
+                wandb.log(
+                    {log: [wandb.Image(file_path)]},
+                    commit=False,
+                )
 
     def visualize_chains(
         self,
@@ -163,7 +180,8 @@ class Visualizer:
                 if self.is_molecular:
                     graphs.append(
                         Molecule(
-                            graph=graph, atom_decoder=self.dataset_infos.atom_decoder
+                            graph=graph,
+                            atom_decoder=self.dataset_infos.atom_decoder,
                         )
                     )
                 else:
@@ -206,7 +224,9 @@ class Visualizer:
                     )
                 else:
                     self.visualize_non_molecule(
-                        graph=graphs[frame], pos=final_pos, path=file_name
+                        graph=graphs[frame],
+                        pos=final_pos,
+                        path=file_name,
                     )
                 save_paths.append(file_name)
             print(
@@ -222,9 +242,18 @@ class Visualizer:
             imageio.mimsave(gif_path, imgs, subrectangles=True, duration=200)
             if wandb.run:
                 wandb.log(
-                    {"chain": [wandb.Video(gif_path, caption=gif_path, format="gif")]}
+                    {
+                        "chain": [
+                            wandb.Video(
+                                gif_path,
+                                caption=gif_path,
+                                format="gif",
+                            )
+                        ]
+                    }
                 )
                 print(f"Saving {gif_path} to wandb")
                 wandb.log(
-                    {"chain": wandb.Video(gif_path, fps=8, format="gif")}, commit=True
+                    {"chain": wandb.Video(gif_path, fps=8, format="gif")},
+                    commit=True,
                 )

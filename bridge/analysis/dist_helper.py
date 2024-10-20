@@ -126,7 +126,14 @@ def disc(samples1, samples2, kernel, is_parallel=True, *args, **kwargs):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for dist in executor.map(
                 kernel_parallel_worker,
-                [(s1, samples2, partial(kernel, *args, **kwargs)) for s1 in samples1],
+                [
+                    (
+                        s1,
+                        samples2,
+                        partial(kernel, *args, **kwargs),
+                    )
+                    for s1 in samples1
+                ],
             ):
                 d += dist
     if len(samples1) * len(samples2) > 0:
@@ -155,4 +162,7 @@ def compute_emd(samples1, samples2, kernel, is_hist=True, *args, **kwargs):
     if is_hist:
         samples1 = [np.mean(samples1)]
         samples2 = [np.mean(samples2)]
-    return disc(samples1, samples2, kernel, *args, **kwargs), [samples1[0], samples2[0]]
+    return disc(samples1, samples2, kernel, *args, **kwargs), [
+        samples1[0],
+        samples2[0],
+    ]

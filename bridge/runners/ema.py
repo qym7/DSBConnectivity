@@ -10,7 +10,8 @@ class EMAHelper(object):
 
     def register(self, module):
         if isinstance(module, nn.DataParallel) or isinstance(
-            module, nn.parallel.distributed.DistributedDataParallel
+            module,
+            nn.parallel.distributed.DistributedDataParallel,
         ):
             module = module.module
         for name, param in module.named_parameters():
@@ -19,7 +20,8 @@ class EMAHelper(object):
 
     def update(self, module):
         if isinstance(module, nn.DataParallel) or isinstance(
-            module, nn.parallel.distributed.DistributedDataParallel
+            module,
+            nn.parallel.distributed.DistributedDataParallel,
         ):
             module = module.module
         for name, param in module.named_parameters():
@@ -30,7 +32,8 @@ class EMAHelper(object):
 
     def ema(self, module):
         if isinstance(module, nn.DataParallel) or isinstance(
-            module, nn.parallel.distributed.DistributedDataParallel
+            module,
+            nn.parallel.distributed.DistributedDataParallel,
         ):
             module = module.module
         for name, param in module.named_parameters():
@@ -39,7 +42,8 @@ class EMAHelper(object):
 
     def ema_copy(self, module):
         if isinstance(module, nn.DataParallel) or isinstance(
-            module, nn.parallel.distributed.DistributedDataParallel
+            module,
+            nn.parallel.distributed.DistributedDataParallel,
         ):
             inner_module = module.module
             locs = inner_module.locals

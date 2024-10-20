@@ -24,6 +24,6 @@ final_chains_to_save: 10
 # training
 batch_size: 32
 
-num_iter : 10
-n_ipf: 10
+num_iter: 10
+num_steps: 10
 n_ipf: 2

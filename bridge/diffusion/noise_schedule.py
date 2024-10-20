@@ -32,7 +32,8 @@ class PredefinedNoiseSchedule(torch.nn.Module):
         # print('gamma', -log_alphas2_to_sigmas2)
 
         self.gamma = torch.nn.Parameter(
-            torch.from_numpy(-log_alphas2_to_sigmas2).float(), requires_grad=False
+            torch.from_numpy(-log_alphas2_to_sigmas2).float(),
+            requires_grad=False,
         )
 
     def forward(self, t):
@@ -79,7 +80,13 @@ class PredefinedNoiseScheduleDiscrete(torch.nn.Module):
 
 
 class MarginalUniformTransition:
-    def __init__(self, x_marginals, e_marginals, y_classes, charge_marginals):
+    def __init__(
+        self,
+        x_marginals,
+        e_marginals,
+        y_classes,
+        charge_marginals,
+    ):
         self.X_classes = len(x_marginals)
         self.E_classes = len(e_marginals)
         self.y_classes = y_classes
@@ -95,8 +102,12 @@ class MarginalUniformTransition:
                 .unsqueeze(0)
             )
 
-        self.u_x = x_marginals.unsqueeze(0).expand(self.X_classes, -1).unsqueeze(0)
-        self.u_e = e_marginals.unsqueeze(0).expand(self.E_classes, -1).unsqueeze(0)
+        self.u_x = (
+            x_marginals.unsqueeze(0).expand(self.X_classes, -1).unsqueeze(0)
+        )
+        self.u_e = (
+            e_marginals.unsqueeze(0).expand(self.E_classes, -1).unsqueeze(0)
+        )
         self.u_y = torch.ones(1, self.y_classes, self.y_classes)
         if self.y_classes > 0:
             self.u_y = self.u_y / self.y_classes
@@ -106,7 +117,8 @@ class MarginalUniformTransition:
         Qt = (1 - beta_t) * I + beta_t / K
 
         beta_t: (bs)                         noise level between 0 and 1
-        returns: qx (bs, dx, dx), qe (bs, de, de), qy (bs, dy, dy)."""
+        returns: qx (bs, dx, dx), qe (bs, de, de), qy (bs, dy, dy).
+        """
         beta_t = beta_t.unsqueeze(1)
         beta_t = beta_t.to(device)
         self.u_x = self.u_x.to(device)
@@ -162,7 +174,8 @@ class MarginalUniformTransition:
         if self.charge_marginals.numel() > 0:
             self.u_charge = self.u_charge.to(device)
             q_charge = (
-                alpha_bar_t * torch.eye(self.charge_classes, device=device).unsqueeze(0)
+                alpha_bar_t
+                * torch.eye(self.charge_classes, device=device).unsqueeze(0)
                 + (1 - alpha_bar_t) * self.u_charge
             )
 
@@ -170,7 +183,13 @@ class MarginalUniformTransition:
 
 
 class AbsorbingStateTransition:
-    def __init__(self, abs_state: int, x_classes: int, e_classes: int, y_classes: int):
+    def __init__(
+        self,
+        abs_state: int,
+        x_classes: int,
+        e_classes: int,
+        y_classes: int,
+    ):
         self.X_classes = x_classes
         self.E_classes = e_classes
         self.y_classes = y_classes
@@ -187,9 +206,15 @@ class AbsorbingStateTransition:
     def get_Qt(self, beta_t):
         """Returns two transition matrix for X and E"""
         beta_t = beta_t.unsqueeze(1)
-        q_x = beta_t * self.u_x + (1 - beta_t) * torch.eye(self.X_classes).unsqueeze(0)
-        q_e = beta_t * self.u_e + (1 - beta_t) * torch.eye(self.E_classes).unsqueeze(0)
-        q_y = beta_t * self.u_y + (1 - beta_t) * torch.eye(self.y_classes).unsqueeze(0)
+        q_x = beta_t * self.u_x + (1 - beta_t) * torch.eye(
+            self.X_classes
+        ).unsqueeze(0)
+        q_e = beta_t * self.u_e + (1 - beta_t) * torch.eye(
+            self.E_classes
+        ).unsqueeze(0)
+        q_y = beta_t * self.u_y + (1 - beta_t) * torch.eye(
+            self.y_classes
+        ).unsqueeze(0)
         return q_x, q_e, q_y
 
     def get_Qt_bar(self, alpha_bar_t):

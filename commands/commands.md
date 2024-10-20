@@ -4,10 +4,14 @@
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=debug num_steps=10 num_iter=10 n_ipf=10 virtual_node=False rand_time=True
 
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=planar_edge_remove name=debug num_steps=10 num_iter=10 n_ipf=10 virtual_node=False rand_time=True
+
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=sbm_split name=debug num_steps=10 num_iter=10 n_ipf=10 virtual_node=False rand_time=True
+
 CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles_less_transfer name=qm9less_01noise_5k_clip05_virtual num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=True noise_level=0.1 grad_clip=0.5
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles_less_transfer name=qm9less_005noise_5k_clip05_virtual num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.05 grad_clip=1.0 virtual_node=True
-
 
 (TORUN) CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=qm9_005noise_5k_clip05_virtual num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.05 grad_clip=1.0 virtual_node=True
 
@@ -49,7 +53,6 @@ CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=qm9_01noise_5k
 
 
 (*) CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles num_steps=50 virtual_node=False  test=True  forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip05/sample_net_f_68_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip05_ipf68_10k
-
 
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True num_iter=10 n_ipf=10 virtual_node=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip1_virtual/net_f_73_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip1_virtual_10k

@@ -5,11 +5,13 @@ from .. import utils
 class ExtraMolecularFeatures:
     def __init__(self, dataset_infos):
         self.charge = ChargeFeature(
-            remove_h=dataset_infos.remove_h, valencies=dataset_infos.valencies
+            remove_h=dataset_infos.remove_h,
+            valencies=dataset_infos.valencies,
         )
         self.valency = ValencyFeature()
         self.weight = WeightFeature(
-            max_weight=dataset_infos.max_weight, atom_weights=dataset_infos.atom_weights
+            max_weight=dataset_infos.max_weight,
+            atom_weights=dataset_infos.atom_weights,
         )
 
     def __call__(self, noisy_data):
@@ -22,7 +24,9 @@ class ExtraMolecularFeatures:
         )
 
         return utils.PlaceHolder(
-            X=torch.cat((charge, valency), dim=-1), E=extra_edge_attr, y=weight
+            X=torch.cat((charge, valency), dim=-1),
+            E=extra_edge_attr,
+            y=weight,
         )
 
 

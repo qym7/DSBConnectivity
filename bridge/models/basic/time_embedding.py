@@ -14,7 +14,8 @@ def get_timestep_embedding(timesteps, embedding_dim=128):
     half_dim = embedding_dim // 2
     emb = math.log(10000) / (half_dim - 1)
     emb = torch.exp(
-        torch.arange(half_dim, dtype=torch.float, device=timesteps.device) * -emb
+        torch.arange(half_dim, dtype=torch.float, device=timesteps.device)
+        * -emb
     )
 
     emb = timesteps.float() * emb.unsqueeze(0)

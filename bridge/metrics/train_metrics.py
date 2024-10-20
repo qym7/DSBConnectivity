@@ -37,15 +37,21 @@ class TrainLossDiscrete(nn.Module):
         if log:
             to_log = {
                 "train_loss/batch_CE": (loss_X + loss_E + loss_y).detach(),
-                "train_loss/X_CE": self.node_loss.compute()
-                if true_data.node.numel() > 0
-                else -1,
-                "train_loss/E_CE": self.edge_loss.compute()
-                if true_data.edge_attr.numel() > 0
-                else -1,
+                "train_loss/X_CE": (
+                    self.node_loss.compute()
+                    if true_data.node.numel() > 0
+                    else -1
+                ),
+                "train_loss/E_CE": (
+                    self.edge_loss.compute()
+                    if true_data.edge_attr.numel() > 0
+                    else -1
+                ),
                 # "train_loss/y_CE": loss_y if pred.y.numel() > 0 else -1,
                 "train_loss/y_CE": -1,
-                "train_loss/charge_CE": loss_charge if pred.charge.numel() > 0 else -1,
+                "train_loss/charge_CE": (
+                    loss_charge if pred.charge.numel() > 0 else -1
+                ),
             }
             if wandb.run:
                 wandb.log(to_log, commit=True)
@@ -58,21 +64,33 @@ class TrainLossDiscrete(nn.Module):
         )
 
     def reset(self):
-        for metric in [self.node_loss, self.edge_loss, self.y_loss]:
+        for metric in [
+            self.node_loss,
+            self.edge_loss,
+            self.y_loss,
+        ]:
             metric.reset()
 
     def log_epoch_metrics(self):
         epoch_node_loss = (
-            self.node_loss.compute() if self.node_loss.total_samples > 0 else -1
+            self.node_loss.compute()
+            if self.node_loss.total_samples > 0
+            else -1
         )
         epoch_edge_loss = (
-            self.edge_loss.compute() if self.edge_loss.total_samples > 0 else -1
+            self.edge_loss.compute()
+            if self.edge_loss.total_samples > 0
+            else -1
         )
         epoch_y_loss = (
-            self.train_y_loss.compute() if self.y_loss.total_samples > 0 else -1
+            self.train_y_loss.compute()
+            if self.y_loss.total_samples > 0
+            else -1
         )
         epoch_charge_loss = (
-            self.charge_loss.compute() if self.charge_loss.total_samples > 0 else -1
+            self.charge_loss.compute()
+            if self.charge_loss.total_samples > 0
+            else -1
         )
 
         to_log = {

@@ -9,13 +9,13 @@ dataset:
   extra_features: 'molecule'
 
   name: "qm9_smiles"
-  datadir: 'data/qm9_less/qm9_pyg_less/'
+  datadir: 'data/qm9/qm9_pyg_less/'
   remove_h: True
   random_subset: null
   pin_memory: False
 
 # transfer
-transfer: False
+transfer: True
 virtual_node: False
 dataset_transfer:
   batch_size: ${batch_size}
@@ -24,14 +24,15 @@ dataset_transfer:
   extra_features: 'molecule'
 
   name: "qm9_smiles"
-  datadir: 'data/qm9_less/qm9_pyg_less/'
+  datadir: 'data/qm9/qm9_pyg_greater/'
   remove_h: True
   random_subset: null
   pin_memory: False
 
 # settings for evaluations
-load: False
-samples_to_generate: 1028
+forward_path: null
+backward_path: null
+samples_to_generate: 1024
 samples_to_save: 20
 chains_to_save: 2
 final_samples_to_generate: 10000

@@ -6,7 +6,7 @@ dataset:
   num_workers: 8
 
   name: 'sbm'
-  datadir: 'data/sbm'
+  datadir: 'data/sbm/sbm'
   remove_h: null
   molecules: False
   spectre: True
@@ -18,8 +18,6 @@ samples_to_generate: 40
 samples_to_save: 20
 chains_to_save: 4
 final_samples_to_generate: 40
-final_samples_to_save: 30
-final_chains_to_save: 20
-clean_loss_weight: 0.0
+final_samples_to_save: 10
 final_chains_to_save: 8
-final_samples_to_generate: 40
+clean_loss_weight: 0.0

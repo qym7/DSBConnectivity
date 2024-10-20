@@ -15,6 +15,9 @@ try:
 except ModuleNotFoundError:
     print("Graph tool could not be loaded")
 
+import os
+
+os.environ["DGLBACKEND"] = "pytorch"  # or 'tensorflow', 'mxnet'
 import dgl
 import wandb
 import pygsp as pg
@@ -30,7 +33,11 @@ from datetime import datetime
 from scipy.linalg import eigvalsh
 from scipy.stats import chi2
 from string import ascii_uppercase, digits
-from torch_geometric.utils import to_dense_adj, is_undirected, to_networkx
+from torch_geometric.utils import (
+    to_dense_adj,
+    is_undirected,
+    to_networkx,
+)
 
 from ..utils import SparsePlaceHolder
 from ..analysis.dist_helper import (
@@ -62,7 +69,12 @@ def degree_worker(G):
     return np.array(nx.degree_histogram(G))
 
 
-def degree_stats(graph_ref_list, graph_pred_list, is_parallel=True, compute_emd=False):
+def degree_stats(
+    graph_ref_list,
+    graph_pred_list,
+    is_parallel=True,
+    compute_emd=False,
+):
     """Compute the distance between the degree distributions of two unordered sets of graphs.
     Args:
         graph_ref_list, graph_target_list: two lists of networkx graphs to be evaluated
@@ -80,14 +92,18 @@ def degree_stats(graph_ref_list, graph_pred_list, is_parallel=True, compute_emd=
             for deg_hist in executor.map(degree_worker, graph_ref_list):
                 sample_ref.append(deg_hist)
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for deg_hist in executor.map(degree_worker, graph_pred_list_remove_empty):
+            for deg_hist in executor.map(
+                degree_worker, graph_pred_list_remove_empty
+            ):
                 sample_pred.append(deg_hist)
     else:
         for i in range(len(graph_ref_list)):
             degree_temp = np.array(nx.degree_histogram(graph_ref_list[i]))
             sample_ref.append(degree_temp)
         for i in range(len(graph_pred_list_remove_empty)):
-            degree_temp = np.array(nx.degree_histogram(graph_pred_list_remove_empty[i]))
+            degree_temp = np.array(
+                nx.degree_histogram(graph_pred_list_remove_empty[i])
+            )
             sample_pred.append(degree_temp)
 
     # mmd_dist = compute_mmd(sample_ref, sample_pred, kernel=gaussian_emd)
@@ -117,21 +133,30 @@ def spectral_worker(G, n_eigvals=-1):
         eigs = np.zeros(G.number_of_nodes())
     if n_eigvals > 0:
         eigs = eigs[1 : n_eigvals + 1]
-    spectral_pmf, _ = np.histogram(eigs, bins=200, range=(-1e-5, 2), density=False)
+    spectral_pmf, _ = np.histogram(
+        eigs, bins=200, range=(-1e-5, 2), density=False
+    )
     spectral_pmf = spectral_pmf / spectral_pmf.sum()
     return spectral_pmf
 
 
 def get_spectral_pmf(eigs, max_eig):
     spectral_pmf, _ = np.histogram(
-        np.clip(eigs, 0, max_eig), bins=200, range=(-1e-5, max_eig), density=False
+        np.clip(eigs, 0, max_eig),
+        bins=200,
+        range=(-1e-5, max_eig),
+        density=False,
     )
     spectral_pmf = spectral_pmf / spectral_pmf.sum()
     return spectral_pmf
 
 
 def eigval_stats(
-    eig_ref_list, eig_pred_list, max_eig=20, is_parallel=True, compute_emd=False
+    eig_ref_list,
+    eig_pred_list,
+    max_eig=20,
+    is_parallel=True,
+    compute_emd=False,
 ):
     """Compute the distance between the degree distributions of two unordered sets of graphs.
     Args:
@@ -264,7 +289,10 @@ def spectral_filter_stats(
         for i in range(len(eigval_ref_list)):
             try:
                 spectral_temp = get_spectral_filter_worker(
-                    eigvec_ref_list[i], eigval_ref_list[i], filters, bound
+                    eigvec_ref_list[i],
+                    eigval_ref_list[i],
+                    filters,
+                    bound,
                 )
                 sample_ref.append(spectral_temp)
             except:
@@ -272,7 +300,10 @@ def spectral_filter_stats(
         for i in range(len(eigval_pred_list)):
             try:
                 spectral_temp = get_spectral_filter_worker(
-                    eigvec_pred_list[i], eigval_pred_list[i], filters, bound
+                    eigvec_pred_list[i],
+                    eigval_pred_list[i],
+                    filters,
+                    bound,
                 )
                 sample_pred.append(spectral_temp)
             except:
@@ -292,7 +323,11 @@ def spectral_filter_stats(
 
 
 def spectral_stats(
-    graph_ref_list, graph_pred_list, is_parallel=True, n_eigvals=-1, compute_emd=False
+    graph_ref_list,
+    graph_pred_list,
+    is_parallel=True,
+    n_eigvals=-1,
+    compute_emd=False,
 ):
     """Compute the distance between the degree distributions of two unordered sets of graphs.
     Args:
@@ -309,7 +344,9 @@ def spectral_stats(
     if is_parallel:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for spectral_density in executor.map(
-                spectral_worker, graph_ref_list, [n_eigvals for i in graph_ref_list]
+                spectral_worker,
+                graph_ref_list,
+                [n_eigvals for i in graph_ref_list],
             ):
                 sample_ref.append(spectral_density)
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -324,7 +361,9 @@ def spectral_stats(
             spectral_temp = spectral_worker(graph_ref_list[i], n_eigvals)
             sample_ref.append(spectral_temp)
         for i in range(len(graph_pred_list_remove_empty)):
-            spectral_temp = spectral_worker(graph_pred_list_remove_empty[i], n_eigvals)
+            spectral_temp = spectral_worker(
+                graph_pred_list_remove_empty[i], n_eigvals
+            )
             sample_pred.append(spectral_temp)
 
     # mmd_dist = compute_mmd(sample_ref, sample_pred, kernel=gaussian_emd)
@@ -350,13 +389,20 @@ def clustering_worker(param):
     G, bins = param
     clustering_coeffs_list = list(nx.clustering(G).values())
     hist, _ = np.histogram(
-        clustering_coeffs_list, bins=bins, range=(0.0, 1.0), density=False
+        clustering_coeffs_list,
+        bins=bins,
+        range=(0.0, 1.0),
+        density=False,
     )
     return hist
 
 
 def clustering_stats(
-    graph_ref_list, graph_pred_list, bins=100, is_parallel=True, compute_emd=False
+    graph_ref_list,
+    graph_pred_list,
+    bins=100,
+    is_parallel=True,
+    compute_emd=False,
 ):
     sample_ref = []
     sample_pred = []
@@ -368,12 +414,14 @@ def clustering_stats(
     if is_parallel:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for clustering_hist in executor.map(
-                clustering_worker, [(G, bins) for G in graph_ref_list]
+                clustering_worker,
+                [(G, bins) for G in graph_ref_list],
             ):
                 sample_ref.append(clustering_hist)
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for clustering_hist in executor.map(
-                clustering_worker, [(G, bins) for G in graph_pred_list_remove_empty]
+                clustering_worker,
+                [(G, bins) for G in graph_pred_list_remove_empty],
             ):
                 sample_pred.append(clustering_hist)
 
@@ -385,9 +433,14 @@ def clustering_stats(
         # print(total)
     else:
         for i in range(len(graph_ref_list)):
-            clustering_coeffs_list = list(nx.clustering(graph_ref_list[i]).values())
+            clustering_coeffs_list = list(
+                nx.clustering(graph_ref_list[i]).values()
+            )
             hist, _ = np.histogram(
-                clustering_coeffs_list, bins=bins, range=(0.0, 1.0), density=False
+                clustering_coeffs_list,
+                bins=bins,
+                range=(0.0, 1.0),
+                density=False,
             )
             sample_ref.append(hist)
 
@@ -396,7 +449,10 @@ def clustering_stats(
                 nx.clustering(graph_pred_list_remove_empty[i]).values()
             )
             hist, _ = np.histogram(
-                clustering_coeffs_list, bins=bins, range=(0.0, 1.0), density=False
+                clustering_coeffs_list,
+                bins=bins,
+                range=(0.0, 1.0),
+                density=False,
             )
             sample_pred.append(hist)
 
@@ -412,7 +468,10 @@ def clustering_stats(
         )
     else:
         mmd_dist = compute_mmd(
-            sample_ref, sample_pred, kernel=gaussian_tv, sigma=1.0 / 10
+            sample_ref,
+            sample_pred,
+            kernel=gaussian_tv,
+            sigma=1.0 / 10,
         )
 
     elapsed = datetime.now() - prev
@@ -445,10 +504,17 @@ def edge_list_reindexed(G):
 def orca(graph):
     # tmp_fname = f'analysis/orca/tmp_{"".join(secrets.choice(ascii_uppercase + digits) for i in range(8))}.txt'
     tmp_fname = f'../analysis/orca/tmp_{"".join(secrets.choice(ascii_uppercase + digits) for i in range(8))}.txt'
-    tmp_fname = os.path.join(os.path.dirname(os.path.realpath(__file__)), tmp_fname)
+    tmp_fname = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), tmp_fname
+    )
     # print(tmp_fname, flush=True)
     f = open(tmp_fname, "w")
-    f.write(str(graph.number_of_nodes()) + " " + str(graph.number_of_edges()) + "\n")
+    f.write(
+        str(graph.number_of_nodes())
+        + " "
+        + str(graph.number_of_edges())
+        + "\n"
+    )
     for u, v in edge_list_reindexed(graph):
         f.write(str(u) + " " + str(v) + "\n")
     f.close()
@@ -456,7 +522,8 @@ def orca(graph):
         [
             str(
                 os.path.join(
-                    os.path.dirname(os.path.realpath(__file__)), "../analysis/orca/orca"
+                    os.path.dirname(os.path.realpath(__file__)),
+                    "../analysis/orca/orca",
                 )
             ),
             "node",
@@ -548,11 +615,17 @@ def motif_stats(
         # EMD option uses the same computation as GraphRNN, the alternative is MMD as computed by GRAN
         # mmd_dist = compute_mmd(total_counts_ref, total_counts_pred, kernel=emd, is_hist=False)
         mmd_dist = compute_mmd(
-            total_counts_ref, total_counts_pred, kernel=gaussian, is_hist=False
+            total_counts_ref,
+            total_counts_pred,
+            kernel=gaussian,
+            is_hist=False,
         )
     else:
         mmd_dist = compute_mmd(
-            total_counts_ref, total_counts_pred, kernel=gaussian, is_hist=False
+            total_counts_ref,
+            total_counts_pred,
+            kernel=gaussian,
+            is_hist=False,
         )
     return mmd_dist
 
@@ -638,6 +711,38 @@ def eval_acc_grid_graph(G_list, grid_start=10, grid_end=20):
     return count / float(len(G_list))
 
 
+# def eval_acc_sbm_graph(
+#     G_list,
+#     p_intra=0.3,
+#     p_inter=0.005,
+#     strict=True,
+#     refinement_steps=1000,
+#     is_parallel=True,
+# ):
+#     count = 0.0
+#     if is_parallel:
+#         with concurrent.futures.ThreadPoolExecutor() as executor:
+#             for prob in executor.map(
+#                 is_sbm_graph,
+#                 [gg for gg in G_list],
+#                 [p_intra for i in range(len(G_list))],
+#                 [p_inter for i in range(len(G_list))],
+#                 [strict for i in range(len(G_list))],
+#                 [refinement_steps for i in range(len(G_list))],
+#             ):
+#                 count += prob
+#     else:
+#         for gg in G_list:
+#             count += is_sbm_graph(
+#                 gg,
+#                 p_intra=p_intra,
+#                 p_inter=p_inter,
+#                 strict=strict,
+#                 refinement_steps=refinement_steps,
+#             )
+#     return count / float(len(G_list))
+
+
 def eval_acc_sbm_graph(
     G_list,
     p_intra=0.3,
@@ -705,7 +810,9 @@ def is_lobster_graph(G):
         num_degree_one = [d for n, d in G.degree() if d == 1]
         num_degree_two = [d for n, d in G.degree() if d == 2]
 
-        if sum(num_degree_one) == 2 and sum(num_degree_two) == 2 * (num_nodes - 2):
+        if sum(num_degree_one) == 2 and sum(num_degree_two) == 2 * (
+            num_nodes - 2
+        ):
             return True
         elif sum(num_degree_one) == 0 and sum(num_degree_two) == 0:
             return True
@@ -742,7 +849,13 @@ def is_grid_graph(G):
         return False
 
 
-def is_sbm_graph(G, p_intra=0.3, p_inter=0.005, strict=True, refinement_steps=1000):
+def is_sbm_graph(
+    G,
+    p_intra=0.3,
+    p_inter=0.005,
+    strict=True,
+    refinement_steps=1000,
+):
     """
     Check if how closely given graph matches a SBM with given probabilites by computing mean probability of Wald test statistic for each recovered parameter
     """
@@ -782,12 +895,18 @@ def is_sbm_graph(G, p_intra=0.3, p_inter=0.005, strict=True, refinement_steps=10
     max_intra_edges = node_counts * (node_counts - 1)
     est_p_intra = np.diagonal(edge_counts) / (max_intra_edges + 1e-6)
 
-    max_inter_edges = node_counts.reshape((-1, 1)) @ node_counts.reshape((1, -1))
+    max_inter_edges = node_counts.reshape((-1, 1)) @ node_counts.reshape(
+        (1, -1)
+    )
     np.fill_diagonal(edge_counts, 0)
     est_p_inter = edge_counts / (max_inter_edges + 1e-6)
 
-    W_p_intra = (est_p_intra - p_intra) ** 2 / (est_p_intra * (1 - est_p_intra) + 1e-6)
-    W_p_inter = (est_p_inter - p_inter) ** 2 / (est_p_inter * (1 - est_p_inter) + 1e-6)
+    W_p_intra = (est_p_intra - p_intra) ** 2 / (
+        est_p_intra * (1 - est_p_intra) + 1e-6
+    )
+    W_p_inter = (est_p_inter - p_inter) ** 2 / (
+        est_p_inter * (1 - est_p_inter) + 1e-6
+    )
 
     W = W_p_inter.copy()
     np.fill_diagonal(W, W_p_intra)
@@ -879,7 +998,11 @@ def eval_fraction_unique_non_isomorphic_valid(
     frac_unique_non_isomorphic_valid = count_valid / float(
         len(fake_graphs)
     )  # Fraction of distinct isomorphism classes in the fake graphs that are not in the training set and are valid
-    return frac_unique, frac_unique_non_isomorphic, frac_unique_non_isomorphic_valid
+    return (
+        frac_unique,
+        frac_unique_non_isomorphic,
+        frac_unique_non_isomorphic_valid,
+    )
 
 
 class SpectreSamplingMetrics(nn.Module):
@@ -934,7 +1057,10 @@ class SpectreSamplingMetrics(nn.Module):
         )  # take a gin-model with predefined params and random weights
         fid_evaluator = FIDEvaluation(model=gin_model)
         rbf_evaluator = MMDEvaluation(
-            model=gin_model, kernel="rbf", sigma="range", multiplier="mean"
+            model=gin_model,
+            kernel="rbf",
+            sigma="range",
+            multiplier="mean",
         )
         # pass the generated graphs and reference graphs to networkx
         generated_max_comp = []
@@ -950,19 +1076,27 @@ class SpectreSamplingMetrics(nn.Module):
             g = dgl.DGLGraph(g)
             test_max_comp.append(g)
 
-        (generated_dataset, reference_dataset), _ = fid_evaluator.get_activations(
-            generated_max_comp, test_max_comp
+        (generated_dataset, reference_dataset), _ = (
+            fid_evaluator.get_activations(generated_max_comp, test_max_comp)
         )
         fid, _ = fid_evaluator.evaluate(
-            generated_dataset=generated_dataset, reference_dataset=reference_dataset
+            generated_dataset=generated_dataset,
+            reference_dataset=reference_dataset,
         )
         rbf, _ = rbf_evaluator.evaluate(
-            generated_dataset=generated_dataset, reference_dataset=reference_dataset
+            generated_dataset=generated_dataset,
+            reference_dataset=reference_dataset,
         )
 
         return fid, rbf
 
-    def forward(self, generated_graphs: list, current_epoch, local_rank, test: bool):
+    def forward(
+        self,
+        generated_graphs: list,
+        current_epoch,
+        local_rank,
+        test: bool,
+    ):
         print(
             f"Computing sampling metrics between {len(generated_graphs)} generated graphs and {len(self.val_graphs)}"
             f" test graphs -- emd computation: {self.compute_emd}"
@@ -982,7 +1116,10 @@ class SpectreSamplingMetrics(nn.Module):
         # networkx_graphs = self.train_graphs # to be deleted
 
         print("Saving all adjacency matrices")
-        np.savez(f"generated_adjs{random.randint(0, 10000)}.npz", *adjacency_matrices)
+        np.savez(
+            f"generated_adjs{random.randint(0, 10000)}.npz",
+            *adjacency_matrices,
+        )
 
         to_log = {}
 
@@ -1051,7 +1188,9 @@ class SpectreSamplingMetrics(nn.Module):
         if "orbit" in self.metrics_list:
             print("Computing orbit stats...")
             orbit = orbit_stats_all(
-                test_graphs, networkx_graphs, compute_emd=self.compute_emd
+                test_graphs,
+                networkx_graphs,
+                compute_emd=self.compute_emd,
             )
             to_log["orbit"] = orbit
             if wandb.run is not None:
@@ -1059,7 +1198,11 @@ class SpectreSamplingMetrics(nn.Module):
 
         if "sbm" in self.metrics_list:
             print("Computing accuracy...")
-            acc = eval_acc_sbm_graph(networkx_graphs, refinement_steps=100, strict=True)
+            acc = eval_acc_sbm_graph(
+                networkx_graphs,
+                refinement_steps=100,
+                strict=True,
+            )
             to_log["sbm_acc"] = acc
             if wandb.run is not None:
                 wandb.run.summary["sbmacc"] = acc
@@ -1105,7 +1248,13 @@ class Comm20SamplingMetrics(SpectreSamplingMetrics):
         super().__init__(
             dataloaders=dataloaders,
             compute_emd=True,
-            metrics_list=["degree", "clustering", "orbit", "spectre", "neural"],
+            metrics_list=[
+                "degree",
+                "clustering",
+                "orbit",
+                "spectre",
+                "neural",
+            ],
             # metrics_list=["degree", "clustering"],
         )
 
@@ -1121,7 +1270,7 @@ class PlanarSamplingMetrics(SpectreSamplingMetrics):
                 "orbit",
                 "spectre",
                 "planar",
-                "neural",
+                # "neural",
             ],
         )
 
@@ -1131,7 +1280,14 @@ class SBMSamplingMetrics(SpectreSamplingMetrics):
         super().__init__(
             dataloaders=dataloaders,
             compute_emd=False,
-            metrics_list=["degree", "clustering", "orbit", "spectre", "sbm", "neural"],
+            metrics_list=[
+                "degree",
+                "clustering",
+                "orbit",
+                "spectre",
+                "sbm",
+                #   "neural"
+            ],
         )
 
 
@@ -1140,7 +1296,13 @@ class ProteinSamplingMetrics(SpectreSamplingMetrics):
         super().__init__(
             dataloaders=dataloaders,
             compute_emd=False,
-            metrics_list=["degree", "clustering", "orbit", "spectre", "neural"],
+            metrics_list=[
+                "degree",
+                "clustering",
+                "orbit",
+                "spectre",
+                #   "neural"
+            ],
         )
 
 
@@ -1149,7 +1311,13 @@ class EgoSamplingMetrics(SpectreSamplingMetrics):
         super().__init__(
             dataloaders=dataloaders,
             compute_emd=False,
-            metrics_list=["degree", "clustering", "orbit", "spectre", "neural"],
+            metrics_list=[
+                "degree",
+                "clustering",
+                "orbit",
+                "spectre",
+                #   "neural"
+            ],
         )
 
 

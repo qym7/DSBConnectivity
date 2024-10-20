@@ -8,7 +8,11 @@ from rdkit import Chem, RDLogger
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-from torch_geometric.data import InMemoryDataset, download_url, extract_zip
+from torch_geometric.data import (
+    InMemoryDataset,
+    download_url,
+    extract_zip,
+)
 from hydra.utils import get_original_cwd
 
 from ..utils import PlaceHolder
@@ -86,17 +90,29 @@ class QM9Dataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
-            charge_types=torch.from_numpy(np.load(self.processed_paths[4])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
+            charge_types=torch.from_numpy(
+                np.load(self.processed_paths[4])
+            ).float(),
             valencies=load_pickle(self.processed_paths[5]),
-            real_node_ratio=torch.from_numpy(np.load(self.processed_paths[7])).float(),
+            real_node_ratio=torch.from_numpy(
+                np.load(self.processed_paths[7])
+            ).float(),
         )
         self.smiles = load_pickle(self.processed_paths[6])
 
     @property
     def raw_file_names(self):
-        return ["gdb9.sdf", "gdb9.sdf.csv", "uncharacterized.txt"]
+        return [
+            "gdb9.sdf",
+            "gdb9.sdf.csv",
+            "uncharacterized.txt",
+        ]
 
     @property
     def split_file_name(self):
@@ -178,7 +194,8 @@ class QM9Dataset(InMemoryDataset):
 
         # Shuffle dataset with df.sample, then split
         train, val, test = np.split(
-            dataset.sample(frac=1, random_state=42), [n_train, n_val + n_train]
+            dataset.sample(frac=1, random_state=42),
+            [n_train, n_val + n_train],
         )
 
         train.to_csv(os.path.join(self.raw_dir, "train.csv"))
@@ -194,7 +211,11 @@ class QM9Dataset(InMemoryDataset):
         with open(self.raw_paths[-1], "r") as f:
             skip = [int(x.split()[0]) - 1 for x in f.read().split("\n")[9:-2]]
 
-        suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=self.remove_h, sanitize=self.remove_h)
+        suppl = Chem.SDMolSupplier(
+            self.raw_paths[0],
+            removeHs=self.remove_h,
+            sanitize=self.remove_h,
+        )
         data_list = []
         all_smiles = []
         num_errors = 0
@@ -206,7 +227,9 @@ class QM9Dataset(InMemoryDataset):
                 num_errors += 1
                 continue
 
-            smiles = Chem.MolToSmiles(mol, isomericSmiles=False, canonical=True)
+            smiles = Chem.MolToSmiles(
+                mol, isomericSmiles=False, canonical=True
+            )
             if smiles is None:
                 num_errors += 1
             else:
@@ -228,7 +251,9 @@ class QM9Dataset(InMemoryDataset):
                 data_list.append(data)
 
         statistics = compute_all_statistics(
-            data_list, self.atom_encoder, charge_dic={-1: 0, 0: 1, 1: 2}
+            data_list,
+            self.atom_encoder,
+            charge_dic={-1: 0, 0: 1, 1: 2},
         )
         save_pickle(statistics.num_nodes, self.processed_paths[1])
         np.save(self.processed_paths[2], statistics.node_types)
@@ -237,14 +262,26 @@ class QM9Dataset(InMemoryDataset):
         save_pickle(statistics.valencies, self.processed_paths[5])
         save_pickle(set(all_smiles), self.processed_paths[6])
         np.save(self.processed_paths[7], statistics.real_node_ratio)
-    
+
         for data in data_list:
-            data.x = F.one_hot(data.x.to(torch.long), num_classes=len(statistics.node_types)).to(torch.float)
-            data.edge_attr = F.one_hot(data.edge_attr.to(torch.long), num_classes=len(statistics.bond_types)).to(torch.float)
-            data.charge = F.one_hot(data.charge.to(torch.long) + 1, num_classes=len(statistics.charge_types[0])).to(torch.float)
-        
+            data.x = F.one_hot(
+                data.x.to(torch.long),
+                num_classes=len(statistics.node_types),
+            ).to(torch.float)
+            data.edge_attr = F.one_hot(
+                data.edge_attr.to(torch.long),
+                num_classes=len(statistics.bond_types),
+            ).to(torch.float)
+            data.charge = F.one_hot(
+                data.charge.to(torch.long) + 1,
+                num_classes=len(statistics.charge_types[0]),
+            ).to(torch.float)
+
         torch.save(self.collate(data_list), self.processed_paths[0])
-        print("Number of molecules that could not be mapped to smiles: ", num_errors)
+        print(
+            "Number of molecules that could not be mapped to smiles: ",
+            num_errors,
+        )
 
 
 class QM9DataModule(MolecularDataModule):
@@ -328,7 +365,10 @@ class QM9Infos(AbstractDatasetInfos):
         super().complete_infos(datamodule.statistics, self.atom_encoder)
         # dimensions settings
         self.output_dims = PlaceHolder(
-            X=self.num_node_types, charge=self.num_charge_types, E=5, y=0
+            X=self.num_node_types,
+            charge=self.num_charge_types,
+            E=5,
+            y=0,
         )
         if not self.use_charge:
             self.output_dims.charge = 0
@@ -337,13 +377,24 @@ class QM9Infos(AbstractDatasetInfos):
         # atom_encoder = {'H': 0, 'C': 1, 'N': 2, 'O': 3, 'F': 4}
         self.valencies = [4, 3, 2, 1] if self.remove_h else [1, 4, 3, 2, 1]
         # self.atom_weights = [12, 14, 16, 19] if self.remove_h else [1, 12, 14, 16, 19]
-        self.atom_weights = {0: 12, 1: 14, 2: 16, 3: 19} if self.remove_h else {0: 1, 1: 12, 2: 14, 3: 16, 4: 19}
+        self.atom_weights = (
+            {0: 12, 1: 14, 2: 16, 3: 19}
+            if self.remove_h
+            else {0: 1, 1: 12, 2: 14, 3: 16, 4: 19}
+        )
         self.max_weight = 40 * 19  # Quite arbitrary
 
         if self.remove_h:
             self.valency_distribution = torch.zeros(3 * self.max_n_nodes - 2)
             self.valency_distribution[0:6] = torch.tensor(
-                [2.6071e-06, 0.163, 0.352, 0.320, 0.16313, 0.00073]
+                [
+                    2.6071e-06,
+                    0.163,
+                    0.352,
+                    0.320,
+                    0.16313,
+                    0.00073,
+                ]
             )
         else:
             self.valency_distribution = torch.zeros(3 * self.max_n_nodes - 2)

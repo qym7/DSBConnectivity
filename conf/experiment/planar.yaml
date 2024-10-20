@@ -8,16 +8,10 @@ dataset:
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/planar/'
-
+  datadir: 'data/planar/planar'
 
 batch_size: 128
-<<<<<<< HEAD
-num_iter: 5000
-=======
-# num_iter: 10000
 num_iter: 2000
->>>>>>> nagham_dev
 
 # settings for evaluations
 samples_to_generate: 40

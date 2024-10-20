@@ -59,13 +59,21 @@ class ProteinDataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
         )
 
     @property
     def raw_file_names(self):
-        return ["train_indices.pt", "val_indices.pt", "test_indices.pt"]
+        return [
+            "train_indices.pt",
+            "val_indices.pt",
+            "test_indices.pt",
+        ]
 
     @property
     def split_file_name(self):
@@ -121,7 +129,8 @@ class ProteinDataset(InMemoryDataset):
         # read
         path = os.path.join(self.root, "raw")
         data_graph_indicator = np.loadtxt(
-            os.path.join(path, "DD_graph_indicator.txt"), delimiter=","
+            os.path.join(path, "DD_graph_indicator.txt"),
+            delimiter=",",
         ).astype(int)
 
         # split data
@@ -133,7 +142,10 @@ class ProteinDataset(InMemoryDataset):
         available_graphs = []
         for idx in np.arange(data_graph_indicator.max()):
             node_idx = data_graph_indicator == idx
-            if node_idx.sum() >= min_num_nodes and node_idx.sum() <= max_num_nodes:
+            if (
+                node_idx.sum() >= min_num_nodes
+                and node_idx.sum() <= max_num_nodes
+            ):
                 available_graphs.append(idx)
         available_graphs = torch.Tensor(available_graphs)
 
@@ -142,9 +154,13 @@ class ProteinDataset(InMemoryDataset):
         train_len = int(round((self.num_graphs - test_len) * 0.8))
         val_len = self.num_graphs - train_len - test_len
         indices = torch.randperm(self.num_graphs, generator=g_cpu)
-        print(f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}")
+        print(
+            f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}"
+        )
         train_indices = available_graphs[indices][:train_len]
-        val_indices = available_graphs[indices][train_len : train_len + val_len]
+        val_indices = available_graphs[indices][
+            train_len : train_len + val_len
+        ]
         test_indices = available_graphs[indices][train_len + val_len :]
         print(f"Train indices: {train_indices}")
         print(f"Val indices: {val_indices}")
@@ -160,27 +176,33 @@ class ProteinDataset(InMemoryDataset):
         )
         data_adj = (
             torch.Tensor(
-                np.loadtxt(os.path.join(self.raw_dir, "DD_A.txt"), delimiter=",")
+                np.loadtxt(
+                    os.path.join(self.raw_dir, "DD_A.txt"),
+                    delimiter=",",
+                )
             ).long()
             - 1
         )
         data_node_label = (
             torch.Tensor(
                 np.loadtxt(
-                    os.path.join(self.raw_dir, "DD_node_labels.txt"), delimiter=","
+                    os.path.join(self.raw_dir, "DD_node_labels.txt"),
+                    delimiter=",",
                 )
             ).long()
             - 1
         )
         data_graph_indicator = torch.Tensor(
             np.loadtxt(
-                os.path.join(self.raw_dir, "DD_graph_indicator.txt"), delimiter=","
+                os.path.join(self.raw_dir, "DD_graph_indicator.txt"),
+                delimiter=",",
             )
         ).long()
         data_graph_types = (
             torch.Tensor(
                 np.loadtxt(
-                    os.path.join(self.raw_dir, "DD_graph_labels.txt"), delimiter=","
+                    os.path.join(self.raw_dir, "DD_graph_labels.txt"),
+                    delimiter=",",
                 )
             ).long()
             - 1
@@ -240,7 +262,9 @@ class ProteinDataset(InMemoryDataset):
             print(node_idx.sum())
 
         num_nodes = node_counts(data_list)
-        node_types = atom_type_counts(data_list, num_classes=self.num_node_type)
+        node_types = atom_type_counts(
+            data_list, num_classes=self.num_node_type
+        )
         bond_types = edge_counts(data_list, num_bond_types=self.num_edge_type)
         torch.save(self.collate(data_list), self.processed_paths[0])
         save_pickle(num_nodes, self.processed_paths[1])
@@ -295,13 +319,20 @@ class ProteinInfos(AbstractDatasetInfos):
         self.node_types = datamodule.inner.statistics.node_types
         self.bond_types = datamodule.inner.statistics.bond_types
         super().complete_infos(
-            datamodule.statistics, len(datamodule.inner.statistics.node_types)
+            datamodule.statistics,
+            len(datamodule.inner.statistics.node_types),
         )
         self.input_dims = PlaceHolder(
-            X=len(self.node_types), E=len(self.bond_types), y=0, charge=0
+            X=len(self.node_types),
+            E=len(self.bond_types),
+            y=0,
+            charge=0,
         )
         self.output_dims = PlaceHolder(
-            X=len(self.node_types), E=len(self.bond_types), y=0, charge=0
+            X=len(self.node_types),
+            E=len(self.bond_types),
+            y=0,
+            charge=0,
         )
         self.statistics = {
             "train": datamodule.statistics["train"],

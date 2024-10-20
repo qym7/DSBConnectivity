@@ -7,7 +7,11 @@ from functools import partial
 
 class MLP(torch.nn.Module):
     def __init__(
-        self, input_dim, layer_widths, activate_final=False, activation_fn=F.relu
+        self,
+        input_dim,
+        layer_widths,
+        activate_final=False,
+        activation_fn=F.relu,
     ):
         super(MLP, self).__init__()
         layers = []
@@ -44,12 +48,20 @@ class ConvEncoder(torch.nn.Module):
         stride=1,
     ):
         super().__init__()
-        self.out_dim = (num_pixels + 2 * padding - (kernel_size - 1) - 1) // stride + 1
+        self.out_dim = (
+            num_pixels + 2 * padding - (kernel_size - 1) - 1
+        ) // stride + 1
 
         self.conv1 = torch.nn.Conv2d(
-            in_channels, out_channels, kernel_size, padding=padding, stride=stride
+            in_channels,
+            out_channels,
+            kernel_size,
+            padding=padding,
+            stride=stride,
         )
-        self.linear1 = torch.nn.Linear(self.out_dim**2 * out_channels, hidden_size)
+        self.linear1 = torch.nn.Linear(
+            self.out_dim**2 * out_channels, hidden_size
+        )
 
     def forward(self, x):
         x = self.conv1(x)
@@ -79,7 +91,8 @@ class ConvDecoder(torch.nn.Module):
 
         self.linear = MLP(
             input_dim=hidden_size,
-            layer_widths=hidden_layers + [self.in_channels * self.in_dim * self.in_dim],
+            layer_widths=hidden_layers
+            + [self.in_channels * self.in_dim * self.in_dim],
             activation_fn=F.relu,
             activate_final=True,
         )
@@ -95,6 +108,9 @@ class ConvDecoder(torch.nn.Module):
         B, d = x.shape
         x = x.reshape(B, self.in_channels, self.in_dim, self.in_dim)
         x = self.deconv(x).reshape(
-            B, self.out_channels, self.num_pixels, self.num_pixels
+            B,
+            self.out_channels,
+            self.num_pixels,
+            self.num_pixels,
         )
         return x

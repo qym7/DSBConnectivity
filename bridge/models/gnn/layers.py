@@ -22,7 +22,10 @@ def timestep_embedding(timesteps, dim, max_period=10000):
     args = timesteps.float() * freqs[None]
     embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
     if dim % 2:
-        embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
+        embedding = torch.cat(
+            [embedding, torch.zeros_like(embedding[:, :1])],
+            dim=-1,
+        )
 
     # import pdb; pdb.set_trace()
     return embedding
@@ -41,9 +44,9 @@ class Xtoy(nn.Module):
         m = X.sum(dim=1) / torch.sum(x_mask, dim=1)
         mi = (X + 1e5 * float_imask).min(dim=1)[0]
         ma = (X - 1e5 * float_imask).max(dim=1)[0]
-        std = torch.sum(((X - m[:, None, :]) ** 2) * x_mask, dim=1) / torch.sum(
-            x_mask, dim=1
-        )
+        std = torch.sum(
+            ((X - m[:, None, :]) ** 2) * x_mask, dim=1
+        ) / torch.sum(x_mask, dim=1)
         z = torch.hstack((m, mi, ma, std))
         out = self.lin(z)
         return out
@@ -65,7 +68,13 @@ class Etoy(nn.Module):
         m = E.sum(dim=(1, 2)) / divide
         mi = (E + 1e5 * float_imask).min(dim=2)[0].min(dim=1)[0]
         ma = (E - 1e5 * float_imask).max(dim=2)[0].max(dim=1)[0]
-        std = torch.sum(((E - m[:, None, None, :]) ** 2) * mask, dim=(1, 2)) / divide
+        std = (
+            torch.sum(
+                ((E - m[:, None, None, :]) ** 2) * mask,
+                dim=(1, 2),
+            )
+            / divide
+        )
         z = torch.hstack((m, mi, ma, std))
         out = self.lin(z)
         return out

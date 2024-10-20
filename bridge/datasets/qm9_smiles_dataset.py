@@ -7,9 +7,11 @@ import os.path as osp
 import pathlib
 
 from rdkit import Chem, DataStructs, RDLogger
+
 print("Found rdkit, all good")
 from rdkit.Chem import RDConfig, QED, MolFromSmiles, MolToSmiles
-sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+
+sys.path.append(os.path.join(RDConfig.RDContribDir, "SA_Score"))
 import sascorer
 
 import torch
@@ -45,15 +47,18 @@ class RemoveYTransform:
         data.y = torch.zeros((1, 0), dtype=torch.float)
         return data
 
+
 class SelectMuTransform:
     def __call__(self, data):
         data.y = data.y[..., :1]
         return data
 
+
 class SelectHOMOTransform:
     def __call__(self, data):
         data.y = data.y[..., 1:]
         return data
+
 
 class QM9SmilesDataset(InMemoryDataset):
     def __init__(
@@ -86,23 +91,39 @@ class QM9SmilesDataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
-            charge_types=torch.from_numpy(np.load(self.processed_paths[4])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
+            charge_types=torch.from_numpy(
+                np.load(self.processed_paths[4])
+            ).float(),
             valencies=load_pickle(self.processed_paths[5]),
-            real_node_ratio=torch.from_numpy(np.load(self.processed_paths[7])).float(),
+            real_node_ratio=torch.from_numpy(
+                np.load(self.processed_paths[7])
+            ).float(),
         )
         self.smiles = load_pickle(self.processed_paths[6])
 
     @property
     def raw_file_names(self):
-        h = 'noh' if self.remove_h else 'h'
-        return [f"train_smiles_qm9_{h}.csv", f"val_smiles_qm9_{h}.csv", f"test_smiles_qm9_{h}.csv"]
+        h = "noh" if self.remove_h else "h"
+        return [
+            f"train_smiles_qm9_{h}.csv",
+            f"val_smiles_qm9_{h}.csv",
+            f"test_smiles_qm9_{h}.csv",
+        ]
 
     @property
     def split_file_name(self):
-        h = 'noh' if self.remove_h else 'h'
-        return [f"train_smiles_qm9_{h}.csv", f"val_smiles_qm9_{h}.csv", f"test_smiles_qm9_{h}.csv"]
+        h = "noh" if self.remove_h else "h"
+        return [
+            f"train_smiles_qm9_{h}.csv",
+            f"val_smiles_qm9_{h}.csv",
+            f"test_smiles_qm9_{h}.csv",
+        ]
 
     @property
     def processed_file_names(self):
@@ -151,7 +172,9 @@ class QM9SmilesDataset(InMemoryDataset):
                 smiles_kept.append(smile)
 
         statistics = compute_all_statistics(
-            data_list, self.atom_encoder, charge_dic={-1: 0, 0: 1, 1: 2}
+            data_list,
+            self.atom_encoder,
+            charge_dic={-1: 0, 0: 1, 1: 2},
         )
         save_pickle(statistics.num_nodes, self.processed_paths[1])
         np.save(self.processed_paths[2], statistics.node_types)
@@ -165,9 +188,18 @@ class QM9SmilesDataset(InMemoryDataset):
         save_pickle(set(smiles_kept), self.processed_paths[6])
 
         for data in data_list:
-            data.x = F.one_hot(data.x.to(torch.long), num_classes=len(statistics.node_types)).to(torch.float)
-            data.edge_attr = F.one_hot(data.edge_attr.to(torch.long), num_classes=len(statistics.bond_types)).to(torch.float)
-            data.charge = F.one_hot(data.charge.to(torch.long) + 1, num_classes=len(statistics.charge_types[0])).to(torch.float)
+            data.x = F.one_hot(
+                data.x.to(torch.long),
+                num_classes=len(statistics.node_types),
+            ).to(torch.float)
+            data.edge_attr = F.one_hot(
+                data.edge_attr.to(torch.long),
+                num_classes=len(statistics.bond_types),
+            ).to(torch.float)
+            data.charge = F.one_hot(
+                data.charge.to(torch.long) + 1,
+                num_classes=len(statistics.charge_types[0]),
+            ).to(torch.float)
         torch.save(self.collate(data_list), self.processed_paths[0])
         np.save(self.processed_paths[7], statistics.real_node_ratio)
 
@@ -182,13 +214,22 @@ class QM9SmilesDataModule(MolecularDataModule):
         self.remove_h = cfg.remove_h
         datasets = {
             "train": QM9SmilesDataset(
-                split="train", root=root_path, remove_h=self.cfg.remove_h, pre_transform=RemoveYTransform()
+                split="train",
+                root=root_path,
+                remove_h=self.cfg.remove_h,
+                pre_transform=RemoveYTransform(),
             ),
             "val": QM9SmilesDataset(
-                split="val", root=root_path, remove_h=self.cfg.remove_h, pre_transform=RemoveYTransform()
+                split="val",
+                root=root_path,
+                remove_h=self.cfg.remove_h,
+                pre_transform=RemoveYTransform(),
             ),
             "test": QM9SmilesDataset(
-                split="test", root=root_path, remove_h=self.cfg.remove_h, pre_transform=RemoveYTransform()
+                split="test",
+                root=root_path,
+                remove_h=self.cfg.remove_h,
+                pre_transform=RemoveYTransform(),
             ),
         }
 
@@ -232,19 +273,35 @@ class QM9SmilesInfos(AbstractDatasetInfos):
         super().complete_infos(datamodule.statistics, self.atom_encoder)
 
         # dimensions
-        self.output_dims = PlaceHolder(X=self.num_node_types, charge=self.num_charge_types, E=5, y=0)
+        self.output_dims = PlaceHolder(
+            X=self.num_node_types,
+            charge=self.num_charge_types,
+            E=5,
+            y=0,
+        )
         if not self.use_charge:
             self.output_dims.charge = 0
 
         # data specific settings
         self.valencies = [4, 3, 2, 1] if self.remove_h else [1, 4, 3, 2, 1]
-        self.atom_weights = {0: 12, 1: 14, 2: 16, 3: 19} if self.remove_h else {0: 1, 1: 12, 2: 14, 3: 16, 4: 19}
+        self.atom_weights = (
+            {0: 12, 1: 14, 2: 16, 3: 19}
+            if self.remove_h
+            else {0: 1, 1: 12, 2: 14, 3: 16, 4: 19}
+        )
         self.max_weight = 40 * 19  # Quite arbitrary
 
         if self.remove_h:
             self.valency_distribution = torch.zeros(3 * self.max_n_nodes - 2)
             self.valency_distribution[0:6] = torch.tensor(
-                [2.6071e-06, 0.163, 0.352, 0.320, 0.16313, 0.00073]
+                [
+                    2.6071e-06,
+                    0.163,
+                    0.352,
+                    0.320,
+                    0.16313,
+                    0.00073,
+                ]
             )
         else:
             self.valency_distribution = torch.zeros(3 * self.max_n_nodes - 2)
@@ -253,10 +310,21 @@ class QM9SmilesInfos(AbstractDatasetInfos):
             )
 
 
-def SA_score_data_separation(path, path_greater, path_greater_more, path_greater_less, path_less, remove_h):
-    RDLogger.DisableLog('rdApp.*')
-    h = 'noh' if remove_h else 'h'
-    list_file = [f'train_smiles_qm9_{h}', f'test_smiles_qm9_{h}', f'val_smiles_qm9_{h}']
+def SA_score_data_separation(
+    path,
+    path_greater,
+    path_greater_more,
+    path_greater_less,
+    path_less,
+    remove_h,
+):
+    RDLogger.DisableLog("rdApp.*")
+    h = "noh" if remove_h else "h"
+    list_file = [
+        f"train_smiles_qm9_{h}",
+        f"test_smiles_qm9_{h}",
+        f"val_smiles_qm9_{h}",
+    ]
     os.makedirs(path_greater, exist_ok=True)
     os.makedirs(path_greater_more, exist_ok=True)
     os.makedirs(path_greater_less, exist_ok=True)
@@ -264,7 +332,7 @@ def SA_score_data_separation(path, path_greater, path_greater_more, path_greater
 
     all_data = []
     for dataset in list_file:
-        with open(os.path.join(path, dataset + '.pickle'), 'rb') as file:
+        with open(os.path.join(path, dataset + ".pickle"), "rb") as file:
             data = pickle.load(file)
             all_data.extend(data)
     random.shuffle(all_data)
@@ -298,18 +366,18 @@ def SA_score_data_separation(path, path_greater, path_greater_more, path_greater
     greater_lists = [train_greater, test_greater, val_greater]
 
     for dataset, selected_less in zip(list_file, less_lists):
-        file_path = os.path.join(path_less, dataset + '.csv')
-        with open(file_path, 'w', newline='') as file:
+        file_path = os.path.join(path_less, dataset + ".csv")
+        with open(file_path, "w", newline="") as file:
             writer = csv.writer(file)
-            writer.writerow(['SMILES'])
+            writer.writerow(["SMILES"])
             for point in selected_less:
                 writer.writerow([point])
 
     for dataset, selected_greater in zip(list_file, greater_lists):
-        file_path = os.path.join(path_greater, dataset + '.csv')
-        with open(file_path, 'w', newline='') as file:
+        file_path = os.path.join(path_greater, dataset + ".csv")
+        with open(file_path, "w", newline="") as file:
             writer = csv.writer(file)
-            writer.writerow(['SMILES'])
+            writer.writerow(["SMILES"])
             for point in selected_greater:
                 writer.writerow([point])
 
@@ -323,10 +391,10 @@ def SA_score_data_separation(path, path_greater, path_greater_more, path_greater
     greater_lists = [train_greater, test_greater, val_greater]
 
     for dataset, selected_greater in zip(list_file, greater_lists):
-        file_path = os.path.join(path_greater_more, dataset + '.csv')
-        with open(file_path, 'w', newline='') as file:
+        file_path = os.path.join(path_greater_more, dataset + ".csv")
+        with open(file_path, "w", newline="") as file:
             writer = csv.writer(file)
-            writer.writerow(['SMILES'])
+            writer.writerow(["SMILES"])
             for point in selected_greater:
                 writer.writerow([point])
 
@@ -340,20 +408,27 @@ def SA_score_data_separation(path, path_greater, path_greater_more, path_greater
     greater_lists = [train_greater, test_greater, val_greater]
 
     for dataset, selected_greater in zip(list_file, greater_lists):
-        file_path = os.path.join(path_greater_less, dataset + '.csv')
-        with open(file_path, 'w', newline='') as file:
+        file_path = os.path.join(path_greater_less, dataset + ".csv")
+        with open(file_path, "w", newline="") as file:
             writer = csv.writer(file)
-            writer.writerow(['SMILES'])
+            writer.writerow(["SMILES"])
             for point in selected_greater:
                 writer.writerow([point])
 
 
 if __name__ == "__main__":
-    path = './data/qm9/qm9_pyg/processed'
-    path_greater = './data/qm9_greater/qm9_pyg_greater/raw'
-    path_greater_more = './data/qm9_greater/qm9_pyg_greater_more/raw'
-    path_greater_less = './data/qm9_greater/qm9_pyg_greater_less/raw'
-    path_less = './data/qm9_less/qm9_pyg_less/raw'
+    path = "./data/qm9/qm9_pyg/processed"
+    path_greater = "./data/qm9/qm9_pyg_greater/raw"
+    path_greater_more = "./data/qm9/qm9_pyg_greater_more/raw"
+    path_greater_less = "./data/qm9/qm9_pyg_greater_less/raw"
+    path_less = "./data/qm9/qm9_pyg_less/raw"
     remove_h = True
 
-    SA_score_data_separation(path, path_greater, path_greater_more, path_greater_less, path_less, remove_h)
+    SA_score_data_separation(
+        path,
+        path_greater,
+        path_greater_more,
+        path_greater_less,
+        path_less,
+        remove_h,
+    )

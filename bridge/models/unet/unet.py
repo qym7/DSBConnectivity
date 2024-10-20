@@ -7,7 +7,10 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .fp16_util import convert_module_to_f16, convert_module_to_f32
+from .fp16_util import (
+    convert_module_to_f16,
+    convert_module_to_f32,
+)
 from .layers import *
 
 
@@ -98,7 +101,13 @@ class UNetModel(nn.Module):
         self.input_blocks = nn.ModuleList(
             [
                 TimestepEmbedSequential(
-                    conv_nd(dims, in_channels, model_channels, 3, padding=1)
+                    conv_nd(
+                        dims,
+                        in_channels,
+                        model_channels,
+                        3,
+                        padding=1,
+                    )
                 )
             ]
         )
@@ -122,14 +131,18 @@ class UNetModel(nn.Module):
                 if ds in attention_resolutions:
                     layers.append(
                         AttentionBlock(
-                            ch, use_checkpoint=use_checkpoint, num_heads=num_heads
+                            ch,
+                            use_checkpoint=use_checkpoint,
+                            num_heads=num_heads,
                         )
                     )
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
                 input_block_chans.append(ch)
             if level != len(channel_mult) - 1:
                 self.input_blocks.append(
-                    TimestepEmbedSequential(Downsample(ch, conv_resample, dims=dims))
+                    TimestepEmbedSequential(
+                        Downsample(ch, conv_resample, dims=dims)
+                    )
                 )
                 input_block_chans.append(ch)
                 ds *= 2
@@ -143,7 +156,11 @@ class UNetModel(nn.Module):
                 use_checkpoint=use_checkpoint,
                 use_scale_shift_norm=use_scale_shift_norm,
             ),
-            AttentionBlock(ch, use_checkpoint=use_checkpoint, num_heads=num_heads),
+            AttentionBlock(
+                ch,
+                use_checkpoint=use_checkpoint,
+                num_heads=num_heads,
+            ),
             ResBlock(
                 ch,
                 time_embed_dim,
@@ -185,7 +202,15 @@ class UNetModel(nn.Module):
         self.out = nn.Sequential(
             normalization(ch),
             SiLU(),
-            zero_module(conv_nd(dims, model_channels, out_channels, 3, padding=1)),
+            zero_module(
+                conv_nd(
+                    dims,
+                    model_channels,
+                    out_channels,
+                    3,
+                    padding=1,
+                )
+            ),
         )
 
     def convert_to_fp16(self):
@@ -218,7 +243,9 @@ class UNetModel(nn.Module):
         ), "must specify y if and only if the model is class-conditional"
 
         hs = []
-        emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
+        emb = self.time_embed(
+            timestep_embedding(timesteps, self.model_channels)
+        )
 
         if self.num_classes is not None:
             assert y.shape == (x.shape[0],)
@@ -254,7 +281,9 @@ class UNetModel(nn.Module):
                  - 'up': a list of hidden state tensors from upsampling.
         """
         hs = []
-        emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
+        emb = self.time_embed(
+            timestep_embedding(timesteps, self.model_channels)
+        )
         if self.num_classes is not None:
             assert y.shape == (x.shape[0],)
             emb = emb + self.label_emb(y)
@@ -284,12 +313,16 @@ class SuperResModel(UNetModel):
 
     def forward(self, x, timesteps, low_res=None, **kwargs):
         _, _, new_height, new_width = x.shape
-        upsampled = F.interpolate(low_res, (new_height, new_width), mode="bilinear")
+        upsampled = F.interpolate(
+            low_res, (new_height, new_width), mode="bilinear"
+        )
         x = th.cat([x, upsampled], dim=1)
         return super().forward(x, timesteps, **kwargs)
 
     def get_feature_vectors(self, x, timesteps, low_res=None, **kwargs):
         _, new_height, new_width, _ = x.shape
-        upsampled = F.interpolate(low_res, (new_height, new_width), mode="bilinear")
+        upsampled = F.interpolate(
+            low_res, (new_height, new_width), mode="bilinear"
+        )
         x = th.cat([x, upsampled], dim=1)
         return super().get_feature_vectors(x, timesteps, **kwargs)

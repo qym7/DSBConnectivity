@@ -27,7 +27,15 @@ from ..metrics.molecular_metrics import SparseMolecule
 from ..metrics.metrics_utils import compute_all_statistics
 
 
-atom_encoder = {"C": 0, "N": 1, "S": 2, "O": 3, "F": 4, "Cl": 5, "Br": 6}
+atom_encoder = {
+    "C": 0,
+    "N": 1,
+    "S": 2,
+    "O": 3,
+    "F": 4,
+    "Cl": 5,
+    "Br": 6,
+}
 atom_decoder = ["C", "N", "S", "O", "F", "Cl", "Br"]
 
 
@@ -64,20 +72,34 @@ class MosesDataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
-            charge_types=torch.from_numpy(np.load(self.processed_paths[4])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
+            charge_types=torch.from_numpy(
+                np.load(self.processed_paths[4])
+            ).float(),
             valencies=load_pickle(self.processed_paths[5]),
         )
         self.smiles = load_pickle(self.processed_paths[6])
 
     @property
     def raw_file_names(self):
-        return ["train_moses.csv", "val_moses.csv", "test_moses.csv"]
+        return [
+            "train_moses.csv",
+            "val_moses.csv",
+            "test_moses.csv",
+        ]
 
     @property
     def split_file_name(self):
-        return ["train_moses.csv", "val_moses.csv", "test_moses.csv"]
+        return [
+            "train_moses.csv",
+            "val_moses.csv",
+            "test_moses.csv",
+        ]
 
     @property
     def processed_file_names(self):
@@ -95,7 +117,10 @@ class MosesDataset(InMemoryDataset):
         import rdkit  # noqa
 
         train_path = download_url(self.train_url, self.raw_dir)
-        os.rename(train_path, osp.join(self.raw_dir, "train_moses.csv"))
+        os.rename(
+            train_path,
+            osp.join(self.raw_dir, "train_moses.csv"),
+        )
 
         test_path = download_url(self.test_url, self.raw_dir)
         os.rename(test_path, osp.join(self.raw_dir, "val_moses.csv"))
@@ -153,13 +178,19 @@ class MosesDataModule(MolecularDataModule):
         self.remove_h = False
         datasets = {
             "train": MosesDataset(
-                split="train", root=root_path, pre_transform=RemoveYTransform()
+                split="train",
+                root=root_path,
+                pre_transform=RemoveYTransform(),
             ),
             "val": MosesDataset(
-                split="val", root=root_path, pre_transform=RemoveYTransform()
+                split="val",
+                root=root_path,
+                pre_transform=RemoveYTransform(),
             ),
             "test": MosesDataset(
-                split="test", root=root_path, pre_transform=RemoveYTransform()
+                split="test",
+                root=root_path,
+                pre_transform=RemoveYTransform(),
             ),
         }
 
@@ -194,7 +225,9 @@ class MosesInfos(AbstractDatasetInfos):
 
         # dimensions
         # atom_decoder = ['C', 'N', 'S', 'O', 'F', 'Cl', 'Br']
-        self.output_dims = PlaceHolder(X=self.num_node_types, charge=0, E=5, y=0)
+        self.output_dims = PlaceHolder(
+            X=self.num_node_types, charge=0, E=5, y=0
+        )
 
         # data specific settings
         # atom_decoder = ['C', 'N', 'S', 'O', 'F', 'Cl', 'Br']

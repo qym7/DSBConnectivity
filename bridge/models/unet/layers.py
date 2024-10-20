@@ -108,12 +108,16 @@ def timestep_embedding(timesteps, dim, max_period=10000):
     """
     half = dim // 2
     freqs = th.exp(
-        -math.log(max_period) * th.arange(start=0, end=half, dtype=th.float32) / half
+        -math.log(max_period)
+        * th.arange(start=0, end=half, dtype=th.float32)
+        / half
     ).to(device=timesteps.device)
     args = timesteps[:, None].float() * freqs[None]
     embedding = th.cat([th.cos(args), th.sin(args)], dim=-1)
     if dim % 2:
-        embedding = th.cat([embedding, th.zeros_like(embedding[:, :1])], dim=-1)
+        embedding = th.cat(
+            [embedding, th.zeros_like(embedding[:, :1])], dim=-1
+        )
     return embedding
 
 
@@ -146,7 +150,9 @@ class CheckpointFunction(th.autograd.Function):
 
     @staticmethod
     def backward(ctx, *output_grads):
-        ctx.input_tensors = [x.detach().requires_grad_(True) for x in ctx.input_tensors]
+        ctx.input_tensors = [
+            x.detach().requires_grad_(True) for x in ctx.input_tensors
+        ]
         with th.enable_grad():
             # Fixes a bug where the first op in run_function modifies the
             # Tensor storage in place, which is not allowed for detach()'d
@@ -213,7 +219,9 @@ class Upsample(nn.Module):
         assert x.shape[1] == self.channels
         if self.dims == 3:
             x = F.interpolate(
-                x, (x.shape[2], x.shape[3] * 2, x.shape[4] * 2), mode="nearest"
+                x,
+                (x.shape[2], x.shape[3] * 2, x.shape[4] * 2),
+                mode="nearest",
             )
         else:
             x = F.interpolate(x, scale_factor=2, mode="nearest")
@@ -238,7 +246,14 @@ class Downsample(nn.Module):
         self.dims = dims
         stride = 2 if dims != 3 else (1, 2, 2)
         if use_conv:
-            self.op = conv_nd(dims, channels, channels, 3, stride=stride, padding=1)
+            self.op = conv_nd(
+                dims,
+                channels,
+                channels,
+                3,
+                stride=stride,
+                padding=1,
+            )
         else:
             self.op = avg_pool_nd(stride)
 
@@ -290,7 +305,11 @@ class ResBlock(TimestepBlock):
             SiLU(),
             linear(
                 emb_channels,
-                2 * self.out_channels if use_scale_shift_norm else self.out_channels,
+                (
+                    2 * self.out_channels
+                    if use_scale_shift_norm
+                    else self.out_channels
+                ),
             ),
         )
         self.out_layers = nn.Sequential(
@@ -298,7 +317,13 @@ class ResBlock(TimestepBlock):
             SiLU(),
             nn.Dropout(p=dropout),
             zero_module(
-                conv_nd(dims, self.out_channels, self.out_channels, 3, padding=1)
+                conv_nd(
+                    dims,
+                    self.out_channels,
+                    self.out_channels,
+                    3,
+                    padding=1,
+                )
             ),
         )
 
@@ -309,7 +334,9 @@ class ResBlock(TimestepBlock):
                 dims, channels, self.out_channels, 3, padding=1
             )
         else:
-            self.skip_connection = conv_nd(dims, channels, self.out_channels, 1)
+            self.skip_connection = conv_nd(
+                dims, channels, self.out_channels, 1
+            )
 
     def forward(self, x, emb):
         """
@@ -319,7 +346,10 @@ class ResBlock(TimestepBlock):
         :return: an [N x C x ...] Tensor of outputs.
         """
         return checkpoint(
-            self._forward, (x, emb), self.parameters(), self.use_checkpoint
+            self._forward,
+            (x, emb),
+            self.parameters(),
+            self.use_checkpoint,
         )
 
     def _forward(self, x, emb):
@@ -328,7 +358,10 @@ class ResBlock(TimestepBlock):
         while len(emb_out.shape) < len(h.shape):
             emb_out = emb_out[..., None]
         if self.use_scale_shift_norm:
-            out_norm, out_rest = self.out_layers[0], self.out_layers[1:]
+            out_norm, out_rest = (
+                self.out_layers[0],
+                self.out_layers[1:],
+            )
             scale, shift = th.chunk(emb_out, 2, dim=1)
             h = out_norm(h) * (1 + scale) + shift
             h = out_rest(h)
@@ -357,7 +390,12 @@ class AttentionBlock(nn.Module):
         self.proj_out = zero_module(conv_nd(1, channels, channels, 1))
 
     def forward(self, x):
-        return checkpoint(self._forward, (x,), self.parameters(), self.use_checkpoint)
+        return checkpoint(
+            self._forward,
+            (x,),
+            self.parameters(),
+            self.use_checkpoint,
+        )
 
     def _forward(self, x):
         b, c, *spatial = x.shape

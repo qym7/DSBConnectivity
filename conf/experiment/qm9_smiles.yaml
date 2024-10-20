@@ -9,7 +9,7 @@ dataset:
   extra_features: 'molecule'
 
   name: "qm9_smiles"
-  datadir: 'data/qm9_greater/qm9_pyg_greater/'
+  datadir: 'data/qm9/qm9_pyg_greater/'
   remove_h: True
   random_subset: null
   pin_memory: False
@@ -24,7 +24,7 @@ dataset_transfer:
   extra_features: 'molecule'
 
   name: "qm9_smiles"
-  datadir: 'data/qm9_less/qm9_pyg_less/'
+  datadir: 'data/qm9/qm9_pyg_less/'
   remove_h: True
   random_subset: null
   pin_memory: False
