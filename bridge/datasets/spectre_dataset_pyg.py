@@ -342,11 +342,12 @@ class SpectreGraphDataModule(AbstractDataModule):
 
 
 class SpectreDatasetInfos(AbstractDatasetInfos):
-    def __init__(self, datamodule):
+    def __init__(self, datamodule, cfg):
         self.is_molecular = False
         self.spectre = True
         self.use_charge = False
         self.dataset_name = datamodule.dataset_name
+        self.is_planar = True if 'planar' in cfg['name'] else False
         self.node_types = datamodule.inner.statistics.node_types
         self.bond_types = datamodule.inner.statistics.bond_types
         super().complete_infos(

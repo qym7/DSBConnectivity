@@ -885,8 +885,8 @@ def eval_fraction_unique_non_isomorphic_valid(
 class SpectreSamplingMetrics(nn.Module):
     def __init__(self, dataloaders, compute_emd, metrics_list):
         super().__init__()
-        # self.train_graphs = self.loader_to_nx(dataloaders["train"])
-        # self.val_graphs = self.loader_to_nx(dataloaders["val"])
+        self.train_graphs = self.loader_to_nx(dataloaders["train"])
+        self.val_graphs = self.loader_to_nx(dataloaders["val"])
         self.test_graphs = self.loader_to_nx(dataloaders["test"])
         # import pdb; pdb.set_trace()
         # print(self.test_graphs[0])
@@ -1119,7 +1119,7 @@ class PlanarSamplingMetrics(SpectreSamplingMetrics):
                 "orbit",
                 "spectre",
                 "planar",
-                "neural",
+                # "neural",
             ],
         )
 

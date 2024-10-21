@@ -206,7 +206,7 @@ if __name__ == "__main__":
     print(f"Relaxed Validity over {len(gen_smiles_data)} molecules: {gen_validity_relax * 100 :.2f}%")
 
     logP_real, qed_real, sa_real = compute_molecular_properties(real_smiles_data)
-    logP_gen, qed_gen, sa_gen = compute_molecular_properties(gen_valid)
+    logP_gen, qed_gen, sa_gen = compute_molecular_properties(gen_valid_relax)
 
     w1_logP = compute_w1(logP_real, logP_gen)
     print(f"W1 LogP is: {w1_logP}")
@@ -216,14 +216,14 @@ if __name__ == "__main__":
     print(f"MAD SA is: {mad_sa}")
 
     gen_smiles_opt = pd.read_csv(gen_smiles_optimized)
-    gen_smiles_opt_filter = gen_smiles_opt[gen_smiles_opt['target_smiles'].isin(gen_valid)]
+    gen_smiles_opt_filter = gen_smiles_opt[gen_smiles_opt['target_smiles'].isin(gen_valid_relax)]
     gen_smiles_opt_source = gen_smiles_opt_filter['source_smiles'].tolist()
     gen_smiles_opt_target = gen_smiles_opt_filter['target_smiles'].tolist()
     nll = nll_total_graph_edit_distance(gen_smiles_opt_source, gen_smiles_opt_target, alpha)
     print(f"NLL Score is: {nll}")
 
     fcd = FCD(device='cuda', n_jobs=8)
-    fcd_score = fcd(real_smiles_data, gen_valid)
+    fcd_score = fcd(real_smiles_data, gen_valid_relax)
     print(f"FCD Score is: {fcd_score}")
 
 

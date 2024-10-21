@@ -110,7 +110,7 @@ def get_datamodules(cfg, transfer):
         else:
             datamodule = PlanarDataModule(cfg)
 
-        dataset_infos = SpectreDatasetInfos(datamodule)
+        dataset_infos = SpectreDatasetInfos(datamodule, cfg)
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
 
