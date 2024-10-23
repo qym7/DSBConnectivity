@@ -84,13 +84,13 @@ class ExtraFeatures:
         elif self.features_type == "rrwp":
             E = noisy_data.E.float()[..., 1:].sum(-1)  # bs, n, n
             rrwp_edge_attr = self.RRWP(E, k=self.rrwp_steps)
-            diag_index = torch.arange(rrwp_edge_attr.shape[1])
+            diag_index = torch.arange(  rrwp_edge_attr.shape[1])
             rrwp_node_attr = rrwp_edge_attr[:, diag_index, diag_index, :]
 
-            feats - utils.PlaceHolder(
+            feats = utils.PlaceHolder(
                 X=rrwp_node_attr,
                 E=rrwp_edge_attr,
-                y=torch.hstack((n, y_cycles)),
+                y=n,
             )
 
         elif self.features_type == "rrwp_comp":
@@ -176,9 +176,9 @@ class RRWPFeatures:
     def __init__(self, k=10):
         self.k = k
 
-    def __call__(self, E, k):
-        # degree = E.sum(dim=-1).float().unsqueeze(1)  # bs, 1, n
-        # degree = degree.repeat(1, E.shape[1], 1)  # bs, n, n
+    def __call__(self, E, k=None):
+        k = k or self.k
+
         (
             bs,
             n,
@@ -190,19 +190,12 @@ class RRWPFeatures:
         degree = torch.diagonal_scatter(degree, to_fill, dim1=1, dim2=2)
         E = degree @ E
 
-        rrwp_list = [E]
-        # multiplication_list = [E]
-        for i in range(k):
+        id = torch.eye(n, device=E.device).unsqueeze(0).repeat(bs, 1, 1)
+        rrwp_list = [id]
+
+        for i in range(k-1):
             cur_rrwp = rrwp_list[-1] @ E
             rrwp_list.append(cur_rrwp)
-            # cur_rrwp = E @ multiplication_list[-1]
-            # multiplication_list.append(cur_rrwp)
-            # rrwp_top = torch.triu(cur_rrwp, diagonal=1)
-            # rrwp_bot = torch.tril(cur_rrwp, diagonal=1)
-            # rrwp_top = rrwp_top + rrwp_top.transpose(1, 2)
-            # rrwp_bot = rrwp_bot + rrwp_bot.transpose(1, 2)
-            # rrwp_list.append(rrwp_top)
-            # rrwp_list.append(rrwp_bot)
 
         return torch.stack(rrwp_list, -1)
 

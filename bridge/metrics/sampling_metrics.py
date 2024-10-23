@@ -68,23 +68,11 @@ class SamplingMetrics(nn.Module):
                 self.domain_metrics = Comm20SamplingMetrics(
                     dataloaders=dataloaders
                 )
-            elif dataset_infos.dataset_name == "planar":
+            elif "planar" in dataset_infos.dataset_name:
                 self.domain_metrics = PlanarSamplingMetrics(
                     dataloaders=dataloaders
                 )
-            elif dataset_infos.dataset_name == "sbm":
-                self.domain_metrics = SBMSamplingMetrics(
-                    dataloaders=dataloaders
-                )
-            elif dataset_infos.dataset_name == "sbm_syn":
-                self.domain_metrics = SBMSamplingMetrics(
-                    dataloaders=dataloaders
-                )
-            elif dataset_infos.dataset_name == "sbm_split":
-                self.domain_metrics = SBMSamplingMetrics(
-                    dataloaders=dataloaders
-                )
-            elif dataset_infos.dataset_name == "sbm_split_small":
+            elif "sbm" in dataset_infos.dataset_name:
                 self.domain_metrics = SBMSamplingMetrics(
                     dataloaders=dataloaders
                 )
@@ -94,14 +82,6 @@ class SamplingMetrics(nn.Module):
                 )
             elif dataset_infos.dataset_name == "ego":
                 self.domain_metrics = EgoSamplingMetrics(
-                    dataloaders=dataloaders
-                )
-            elif dataset_infos.dataset_name == "planar_edge_remove":
-                self.domain_metrics = PlanarSamplingMetrics(
-                    dataloaders=dataloaders
-                )
-            elif dataset_infos.dataset_name == "planar_edge_add":
-                self.domain_metrics = PlanarSamplingMetrics(
                     dataloaders=dataloaders
                 )
             else:

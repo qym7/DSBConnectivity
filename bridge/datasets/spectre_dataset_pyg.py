@@ -28,7 +28,7 @@ from ..metrics.metrics_utils import (
     atom_type_counts,
     edge_counts,
 )
-from ..data.synthetic_graphs import (
+from ..datasets.synthetic_graphs import (
     generate_sbm_graphs,
     generate_tree_graphs,
     generate_planar_graphs,
@@ -161,18 +161,7 @@ class SpectreGraphDataset(InMemoryDataset):
                 torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
                 for network in networks
             ]
-        elif self.dataset_name == "sbm_split_small":
-            networks = generate_small_split_sbm_graphs(
-                num_graphs=self.cfg.num_graphs,
-                num_communities=self.cfg.num_communities,
-                intra_prob=self.cfg.intra_prob,
-                inter_prob=self.cfg.inter_prob,
-            )
-            adjs = [
-                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
-                for network in networks
-            ]
-        elif self.dataset_name == "planar_edge_remove":
+        elif self.dataset_name == "planar_remove":
             networks = generate_planar_edge_remove_graphs(
                 num_graphs=self.cfg.num_graphs,
                 num_nodes=self.cfg.num_nodes,
@@ -182,24 +171,12 @@ class SpectreGraphDataset(InMemoryDataset):
                 torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
                 for network in networks
             ]
-        elif self.dataset_name == "planar_edge_add":
-            networks = generate_planar_edge_add_graphs(
-                num_graphs=self.cfg.num_graphs,
-                num_nodes=self.cfg.num_nodes,
-                avg_degree=self.cfg.avg_degree,
-                shortest_path=self.cfg.shortest_path,
-            )
-            adjs = [
-                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
-                for network in networks
-            ]
         else:
             raise ValueError(f"Unknown dataset {self.dataset_name}")
 
         if (
-            "syn" not in self.dataset_name
-            and "split" not in self.dataset_name
-            and "edge" not in self.dataset_name
+            "split" not in self.dataset_name  # SBM
+            and "remove" not in self.dataset_name  # Planar
         ):
             file_path = download_url(raw_url, self.raw_dir)
 
@@ -212,8 +189,7 @@ class SpectreGraphDataset(InMemoryDataset):
         elif (
             self.dataset_name in ["sbm_syn"]
             or "sbm_split" in self.dataset_name
-            or "planar_edge_remove" in self.dataset_name
-            or "planar_edge_add" in self.dataset_name
+            or "planar_remove" in self.dataset_name
         ):
             pass
         else:
@@ -413,16 +389,9 @@ class SBMDataModule(SpectreGraphDataModule):
     def __init__(self, cfg):
         super().__init__(cfg)
 
-
-class SBMSynDataModule(SpectreGraphDataModule):
-    def __init__(self, cfg):
-        super().__init__(cfg)
-
-
 class PlanarDataModule(SpectreGraphDataModule):
     def __init__(self, cfg):
         super().__init__(cfg)
-
 
 class EgoDataModule(SpectreGraphDataModule):
     def __init__(self, cfg):

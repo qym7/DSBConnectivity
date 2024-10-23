@@ -119,18 +119,16 @@ def get_datamodules(cfg):
         cfg["name"]
         in [
             "sbm",
-            "sbm_syn",
             "comm20",
             "planar",
             "ego",
-            "planar_edge_remove",
-            "planar_edge_add",
+            "planar_remove",
+            "planar_add",
         ]
         or "sbm_split" in cfg["name"]
     ):
         from ..datasets.spectre_dataset_pyg import (
             SBMDataModule,
-            SBMSynDataModule,
             Comm20DataModule,
             EgoDataModule,
             PlanarDataModule,
@@ -139,15 +137,13 @@ def get_datamodules(cfg):
 
         if cfg["name"] == "sbm":
             datamodule = SBMDataModule(cfg)
-        elif cfg["name"] == "sbm_syn":
-            datamodule = SBMSynDataModule(cfg)
-        elif "sbm_split" in cfg["name"]:
-            datamodule = SBMSynDataModule(cfg)
         elif cfg["name"] == "comm20":
             datamodule = Comm20DataModule(cfg)
         elif cfg["name"] == "ego":
             datamodule = EgoDataModule(cfg)
-        elif cfg["name"] == "planar":
+        elif "sbm" in cfg["name"]:
+            datamodule = SBMDataModule(cfg)
+        elif "planar" in cfg["name"]:
             datamodule = PlanarDataModule(cfg)
 
         dataset_infos = SpectreDatasetInfos(datamodule)
