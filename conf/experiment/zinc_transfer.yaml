@@ -1,5 +1,5 @@
 # @package _global_
-project_name: moses
+project_name: zinc
 
 # data
 dataset:
@@ -8,11 +8,12 @@ dataset:
   use_charge: False
   extra_features: 'molecule'
 
-  name: "moses"
-  datadir: 'data/moses_greater/moses_pyg_greater/'
+  name: "zinc"
+  datadir: 'data/zinc/zinc_logp2/zinc_pyg/'    # logP around 2
   remove_h: True
   random_subset: null
   pin_memory: False
+  is_target: False
 
 # transfer
 transfer: True
@@ -23,21 +24,22 @@ dataset_transfer:
   use_charge: False
   extra_features: 'molecule'
 
-  name: "moses"
-  datadir: 'data/moses_less/moses_pyg_less/'
+  name: "zinc"
+  datadir: 'data/zinc/zinc_logP4/zinc_pyg/'    # logP around 4
   remove_h: True
   random_subset: null
   pin_memory: False
+  is_target: True
 
 # settings for evaluations
 forward_path: null
 backward_path: null
-samples_to_generate: 64
+samples_to_generate: 1024
 samples_to_save: 20
 chains_to_save: 2
-final_samples_to_generate: 10000
+final_samples_to_generate: 16000
 final_samples_to_save: 30
 final_chains_to_save: 20
 
 # training
-batch_size: 64
+batch_size: 1024
