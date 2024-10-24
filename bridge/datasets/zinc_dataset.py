@@ -245,10 +245,6 @@ class ZincDataModule(MolecularDataModule):
 
 
 class ZincInfos(AbstractDatasetInfos):
-    """
-    Moses will not support charge as it only contains one charge type 1
-    """
-
     def __init__(self, datamodule, cfg):
         # basic information
         self.name = "zinc"

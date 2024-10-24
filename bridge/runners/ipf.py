@@ -874,6 +874,7 @@ class IPFBase(torch.nn.Module):
                     local_rank=0,
                     fb=fb,
                     i=np.round(i / (self.num_iter + 1), 2),
+                    source_graphs=init_list,
                 )
 
                 val_to_log[f"{fb}_X_change"] = X_abs.item()  # the nbr of nodes changed
