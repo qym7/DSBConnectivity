@@ -305,9 +305,7 @@ def compute_posterior_distribution(M, M_t, Qt_M, Qsb_M, Qtb_M):
     product = left_term * right_term  # (bs, N, d)
 
     denom = M @ Qtb_M  # (bs, N, d) @ (bs, d, d) = (bs, N, d)
-    denom = (denom * M_t).sum(
-        dim=-1
-    )  # (bs, N, d) * (bs, N, d) + sum = (bs, N)
+    denom = (denom * M_t).sum(dim=-1)  # (bs, N, d) * (bs, N, d) + sum = (bs, N)
 
     # mask out where denom is 0.
     denom[denom == 0.0] = 1
@@ -377,13 +375,9 @@ def mask_distributions(
     pred_charge=None,
 ):
     # Set masked rows to arbitrary distributions, so it doesn't contribute to loss
-    row_X = torch.zeros(
-        true_X.size(-1), dtype=torch.float, device=true_X.device
-    )
+    row_X = torch.zeros(true_X.size(-1), dtype=torch.float, device=true_X.device)
     row_X[0] = 1.0
-    row_E = torch.zeros(
-        true_E.size(-1), dtype=torch.float, device=true_E.device
-    )
+    row_E = torch.zeros(true_E.size(-1), dtype=torch.float, device=true_E.device)
     row_E[0] = 1.0
 
     diag_mask = ~torch.eye(
@@ -419,9 +413,7 @@ def mask_distributions(
         pred_charge[~node_mask] = row_charge
 
         pred_charge = pred_charge + 1e-7
-        pred_charge = pred_charge / torch.sum(
-            pred_charge, dim=-1, keepdim=True
-        )
+        pred_charge = pred_charge / torch.sum(pred_charge, dim=-1, keepdim=True)
 
     return (
         true_X,
@@ -433,9 +425,7 @@ def mask_distributions(
     )
 
 
-def posterior_distributions(
-    X, E, X_t, E_t, y_t, Qt, Qsb, Qtb, charge, charge_t
-):
+def posterior_distributions(X, E, X_t, E_t, y_t, Qt, Qsb, Qtb, charge, charge_t):
     prob_X = compute_posterior_distribution(
         M=X, M_t=X_t, Qt_M=Qt.X, Qsb_M=Qsb.X, Qtb_M=Qtb.X
     )  # (bs, n, dx)
@@ -507,9 +497,7 @@ def sample_sparse_discrete_feature_noise(limit_dist, node_mask):
 
     # expand dimensions
     x_limit = limit_dist.X[None, :].expand(n_node, -1)  # (n_node, dx)
-    e_limit = limit_dist.E[None, :].expand(
-        n_exist_edges.sum(), -1
-    )  # (n_edge, de)
+    e_limit = limit_dist.E[None, :].expand(n_exist_edges.sum(), -1)  # (n_edge, de)
 
     # sample nodes and existing edges
     node = x_limit.multinomial(1)[:, 0]

@@ -30,7 +30,7 @@ dataset_transfer:
   pin_memory: False
 
 # settings for evaluations
-forward_path: null
+forward_path: null #'/scratch/uceeosm/DSBConnectivity/experiments/2024-09-10/qm9_tanimoto/01-25-41/checkpoints/sample_net_f_44_1999.ckpt'
 backward_path: null
 samples_to_generate: 1024
 samples_to_save: 20

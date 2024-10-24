@@ -1,5 +1,5 @@
 # @package _global_
-project_name: qm9
+project_name: zinc
 
 # data
 dataset:
@@ -8,8 +8,8 @@ dataset:
   use_charge: False
   extra_features: 'molecule'
 
-  name: "qm9"
-  datadir: 'data/qm9_noh_trial/qm9_noh_greater_3/qm9_pyg/'
+  name: "zinc"
+  datadir: 'data/zinc/zinc_source/zinc_pyg/'    # logP around 2
   remove_h: True
   random_subset: null
   pin_memory: False
@@ -24,20 +24,20 @@ dataset_transfer:
   use_charge: False
   extra_features: 'molecule'
 
-  name: "qm9"
-  datadir: 'data/qm9_noh_trial/qm9_noh_less_3/qm9_pyg/'
+  name: "zinc"
+  datadir: 'data/zinc/zinc_target/zinc_pyg/'    # logP around 4
   remove_h: True
   random_subset: null
   pin_memory: False
   is_target: True
 
 # settings for evaluations
-forward_path: null
-backward_path: null
+forward_path: null #'/scratch/uceeosm/DSBConnectivity/experiments/2024-10-09/zinc/03-19-43/checkpoints/sample_net_f_102_4999.ckpt'
+backward_path: null #'/scratch/uceeosm/DSBConnectivity/experiments/2024-10-09/zinc/03-19-43/checkpoints/sample_net_b_114_4999.ckpt'
 samples_to_generate: 1024
 samples_to_save: 20
 chains_to_save: 2
-final_samples_to_generate: 10000
+final_samples_to_generate: 16000
 final_samples_to_save: 30
 final_chains_to_save: 20
 

@@ -17,9 +17,7 @@ import torch.nn.functional as F
 
 
 def setup_wandb(cfg):
-    config_dict = OmegaConf.to_container(
-        cfg, resolve=True, throw_on_missing=True
-    )
+    config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     name = cfg.dataset.name
     if name == "qm9" and cfg.dataset.remove_h == False:
         name = "qm9_h"
@@ -103,9 +101,7 @@ def symmetize_edge_matrix(matrix):
     matrix: bs, n, n, de
     """
     upper_triangular_mask = torch.zeros_like(matrix)
-    indices = torch.triu_indices(
-        row=matrix.size(1), col=matrix.size(2), offset=1
-    )
+    indices = torch.triu_indices(row=matrix.size(1), col=matrix.size(2), offset=1)
     upper_triangular_mask[:, indices[0], indices[1], :] = 1
 
     matrix = matrix * upper_triangular_mask
@@ -116,9 +112,7 @@ def symmetize_edge_matrix(matrix):
 
 
 def to_dense_node(x, batch, max_num_nodes):
-    X, node_mask = to_dense_batch(
-        x=x, batch=batch, max_num_nodes=max_num_nodes
-    )
+    X, node_mask = to_dense_batch(x=x, batch=batch, max_num_nodes=max_num_nodes)
 
     return X, node_mask
 
@@ -232,9 +226,7 @@ def to_sparse_all_edges(X, E, y, node_mask):
 
     edge_index, edge_attr = remove_self_loops(edge_index, edge_attr)
     ptr = torch.unique(batch, sorted=True, return_counts=True)[1]
-    ptr = torch.hstack(
-        [torch.tensor([0]).to(self.device), ptr.cumsum(-1)]
-    ).long()
+    ptr = torch.hstack([torch.tensor([0]).to(self.device), ptr.cumsum(-1)]).long()
 
     sparse_noisy_data = {
         "node_t": node,
@@ -257,9 +249,7 @@ def encode_no_edge(E):
     first_elt[no_edge] = 1
     E[:, :, :, 0] = first_elt
     diag = (
-        torch.eye(E.shape[1], dtype=torch.bool)
-        .unsqueeze(0)
-        .expand(E.shape[0], -1, -1)
+        torch.eye(E.shape[1], dtype=torch.bool).unsqueeze(0).expand(E.shape[0], -1, -1)
     )
     E[diag] = 0
     return E
@@ -434,9 +424,7 @@ class PlaceHolder:
         probE = probE.reshape(bs * n * n, -1)  # (bs * n * n, de_out)
 
         # Sample E
-        E_t = probE.multinomial(1, replacement=True).reshape(
-            bs, n, n
-        )  # (bs, n, n)
+        E_t = probE.multinomial(1, replacement=True).reshape(bs, n, n)  # (bs, n, n)
         E_t = torch.triu(E_t, diagonal=1)
         E_t = E_t + torch.transpose(E_t, 1, 2)
 
@@ -458,11 +446,7 @@ class PlaceHolder:
             self.E[:, k] = graph_data.E
         if (self.charge is not None) and (graph_data.charge is not None):
             self.charge[:, k] = graph_data.charge
-        if (
-            (self.y is not None)
-            and (graph_data.y is not None)
-            and (self.y.numel() > 0)
-        ):
+        if (self.y is not None) and (graph_data.y is not None) and (self.y.numel() > 0):
             self.y[:, k] = graph_data.y
         return self
 
@@ -547,9 +531,7 @@ class PlaceHolder:
         self.X = self.X.type_as(x)
         self.E = self.E.type_as(x)
         self.y = self.y.type_as(x)
-        self.charge = (
-            self.charge.type_as(x) if self.charge.numel() > 0 else None
-        )
+        self.charge = self.charge.type_as(x) if self.charge.numel() > 0 else None
         return self
 
     def mask(self, node_mask=None, collapse=False, mask_node=True):
@@ -605,9 +587,7 @@ class PlaceHolder:
 
         batch_indices = torch.arange(bs).unsqueeze(1).expand(bs, n)
         self.X = self.X[batch_indices, permuted_indices]
-        batch_indices = (
-            torch.arange(bs).unsqueeze(1).unsqueeze(2).expand(bs, n, n)
-        )
+        batch_indices = torch.arange(bs).unsqueeze(1).unsqueeze(2).expand(bs, n, n)
         indices_row = permuted_indices.unsqueeze(2).expand(bs, n, n)
         indices_column = permuted_indices.unsqueeze(1).expand(bs, n, n)
         self.E = self.E[batch_indices, indices_row, indices_column]
@@ -630,9 +610,7 @@ class PlaceHolder:
                 y = None
             else:
                 y = self.y[i]
-            graph_list.append(
-                PlaceHolder(X=x, charge=None, E=e, y=y, node_mask=None)
-            )
+            graph_list.append(PlaceHolder(X=x, charge=None, E=e, y=y, node_mask=None))
         return graph_list
 
     def collapse(self, collapse_charge=None, node_mask=None):
@@ -711,12 +689,8 @@ class SparsePlaceHolder:
         self.y = self.y.type_as(x)
 
         self.ptr = self.ptr if self.ptr is None else self.ptr.type_as(x)
-        self.batch = (
-            self.batch if self.batch is None else self.batch.type_as(x)
-        )
-        self.charge = (
-            self.charge if self.charge is None else self.charge.type_as(x)
-        )
+        self.batch = self.batch if self.batch is None else self.batch.type_as(x)
+        self.charge = self.charge if self.charge is None else self.charge.type_as(x)
 
         return self
 
@@ -728,12 +702,8 @@ class SparsePlaceHolder:
         self.y = self.y.to(device)
 
         self.ptr = self.ptr if self.ptr is None else self.ptr.to(device)
-        self.batch = (
-            self.batch if self.batch is None else self.batch.to(device)
-        )
-        self.charge = (
-            self.charge if self.charge is None else self.charge.to(device)
-        )
+        self.batch = self.batch if self.batch is None else self.batch.to(device)
+        self.charge = self.charge if self.charge is None else self.charge.to(device)
 
         return self
 
@@ -745,9 +715,7 @@ class SparsePlaceHolder:
 
     def symmetry(self):
         """ecover directed graph to undirected graph"""
-        self.edge_index, self.edge_attr = to_undirected(
-            self.edge_index, self.edge_attr
-        )
+        self.edge_index, self.edge_attr = to_undirected(self.edge_index, self.edge_attr)
         return self
 
     def collapse(self, collapse_charge=None):
@@ -759,12 +727,8 @@ class SparsePlaceHolder:
 
 
 def delete_repeated_twice_edges(edge_index, edge_attr):
-    min_edge_index, min_edge_attr = coalesce(
-        edge_index, edge_attr, reduce="min"
-    )
-    max_edge_index, max_edge_attr = coalesce(
-        edge_index, edge_attr, reduce="max"
-    )
+    min_edge_index, min_edge_attr = coalesce(edge_index, edge_attr, reduce="min")
+    max_edge_index, max_edge_attr = coalesce(edge_index, edge_attr, reduce="max")
     rand_pos = torch.randint(0, 2, (len(edge_attr),))
     max_edge_attr[rand_pos] = min_edge_attr[rand_pos]
 
@@ -800,9 +764,7 @@ def mask_node(node, node_mask):
 
 
 def get_masks(n_nodes, max_n_nodes, bs, device):
-    arange = (
-        torch.arange(max_n_nodes, device=device).unsqueeze(0).expand(bs, -1)
-    )
+    arange = torch.arange(max_n_nodes, device=device).unsqueeze(0).expand(bs, -1)
     bs = len(n_nodes)
     node_mask = arange < n_nodes.unsqueeze(1)
     x_mask = node_mask  # bs, n
@@ -817,9 +779,7 @@ def get_masks(n_nodes, max_n_nodes, bs, device):
 
 
 def get_node_mask(n_nodes, max_n_nodes, bs, device):
-    arange = (
-        torch.arange(max_n_nodes, device=device).unsqueeze(0).expand(bs, -1)
-    )
+    arange = torch.arange(max_n_nodes, device=device).unsqueeze(0).expand(bs, -1)
     bs = len(n_nodes)
     node_mask = arange < n_nodes.unsqueeze(1)
 
@@ -951,12 +911,10 @@ def sample_rand_edges(
         b_nodes = batch[rand_nodes].long()
         n_edges = n_nodes[b_nodes]
         rand_edge_index1 = [
-            torch.ones(n_edges[i]).to(device) * n
-            for i, n in enumerate(rand_nodes)
+            torch.ones(n_edges[i]).to(device) * n for i, n in enumerate(rand_nodes)
         ]
         rand_edge_index2 = [
-            torch.arange(n_edges[i]).to(device) + ptr[b]
-            for i, b in enumerate(b_nodes)
+            torch.arange(n_edges[i]).to(device) + ptr[b] for i, b in enumerate(b_nodes)
         ]
         rand_edge_index1 = torch.hstack(rand_edge_index1)
         rand_edge_index2 = torch.hstack(rand_edge_index2)
@@ -969,13 +927,11 @@ def sample_rand_edges(
     #       YM: This problem can be partially solved by save the number of rand edges, and using this number for sampling
     # TODO: We should try to think of a way to sample edges without self-loops
 
-    rand_edge_pos, max_comp_edge_index, max_comp_edge_attr = (
-        coalesce_all_graphs(
-            rand_edge_index,
-            edge_index,
-            edge_attr,
-            true_rand_edge_attr,
-        )
+    rand_edge_pos, max_comp_edge_index, max_comp_edge_attr = coalesce_all_graphs(
+        rand_edge_index,
+        edge_index,
+        edge_attr,
+        true_rand_edge_attr,
     )
 
     # it is wierd because rand_edge_pos sum is not equal to rand_edge_index after remove self-loop / to_undirected / coalesce
@@ -998,9 +954,7 @@ def coalesce_all_graphs(
     device = query_edge_index.device
 
     if true_rand_edge_attr is None:
-        rand_edge_attr = torch.zeros((query_edge_index.shape[1], de)).to(
-            device
-        )
+        rand_edge_attr = torch.zeros((query_edge_index.shape[1], de)).to(device)
         rand_edge_attr[:, 0] = 1
         # delete self-loop
         query_edge_index, rand_edge_attr = remove_self_loops(
@@ -1026,9 +980,7 @@ def coalesce_all_graphs(
         )
         true_rand_edge_attr = true_rand_edge_attr[true_sort_edge_attr.long()]
         # define rand edge attr
-        rand_edge_attr = torch.zeros((query_edge_index.shape[1], de)).to(
-            device
-        )
+        rand_edge_attr = torch.zeros((query_edge_index.shape[1], de)).to(device)
         rand_edge_attr[:, 0] = 1
 
     # find the attributes for random edges
@@ -1051,9 +1003,7 @@ def coalesce_all_graphs(
     rand_edge_pos = min_comp_edge_attr == 0
 
     # pass attr to one-hot
-    max_comp_edge_attr = F.one_hot(
-        max_comp_edge_attr_label, num_classes=de
-    ).to(device)
+    max_comp_edge_attr = F.one_hot(max_comp_edge_attr_label, num_classes=de).to(device)
 
     if true_rand_edge_attr is not None:
         comp_true_edge_attr = torch.hstack(
@@ -1067,9 +1017,7 @@ def coalesce_all_graphs(
             comp_true_edge_attr,
             reduce="max",
         )
-        true_comp_edge_attr = F.one_hot(
-            true_comp_edge_attr, num_classes=de
-        ).to(device)
+        true_comp_edge_attr = F.one_hot(true_comp_edge_attr, num_classes=de).to(device)
         # position for random edges which is originally negative
         rand_edge_pos = torch.logical_and(
             max_comp_edge_attr_label == min_comp_edge_attr,
@@ -1087,12 +1035,8 @@ def coalesce_all_graphs(
 
 def ptr_to_node_mask(ptr, batch, n_node):
     device = ptr.device
-    node_mask = torch.ones((int(batch.max() + 1), int(n_node))).cumsum(
-        -1
-    )  # bs, n_node
-    node_mask = node_mask.to(device) <= (ptr.diff()).unsqueeze(-1).repeat(
-        1, n_node
-    )
+    node_mask = torch.ones((int(batch.max() + 1), int(n_node))).cumsum(-1)  # bs, n_node
+    node_mask = node_mask.to(device) <= (ptr.diff()).unsqueeze(-1).repeat(1, n_node)
 
     return node_mask
 
@@ -1175,9 +1119,7 @@ def split_samples(samples, num_split):
         cur_node = node[node_mask]
         cur_charge = charge[node_mask]
 
-        edge_mask = torch.logical_and(
-            edge_batch < end_idx, edge_batch >= start_idx
-        )
+        edge_mask = torch.logical_and(edge_batch < end_idx, edge_batch >= start_idx)
         cur_edge_index = edge_index[:, edge_mask]
         cur_edge_index = (cur_edge_index - (batch < start_idx).sum()).long()
         cur_edge_attr = edge_attr[edge_mask]

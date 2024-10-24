@@ -4,6 +4,14 @@ import re
 import wandb
 import os
 import sys
+from scipy.stats import wasserstein_distance
+from sklearn.metrics import mean_absolute_error
+from fcd_torch import FCD
+import functools
+import pygmtools as pygm
+
+pygm.set_backend("pytorch")
+_ = torch.manual_seed(1)
 
 try:
     from rdkit import Chem, DataStructs, RDLogger
@@ -16,6 +24,7 @@ try:
         AllChem,
         MolFromSmiles,
         MolToSmiles,
+        Descriptors,
     )
 
     sys.path.append(os.path.join(RDConfig.RDContribDir, "SA_Score"))
@@ -73,15 +82,12 @@ class BasicMolecularMetrics(object):
     def __init__(self, dataset_info, test_smiles=None, train_smiles=None):
         self.atom_decoder = dataset_info.atom_decoder
         self.dataset_info = dataset_info
+        self.name = dataset_info.name
         # Retrieve dataset smiles only for qm9 currently.
         self.test_smiles = test_smiles
         self.dataset_smiles_list = train_smiles
-        self.test_sa_avg, _, self.test_sa_success = self.compute_sascore(
-            test_smiles
-        )
-        self.train_sa_avg, _, self.train_sa_success = self.compute_sascore(
-            train_smiles
-        )
+        self.test_sa_avg, _, self.test_sa_success = self.compute_sascore(test_smiles)
+        self.train_sa_avg, _, self.train_sa_success = self.compute_sascore(train_smiles)
 
     def compute_validity(self, generated):
         """generated: list of couples (positions, atom_types)"""
@@ -130,6 +136,98 @@ class BasicMolecularMetrics(object):
             len(valid) / len(generated),
             np.array(num_components),
             all_smiles,
+        )
+
+    def compute_validity_smiles(self, generated):
+        valid = []
+        num_components = []
+        all_smiles = []
+        valid_indices = []  # To store indices of valid molecules
+
+        for idx, smiles in enumerate(generated):
+            mol = MolFromSmiles(smiles)
+            smiles = mol2smiles(mol)
+            try:
+                mol_frags = Chem.rdmolops.GetMolFrags(
+                    mol, asMols=True, sanitizeFrags=True
+                )
+                num_components.append(len(mol_frags))
+            except:
+                pass
+
+            if smiles is not None:
+                try:
+                    mol_frags = Chem.rdmolops.GetMolFrags(
+                        mol, asMols=True, sanitizeFrags=True
+                    )
+                    largest_mol = max(
+                        mol_frags, default=mol, key=lambda m: m.GetNumAtoms()
+                    )
+                    smiles = mol2smiles(largest_mol)
+                    valid.append(smiles)
+                    all_smiles.append(smiles)
+                    valid_indices.append(idx)  # Record index of valid molecule
+                except Chem.rdchem.AtomValenceException:
+                    print("Valence error in GetMolFrags")
+                    all_smiles.append(None)
+                except Chem.rdchem.KekulizeException:
+                    print("Can't kekulize molecule")
+                    all_smiles.append(None)
+            else:
+                all_smiles.append(None)
+
+        return (
+            valid,
+            len(valid) / len(generated),
+            np.array(num_components),
+            all_smiles,
+            valid_indices,
+        )
+
+    def compute_validity_smiles(self, generated):
+        valid = []
+        num_components = []
+        all_smiles = []
+        valid_indices = []  # To store indices of valid molecules
+
+        for idx, smiles in enumerate(generated):
+            mol = MolFromSmiles(smiles)
+            smiles = mol2smiles(mol)
+            try:
+                mol_frags = Chem.rdmolops.GetMolFrags(
+                    mol, asMols=True, sanitizeFrags=True
+                )
+                num_components.append(len(mol_frags))
+            except:
+                pass
+
+            if smiles is not None:
+                try:
+                    mol_frags = Chem.rdmolops.GetMolFrags(
+                        mol, asMols=True, sanitizeFrags=True
+                    )
+                    largest_mol = max(
+                        mol_frags, default=mol, key=lambda m: m.GetNumAtoms()
+                    )
+                    smiles = mol2smiles(largest_mol)
+                    valid.append(smiles)
+                    all_smiles.append(smiles)
+                    valid_indices.append(idx)  # Record index of valid molecule
+                except Chem.rdchem.AtomValenceException:
+                    print("Valence error in GetMolFrags")
+                    all_smiles.append(None)
+                except Chem.rdchem.KekulizeException:
+                    print("Can't kekulize molecule")
+                    all_smiles.append(None)
+            else:
+                all_smiles.append(None)
+
+        return (
+            valid,
+            len(valid) / len(generated),
+            np.array(num_components),
+            all_smiles,
+            valid_indices,
         )
 
     def compute_uniqueness(self, valid):
@@ -200,6 +298,48 @@ class BasicMolecularMetrics(object):
             len(valid_smiles) / len(generated),
         )
 
+    def compute_relaxed_validity_smiles(self, generated):
+        valid = []
+        for smiles in generated:
+            mol = MolFromSmiles(smiles)
+            smiles = mol2smiles(mol)
+            if smiles is not None:
+                try:
+                    mol_frags = Chem.rdmolops.GetMolFrags(
+                        mol, asMols=True, sanitizeFrags=True
+                    )
+                    largest_mol = max(
+                        mol_frags, default=mol, key=lambda m: m.GetNumAtoms()
+                    )
+                    smiles = mol2smiles(largest_mol)
+                    valid.append(smiles)
+                except Chem.rdchem.AtomValenceException:
+                    print("Valence error in GetmolFrags")
+                except Chem.rdchem.KekulizeException:
+                    print("Can't kekulize molecule")
+        return valid, len(valid) / len(generated)
+
+    def compute_relaxed_validity_smiles(self, generated):
+        valid = []
+        for smiles in generated:
+            mol = MolFromSmiles(smiles)
+            smiles = mol2smiles(mol)
+            if smiles is not None:
+                try:
+                    mol_frags = Chem.rdmolops.GetMolFrags(
+                        mol, asMols=True, sanitizeFrags=True
+                    )
+                    largest_mol = max(
+                        mol_frags, default=mol, key=lambda m: m.GetNumAtoms()
+                    )
+                    smiles = mol2smiles(largest_mol)
+                    valid.append(smiles)
+                except Chem.rdchem.AtomValenceException:
+                    print("Valence error in GetmolFrags")
+                except Chem.rdchem.KekulizeException:
+                    print("Can't kekulize molecule")
+        return valid, len(valid) / len(generated)
+
     def compute_sascore(self, all_smiles):
         count_true_sa = 0
         sa_values = []
@@ -228,20 +368,272 @@ class BasicMolecularMetrics(object):
             count_true_sa / len(all_smiles),
         )
 
+    def check_nll(self, generated, source, eps=1e-18):
+        # get maximum number of nodes across all graphs in the batch
+        max_nodes_0 = max(graph[0].size(0) for graph in generated)
+        max_nodes_T = max(graph[0].size(0) for graph in source)
+
+        X_0_padded = []
+        E_0_padded = []
+        X_T_padded = []
+        E_T_padded = []
+        node_masks = []
+
+        # pad each graph to the maximum size in the batch
+        for (X_0, E_0), (X_T, E_T) in zip(generated, source):
+            n_nodes_0 = X_0.size(0)
+            n_nodes_T = X_T.size(0)
+
+            X_0_pad = torch.zeros((max_nodes_0,), dtype=X_0.dtype, device=X_0.device)
+            X_T_pad = torch.zeros((max_nodes_T,), dtype=X_T.dtype, device=X_T.device)
+            X_0_pad[:n_nodes_0] = X_0
+            X_T_pad[:n_nodes_T] = X_T
+
+            E_0_pad = torch.zeros(
+                (max_nodes_0, max_nodes_0), dtype=E_0.dtype, device=E_0.device
+            )
+            E_T_pad = torch.zeros(
+                (max_nodes_T, max_nodes_T), dtype=E_T.dtype, device=E_T.device
+            )
+            E_0_pad[:n_nodes_0, :n_nodes_0] = E_0
+            E_T_pad[:n_nodes_T, :n_nodes_T] = E_T
+
+            X_0_padded.append(X_0_pad)
+            E_0_padded.append(E_0_pad)
+            X_T_padded.append(X_T_pad)
+            E_T_padded.append(E_T_pad)
+
+            # create node masks
+            node_masks.append(
+                (
+                    torch.arange(max(max_nodes_0, max_nodes_T), device=X_0.device)
+                    < n_nodes_0
+                ).float()
+            )
+
+        X_0_padded = torch.stack(X_0_padded)
+        E_0_padded = torch.stack(E_0_padded)
+        X_T_padded = torch.stack(X_T_padded)
+        E_T_padded = torch.stack(E_T_padded)
+        node_masks = torch.stack(node_masks)
+
+        n0 = torch.tensor(
+            [X.shape[0] for X, _ in generated], device=X_0_padded.device
+        ).unsqueeze(1)
+        nT = torch.tensor(
+            [X.shape[0] for X, _ in source], device=X_T_padded.device
+        ).unsqueeze(1)
+
+        conn0, edge0, ne0 = pygm.utils.dense_to_sparse(E_0_padded)
+        connT, edgeT, neT = pygm.utils.dense_to_sparse(E_T_padded)
+
+        gaussian_aff = functools.partial(pygm.utils.gaussian_aff_fn, sigma=0.1)
+
+        K = pygm.utils.build_aff_mat(
+            X_0_padded.unsqueeze(-1),
+            edge0,
+            conn0,
+            X_T_padded.unsqueeze(-1),
+            edgeT,
+            connT,
+            n0,
+            ne0,
+            nT,
+            neT,
+            node_aff_fn=gaussian_aff,
+            edge_aff_fn=gaussian_aff,
+        )
+
+        Y = pygm.sm(K, n0, nT)
+        Y = pygm.hungarian(Y)
+        Y = Y.to(X_T_padded.dtype)
+
+        # align the node and edge feature matrices using the matching matrices
+        X_T_aligned = torch.matmul(Y, X_T_padded.unsqueeze(-1)).squeeze(
+            -1
+        )  # Align node values
+        E_T_aligned = torch.matmul(torch.matmul(Y, E_T_padded), Y.transpose(1, 2))
+
+        nll_X = -torch.log(X_0_padded + eps) * X_T_aligned
+        nll_E = -torch.log(E_0_padded + eps) * E_T_aligned
+
+        # mask the padded entries
+        nll_X = nll_X * node_masks  # Mask node values
+        nll_E = (
+            nll_E * node_masks.unsqueeze(-1) * node_masks.unsqueeze(-2)
+        )  # Mask edge values
+
+        nll_X = nll_X.sum(dim=-1)
+        nll_E = nll_E.view(E_0_padded.size(0), -1).sum(dim=-1)
+        nll_graph = nll_X + nll_E
+
+        return nll_graph.mean().item(), nll_graph.tolist()
+
+    def compute_w1(self, generated_values, source_values):
+        return wasserstein_distance(generated_values, source_values)
+
+    def compute_mad(self, generated_values, source_values):
+        min_length = min(len(generated_values), len(source_values))
+        property_gen = generated_values[:min_length]
+        property_source = source_values[:min_length]
+        return mean_absolute_error(property_gen, property_source), min_length
+
+    def compute_properties(self, molecules):
+        logP_values = []
+        qed_values = []
+        sa_scores = []
+
+        for smiles in molecules:
+            mol = Chem.MolFromSmiles(smiles)
+            logP_values.append(Descriptors.MolLogP(mol))
+            qed_values.append(QED.qed(mol))
+            sa_scores.append(sascorer.calculateScore(mol))
+
+        return np.array(logP_values), np.array(qed_values), np.array(sa_scores)
+
+    def calculate_fcd(self, generated, source):
+        fcd = FCD(device="cuda", n_jobs=8)
+        fcd_score = fcd(generated, source)
+        return fcd_score
+
+    def check_nll(self, generated, source, eps=1e-18):
+        # get maximum number of nodes across all graphs in the batch
+        max_nodes_0 = max(graph[0].size(0) for graph in generated)
+        max_nodes_T = max(graph[0].size(0) for graph in source)
+
+        X_0_padded = []
+        E_0_padded = []
+        X_T_padded = []
+        E_T_padded = []
+        node_masks = []
+
+        # pad each graph to the maximum size in the batch
+        for (X_0, E_0), (X_T, E_T) in zip(generated, source):
+            n_nodes_0 = X_0.size(0)
+            n_nodes_T = X_T.size(0)
+
+            X_0_pad = torch.zeros((max_nodes_0,), dtype=X_0.dtype, device=X_0.device)
+            X_T_pad = torch.zeros((max_nodes_T,), dtype=X_T.dtype, device=X_T.device)
+            X_0_pad[:n_nodes_0] = X_0
+            X_T_pad[:n_nodes_T] = X_T
+
+            E_0_pad = torch.zeros(
+                (max_nodes_0, max_nodes_0), dtype=E_0.dtype, device=E_0.device
+            )
+            E_T_pad = torch.zeros(
+                (max_nodes_T, max_nodes_T), dtype=E_T.dtype, device=E_T.device
+            )
+            E_0_pad[:n_nodes_0, :n_nodes_0] = E_0
+            E_T_pad[:n_nodes_T, :n_nodes_T] = E_T
+
+            X_0_padded.append(X_0_pad)
+            E_0_padded.append(E_0_pad)
+            X_T_padded.append(X_T_pad)
+            E_T_padded.append(E_T_pad)
+
+            # create node masks
+            node_masks.append(
+                (
+                    torch.arange(max(max_nodes_0, max_nodes_T), device=X_0.device)
+                    < n_nodes_0
+                ).float()
+            )
+
+        X_0_padded = torch.stack(X_0_padded)
+        E_0_padded = torch.stack(E_0_padded)
+        X_T_padded = torch.stack(X_T_padded)
+        E_T_padded = torch.stack(E_T_padded)
+        node_masks = torch.stack(node_masks)
+
+        n0 = torch.tensor(
+            [X.shape[0] for X, _ in generated], device=X_0_padded.device
+        ).unsqueeze(1)
+        nT = torch.tensor(
+            [X.shape[0] for X, _ in source], device=X_T_padded.device
+        ).unsqueeze(1)
+
+        conn0, edge0, ne0 = pygm.utils.dense_to_sparse(E_0_padded)
+        connT, edgeT, neT = pygm.utils.dense_to_sparse(E_T_padded)
+
+        gaussian_aff = functools.partial(pygm.utils.gaussian_aff_fn, sigma=0.1)
+
+        K = pygm.utils.build_aff_mat(
+            X_0_padded.unsqueeze(-1),
+            edge0,
+            conn0,
+            X_T_padded.unsqueeze(-1),
+            edgeT,
+            connT,
+            n0,
+            ne0,
+            nT,
+            neT,
+            node_aff_fn=gaussian_aff,
+            edge_aff_fn=gaussian_aff,
+        )
+
+        Y = pygm.sm(K, n0, nT)
+        Y = pygm.hungarian(Y)
+        Y = Y.to(X_T_padded.dtype)
+
+        # align the node and edge feature matrices using the matching matrices
+        X_T_aligned = torch.matmul(Y, X_T_padded.unsqueeze(-1)).squeeze(
+            -1
+        )  # Align node values
+        E_T_aligned = torch.matmul(torch.matmul(Y, E_T_padded), Y.transpose(1, 2))
+
+        nll_X = -torch.log(X_0_padded + eps) * X_T_aligned
+        nll_E = -torch.log(E_0_padded + eps) * E_T_aligned
+
+        # mask the padded entries
+        nll_X = nll_X * node_masks  # Mask node values
+        nll_E = (
+            nll_E * node_masks.unsqueeze(-1) * node_masks.unsqueeze(-2)
+        )  # Mask edge values
+
+        nll_X = nll_X.sum(dim=-1)
+        nll_E = nll_E.view(E_0_padded.size(0), -1).sum(dim=-1)
+        nll_graph = nll_X + nll_E
+
+        return nll_graph.mean().item(), nll_graph.tolist()
+
+    def compute_w1(self, generated_values, source_values):
+        return wasserstein_distance(generated_values, source_values)
+
+    def compute_mad(self, generated_values, source_values):
+        min_length = min(len(generated_values), len(source_values))
+        property_gen = generated_values[:min_length]
+        property_source = source_values[:min_length]
+        return mean_absolute_error(property_gen, property_source), min_length
+
+    def compute_properties(self, molecules):
+        logP_values = []
+        qed_values = []
+        sa_scores = []
+
+        for smiles in molecules:
+            mol = Chem.MolFromSmiles(smiles)
+            logP_values.append(Descriptors.MolLogP(mol))
+            qed_values.append(QED.qed(mol))
+            sa_scores.append(sascorer.calculateScore(mol))
+
+        return np.array(logP_values), np.array(qed_values), np.array(sa_scores)
+
+    def calculate_fcd(self, generated, source):
+        fcd = FCD(device="cuda", n_jobs=8)
+        fcd_score = fcd(generated, source)
+        return fcd_score
+
     def evaluate(self, generated, source):
-        """generated: list of pairs (positions: n x 3, atom_types: n [int])
-        the positions and atom types should already be masked.
-        """
+        """generated: list of pairs (atom_types: n [int], edge_types: n * n)"""
 
         print(f"Number of generated molecules: {len(generated)}")
         valid, validity, num_components, _ = self.compute_validity(generated)
 
         if source is not None:
-            _, all_relaxed_smiles_source, _ = self.compute_relaxed_validity(
-                source
-            )
-            v_sa_avg_source, sa_values_source, sa_v_source = (
-                self.compute_sascore(all_relaxed_smiles_source)
+            _, all_relaxed_smiles_source, _ = self.compute_relaxed_validity(source)
+            v_sa_avg_source, sa_values_source, sa_v_source = self.compute_sascore(
+                all_relaxed_smiles_source
             )
         else:
             all_relaxed_smiles_source = None
@@ -251,9 +643,7 @@ class BasicMolecularMetrics(object):
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
         nc_max = num_components.max() if len(num_components) > 0 else 0
-        print(
-            f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%"
-        )
+        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
         print(
             f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
         )
@@ -270,17 +660,13 @@ class BasicMolecularMetrics(object):
             f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%"
         )
         if relaxed_validity > 0:
-            unique_smiles, uniqueness = self.compute_uniqueness(
-                relaxed_valid_smiles
-            )
+            unique_smiles, uniqueness = self.compute_uniqueness(relaxed_valid_smiles)
             print(
                 f"Uniqueness over {len(relaxed_valid_smiles)} valid molecules: {uniqueness * 100 :.2f}%"
             )
 
             if self.dataset_smiles_list is not None:
-                novel_smiles, novelty, _, coverage = self.compute_novelty(
-                    unique_smiles
-                )
+                novel_smiles, novelty, _, coverage = self.compute_novelty(unique_smiles)
                 print(
                     f"Novelty over {len(unique_smiles)} unique valid molecules: {novelty * 100 :.2f}%"
                 )
@@ -336,6 +722,356 @@ class BasicMolecularMetrics(object):
             (all_relaxed_smiles_source, all_smiles),
             (sa_values_source, sa_values),
         )
+
+    def evaluate_zinc(self, generated, source):
+        """generated: list of pairs (atom_types: n [int], edge_types: n * n)"""
+
+        print(f"Number of generated molecules: {len(generated)}")
+        valid, validity, num_components, all_smiles = self.compute_validity(generated)
+
+        if source is not None:
+            valid_source, _, _, all_smiles_source = self.compute_validity(source)
+            nll, nll_vals = self.check_nll(generated, source)
+            print(
+                f"NLL Score over {len(generated)} total generated molecules is: {nll}"
+            )
+        else:
+            valid_source = None
+            all_smiles_source = None
+            nll = -1.0
+
+        nc_mu = num_components.mean() if len(num_components) > 0 else 0
+        nc_min = num_components.min() if len(num_components) > 0 else 0
+        nc_max = num_components.max() if len(num_components) > 0 else 0
+        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(
+            f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
+        )
+
+        connectivity = (num_components == 1).sum() / len(num_components)
+        print(
+            f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%"
+        )
+
+        relaxed_valid, relaxed_validity = self.compute_relaxed_validity(generated)
+        print(
+            f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%"
+        )
+        if relaxed_validity > 0:
+            unique, uniqueness = self.compute_uniqueness(relaxed_valid)
+            print(
+                f"Uniqueness over {len(relaxed_valid)} valid molecules: {uniqueness * 100 :.2f}%"
+            )
+
+            if self.dataset_smiles_list is not None:
+                _, novelty, _, coverage = self.compute_novelty(unique)
+                print(
+                    f"Novelty over {len(unique)} unique valid molecules: {novelty * 100 :.2f}%"
+                )
+                print(
+                    f"Coverage over {len(unique)} unique valid molecules: {coverage * 100 :.2f}%"
+                )
+            else:
+                novelty = -1.0
+
+            if valid_source is not None:
+                logP_gen, qed_gen, sa_gen = self.compute_properties(relaxed_valid)
+                logP_source, qed_source, sa_source = self.compute_properties(
+                    valid_source
+                )
+
+                w1_logP = self.compute_w1(logP_gen, logP_source)
+                print(
+                    f"W1 LogP over {len(relaxed_valid)} valid molecules is: {w1_logP}"
+                )
+                mad_qed, qed_length = self.compute_mad(qed_gen, qed_source)
+                print(
+                    f"MAD QED over {qed_length} (a portion) valid molecules is: {mad_qed}"
+                )
+                mad_sa, sa_length = self.compute_mad(sa_gen, sa_source)
+                print(f"MAD SA {sa_length} (a portion) valid molecules is: {mad_sa}")
+
+                fcd_score = self.calculate_fcd(relaxed_valid, valid_source)
+                print(
+                    f"FCD Score over {len(relaxed_valid)} valid molecules is: {fcd_score}"
+                )
+            else:
+                w1_logP = -1.0
+                mad_qed = -1.0
+                mad_sa = -1.0
+                fcd_score = -1.0
+        else:
+            novelty = -1.0
+            uniqueness = 0.0
+            w1_logP = -1.0
+            mad_qed = -1.0
+            mad_sa = -1.0
+            fcd_score = -1.0
+            coverage = 0.0
+            unique = []
+        return (
+            [
+                validity,
+                relaxed_validity,
+                uniqueness,
+                novelty,
+                connectivity,
+                w1_logP,
+                mad_qed,
+                mad_sa,
+                fcd_score,
+                coverage,
+                nll,
+            ],
+            unique,
+            dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
+            (all_smiles_source, all_smiles),
+        )
+
+    def evaluate_baselines(self, generated):
+        """generated: list of pairs (atom_types: n [int], edge_types: n * n)"""
+
+        print(f"Number of molecules to evaluate: {len(generated)}")
+        valid, validity, num_components, all_smiles, valid_indices = (
+            self.compute_validity_smiles(generated)
+        )
+
+        nc_mu = num_components.mean() if len(num_components) > 0 else 0
+        nc_min = num_components.min() if len(num_components) > 0 else 0
+        nc_max = num_components.max() if len(num_components) > 0 else 0
+        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(
+            f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
+        )
+
+        connectivity = (num_components == 1).sum() / len(num_components)
+        print(
+            f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%"
+        )
+
+        relaxed_valid, relaxed_validity = self.compute_relaxed_validity_smiles(
+            generated
+        )
+        print(
+            f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%"
+        )
+        if relaxed_validity > 0:
+            unique, uniqueness = self.compute_uniqueness(relaxed_valid)
+            print(
+                f"Uniqueness over {len(relaxed_valid)} valid molecules: {uniqueness * 100 :.2f}%"
+            )
+
+            if self.dataset_smiles_list is not None:
+                novel, novelty, _, coverage = self.compute_novelty(unique)
+                print(
+                    f"Novelty over {len(unique)} unique valid molecules: {novelty * 100 :.2f}%"
+                )
+                print(
+                    f"Coverage over {len(unique)} unique valid molecules: {coverage * 100 :.2f}%"
+                )
+
+            _, sav_avg, sav_success = self.compute_sascore(relaxed_valid)
+            _, savu_avg, savu_success = self.compute_sascore(unique)
+            vu_sa = savu_success * len(unique) / len(all_smiles)
+            _, savun_avg, savun_success = self.compute_sascore(novel)
+            vun_sa = savun_success * len(novel) / len(all_smiles)
+
+            print(
+                f"SA Score Success Rate (<3) over {len(relaxed_valid)} relaxed valid molecules: {sav_success * 100 :.2f}%"
+            )
+            print(
+                f"SA Score Success Rate (<3) over {len(unique)} unique valid molecules: {vu_sa * 100 :.2f}%"
+            )
+            print(
+                f"SA Score Success Rate (<3) over {len(novel)} novel unique valid molecules: {vun_sa * 100 :.2f}%"
+            )
+
+            print(
+                f"SA Average Value over {len(relaxed_valid)} relaxed valid molecules: {sav_avg :.2f}"
+            )
+            print(
+                f"SA Average Value over {len(unique)} unique valid molecules: {savu_avg :.2f}"
+            )
+            print(
+                f"SA Average Value over {len(novel)} novel unique valid molecules: {savun_avg :.2f}"
+            )
+
+        return relaxed_valid, unique, novel, valid, valid_indices
+
+    def evaluate_zinc(self, generated, source):
+        """generated: list of pairs (atom_types: n [int], edge_types: n * n)"""
+
+        print(f"Number of generated molecules: {len(generated)}")
+        valid, validity, num_components, all_smiles = self.compute_validity(generated)
+
+        if source is not None:
+            valid_source, _, _, all_smiles_source = self.compute_validity(source)
+            nll, nll_vals = self.check_nll(generated, source)
+            print(
+                f"NLL Score over {len(generated)} total generated molecules is: {nll}"
+            )
+        else:
+            valid_source = None
+            all_smiles_source = None
+            nll = -1.0
+
+        nc_mu = num_components.mean() if len(num_components) > 0 else 0
+        nc_min = num_components.min() if len(num_components) > 0 else 0
+        nc_max = num_components.max() if len(num_components) > 0 else 0
+        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(
+            f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
+        )
+
+        connectivity = (num_components == 1).sum() / len(num_components)
+        print(
+            f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%"
+        )
+
+        relaxed_valid, relaxed_validity = self.compute_relaxed_validity(generated)
+        print(
+            f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%"
+        )
+        if relaxed_validity > 0:
+            unique, uniqueness = self.compute_uniqueness(relaxed_valid)
+            print(
+                f"Uniqueness over {len(relaxed_valid)} valid molecules: {uniqueness * 100 :.2f}%"
+            )
+
+            if self.dataset_smiles_list is not None:
+                _, novelty, _, coverage = self.compute_novelty(unique)
+                print(
+                    f"Novelty over {len(unique)} unique valid molecules: {novelty * 100 :.2f}%"
+                )
+                print(
+                    f"Coverage over {len(unique)} unique valid molecules: {coverage * 100 :.2f}%"
+                )
+            else:
+                novelty = -1.0
+
+            if valid_source is not None:
+                logP_gen, qed_gen, sa_gen = self.compute_properties(relaxed_valid)
+                logP_source, qed_source, sa_source = self.compute_properties(
+                    valid_source
+                )
+
+                w1_logP = self.compute_w1(logP_gen, logP_source)
+                print(
+                    f"W1 LogP over {len(relaxed_valid)} valid molecules is: {w1_logP}"
+                )
+                mad_qed, qed_length = self.compute_mad(qed_gen, qed_source)
+                print(
+                    f"MAD QED over {qed_length} (a portion) valid molecules is: {mad_qed}"
+                )
+                mad_sa, sa_length = self.compute_mad(sa_gen, sa_source)
+                print(f"MAD SA {sa_length} (a portion) valid molecules is: {mad_sa}")
+
+                fcd_score = self.calculate_fcd(relaxed_valid, valid_source)
+                print(
+                    f"FCD Score over {len(relaxed_valid)} valid molecules is: {fcd_score}"
+                )
+            else:
+                w1_logP = -1.0
+                mad_qed = -1.0
+                mad_sa = -1.0
+                fcd_score = -1.0
+        else:
+            novelty = -1.0
+            uniqueness = 0.0
+            w1_logP = -1.0
+            mad_qed = -1.0
+            mad_sa = -1.0
+            fcd_score = -1.0
+            coverage = 0.0
+            unique = []
+        return (
+            [
+                validity,
+                relaxed_validity,
+                uniqueness,
+                novelty,
+                connectivity,
+                w1_logP,
+                mad_qed,
+                mad_sa,
+                fcd_score,
+                coverage,
+                nll,
+            ],
+            unique,
+            dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
+            (all_smiles_source, all_smiles),
+        )
+
+    def evaluate_baselines(self, generated):
+        """generated: list of pairs (atom_types: n [int], edge_types: n * n)"""
+
+        print(f"Number of molecules to evaluate: {len(generated)}")
+        valid, validity, num_components, all_smiles, valid_indices = (
+            self.compute_validity_smiles(generated)
+        )
+
+        nc_mu = num_components.mean() if len(num_components) > 0 else 0
+        nc_min = num_components.min() if len(num_components) > 0 else 0
+        nc_max = num_components.max() if len(num_components) > 0 else 0
+        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(
+            f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
+        )
+
+        connectivity = (num_components == 1).sum() / len(num_components)
+        print(
+            f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%"
+        )
+
+        relaxed_valid, relaxed_validity = self.compute_relaxed_validity_smiles(
+            generated
+        )
+        print(
+            f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%"
+        )
+        if relaxed_validity > 0:
+            unique, uniqueness = self.compute_uniqueness(relaxed_valid)
+            print(
+                f"Uniqueness over {len(relaxed_valid)} valid molecules: {uniqueness * 100 :.2f}%"
+            )
+
+            if self.dataset_smiles_list is not None:
+                novel, novelty, _, coverage = self.compute_novelty(unique)
+                print(
+                    f"Novelty over {len(unique)} unique valid molecules: {novelty * 100 :.2f}%"
+                )
+                print(
+                    f"Coverage over {len(unique)} unique valid molecules: {coverage * 100 :.2f}%"
+                )
+
+            _, sav_avg, sav_success = self.compute_sascore(relaxed_valid)
+            _, savu_avg, savu_success = self.compute_sascore(unique)
+            vu_sa = savu_success * len(unique) / len(all_smiles)
+            _, savun_avg, savun_success = self.compute_sascore(novel)
+            vun_sa = savun_success * len(novel) / len(all_smiles)
+
+            print(
+                f"SA Score Success Rate (<3) over {len(relaxed_valid)} relaxed valid molecules: {sav_success * 100 :.2f}%"
+            )
+            print(
+                f"SA Score Success Rate (<3) over {len(unique)} unique valid molecules: {vu_sa * 100 :.2f}%"
+            )
+            print(
+                f"SA Score Success Rate (<3) over {len(novel)} novel unique valid molecules: {vun_sa * 100 :.2f}%"
+            )
+
+            print(
+                f"SA Average Value over {len(relaxed_valid)} relaxed valid molecules: {sav_avg :.2f}"
+            )
+            print(
+                f"SA Average Value over {len(unique)} unique valid molecules: {savu_avg :.2f}"
+            )
+            print(
+                f"SA Average Value over {len(novel)} novel unique valid molecules: {savun_avg :.2f}"
+            )
+
+        return relaxed_valid, unique, novel, valid, valid_indices
 
 
 def mol2smiles(mol):
@@ -582,9 +1318,7 @@ def compute_molecular_metrics(
         for i, mol in enumerate(molecule_list):
             atom_types, edge_types = mol
 
-            validity_results = check_stability(
-                atom_types, edge_types, dataset_info
-            )
+            validity_results = check_stability(atom_types, edge_types, dataset_info)
 
             molecule_stable += int(validity_results[0])
             nr_stable_bonds += int(validity_results[1])
@@ -606,7 +1340,35 @@ def compute_molecular_metrics(
         }
 
     metrics = BasicMolecularMetrics(dataset_info, test_smiles, train_smiles)
-    rdkit_metrics = metrics.evaluate(molecule_list, source_molecule_list)
+    if dataset_info.name == "zinc":
+        rdkit_metrics = metrics.evaluate_zinc(molecule_list, source_molecule_list)
+
+        all_smiles = rdkit_metrics[-1]
+        nc = rdkit_metrics[-2]
+        dic = {
+            f"mol_metrics_charts_{fb}/Validity": rdkit_metrics[0][0],
+            f"mol_metrics_charts_{fb}/Relaxed Validity": rdkit_metrics[0][1],
+            f"mol_metrics_charts_{fb}/Uniqueness": rdkit_metrics[0][2],
+            f"mol_metrics_charts_{fb}/Novelty": rdkit_metrics[0][3],
+            f"mol_metrics_charts_{fb}/Connectivity": rdkit_metrics[0][4],
+            f"mol_metrics_charts_{fb}/W1 LogP": float(rdkit_metrics[0][5]),
+            f"mol_metrics_charts_{fb}/MAD QED": float(rdkit_metrics[0][6]),
+            f"mol_metrics_charts_{fb}/MAD SA": float(rdkit_metrics[0][7]),
+            f"mol_metrics_charts_{fb}/FCD": float(rdkit_metrics[0][8]),
+            f"mol_metrics_charts_{fb}/NLL GED": float(rdkit_metrics[0][10]),
+            f"mol_metrics_charts_{fb}/coverage except training": float(
+                rdkit_metrics[0][9]
+            ),
+            f"mol_metrics_charts_{fb}/nc_max": nc["nc_max"],
+            f"mol_metrics_charts_{fb}/nc_mu": nc["nc_mu"],
+        }
+        if wandb.run:
+            dic = dic
+            wandb.log(dic)
+
+        return validity_dict, rdkit_metrics, all_smiles, dic, (None, None)
+    else:
+        rdkit_metrics = metrics.evaluate(molecule_list, source_molecule_list)
 
     all_smiles = rdkit_metrics[-2]
     nc = rdkit_metrics[-3]
@@ -618,26 +1380,17 @@ def compute_molecular_metrics(
         f"mol_metrics_charts_{fb}/Uniqueness": rdkit_metrics[0][2],
         f"mol_metrics_charts_{fb}/Novelty": rdkit_metrics[0][3],
         f"mol_metrics_charts_{fb}/Connectivity": rdkit_metrics[0][4],
-        f"mol_metrics_charts_{fb}/train SA Average Value": float(
-            rdkit_metrics[0][5]
-        ),
-        f"mol_metrics_charts_{fb}/train SA Success": float(
-            rdkit_metrics[0][6]
-        ),
-        f"mol_metrics_charts_{fb}/test SA Average Value": float(
-            rdkit_metrics[0][7]
-        ),
+        f"mol_metrics_charts_{fb}/train SA Average Value": float(rdkit_metrics[0][5]),
+        f"mol_metrics_charts_{fb}/train SA Success": float(rdkit_metrics[0][6]),
+        f"mol_metrics_charts_{fb}/test SA Average Value": float(rdkit_metrics[0][7]),
         f"mol_metrics_charts_{fb}/test SA Success": float(rdkit_metrics[0][8]),
-        f"mol_metrics_charts_{fb}/coverage except training": float(
-            rdkit_metrics[0][9]
-        ),
+        f"mol_metrics_charts_{fb}/coverage except training": float(rdkit_metrics[0][9]),
         f"mol_metrics_charts_{fb}/SA V. Average": float(rdkit_metrics[0][10]),
         f"mol_metrics_charts_{fb}/SA V.": float(rdkit_metrics[0][11]),
         f"mol_metrics_charts_{fb}/SA.V.U.": float(rdkit_metrics[0][12]),
         f"mol_metrics_charts_{fb}/SA.V.U.N.": float(rdkit_metrics[0][13]),
         f"mol_metrics_charts_{fb}/V.": rdkit_metrics[0][1],
-        f"mol_metrics_charts_{fb}/V.U.": rdkit_metrics[0][1]
-        * rdkit_metrics[0][2],
+        f"mol_metrics_charts_{fb}/V.U.": rdkit_metrics[0][1] * rdkit_metrics[0][2],
         f"mol_metrics_charts_{fb}/V.U.N.": rdkit_metrics[0][1]
         * rdkit_metrics[0][2]
         * rdkit_metrics[0][3],

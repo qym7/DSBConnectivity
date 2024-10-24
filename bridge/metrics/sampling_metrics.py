@@ -44,8 +44,7 @@ class SamplingMetrics(nn.Module):
             )
 
             all_val_smiles = set(
-                list(dataset_infos.val_smiles)
-                + list(dataset_infos.test_smiles)
+                list(dataset_infos.val_smiles) + list(dataset_infos.test_smiles)
             )
             self.domain_metrics = SamplingMolecularMetrics(
                 dataset_infos,
@@ -65,30 +64,18 @@ class SamplingMetrics(nn.Module):
 
             # self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
             if dataset_infos.dataset_name == "comm20":
-                self.domain_metrics = Comm20SamplingMetrics(
-                    dataloaders=dataloaders
-                )
+                self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
             elif "planar" in dataset_infos.dataset_name:
-                self.domain_metrics = PlanarSamplingMetrics(
-                    dataloaders=dataloaders
-                )
+                self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
             elif "sbm" in dataset_infos.dataset_name:
-                self.domain_metrics = SBMSamplingMetrics(
-                    dataloaders=dataloaders
-                )
+                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
             elif dataset_infos.dataset_name == "protein":
-                self.domain_metrics = ProteinSamplingMetrics(
-                    dataloaders=dataloaders
-                )
+                self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders)
             elif dataset_infos.dataset_name == "ego":
-                self.domain_metrics = EgoSamplingMetrics(
-                    dataloaders=dataloaders
-                )
+                self.domain_metrics = EgoSamplingMetrics(dataloaders=dataloaders)
             else:
                 raise ValueError(
-                    "Dataset {} not implemented".format(
-                        dataset_infos.dataset_name
-                    )
+                    "Dataset {} not implemented".format(dataset_infos.dataset_name)
                 )
 
     def reset(self):
@@ -134,9 +121,7 @@ class SamplingMetrics(nn.Module):
         if self.domain_metrics is not None:
             if self.dataset_infos.is_molecular:
                 domain_key = (
-                    f"domain_val_{fb}"
-                    if not self.test
-                    else f"domain_test_{fb}"
+                    f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
                 )
                 do_metrics = self.domain_metrics.forward(
                     generated_graphs,
@@ -146,15 +131,11 @@ class SamplingMetrics(nn.Module):
                     test=self.test,
                     source_graphs=source_graphs,
                 )
-                do_metrics = {
-                    f"{domain_key}/{k}": do_metrics[k] for k in do_metrics
-                }
+                do_metrics = {f"{domain_key}/{k}": do_metrics[k] for k in do_metrics}
                 to_log.update(do_metrics)
             else:
                 domain_key = (
-                    f"domain_val_{fb}"
-                    if not self.test
-                    else f"domain_test_{fb}"
+                    f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
                 )
                 do_metrics = self.domain_metrics.forward(
                     generated_graphs,
@@ -162,9 +143,7 @@ class SamplingMetrics(nn.Module):
                     local_rank,
                     test=self.test,
                 )
-                do_metrics = {
-                    f"{domain_key}/{k}": do_metrics[k] for k in do_metrics
-                }
+                do_metrics = {f"{domain_key}/{k}": do_metrics[k] for k in do_metrics}
                 to_log.update(do_metrics)
 
         # if wandb.run:
@@ -270,9 +249,7 @@ def bond_types_distance(generated_graphs, target, save_histogram=True):
             generated_distribution.cpu().numpy(),
         )
 
-    tv, tv_per_class = total_variation1d(
-        generated_distribution, target.to(device)
-    )
+    tv, tv_per_class = total_variation1d(generated_distribution, target.to(device))
     return tv, tv_per_class
 
 
@@ -286,14 +263,10 @@ def connected_components(generated_graphs):
         node_mask = batch == i
         edge_mask = edge_batch == i
         node = generated_graphs.node[node_mask]
-        edge_index = (
-            generated_graphs.edge_index[:, edge_mask] - generated_graphs.ptr[i]
-        )
+        edge_index = generated_graphs.edge_index[:, edge_mask] - generated_graphs.ptr[i]
         # DENSE OPERATIONS
         sp_adj = to_scipy_sparse_matrix(edge_index, num_nodes=len(node))
-        num_components, component = sp.csgraph.connected_components(
-            sp_adj.toarray()
-        )
+        num_components, component = sp.csgraph.connected_components(sp_adj.toarray())
         all_num_components[i] = num_components
 
     return all_num_components

@@ -40,9 +40,7 @@ class CSVLogger(Logger):
 class NeptuneLogger(Logger):
     def __init__(self, project_name, api_key, save_folder="./"):
         self.directory = save_folder
-        self.logger = _NeptuneLogger(
-            api_key=api_key, project_name=project_name
-        )
+        self.logger = _NeptuneLogger(api_key=api_key, project_name=project_name)
 
     def log_metrics(self, metrics, step=None):
         self.logger.log_metrics(metrics, step=step)

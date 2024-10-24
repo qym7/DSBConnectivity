@@ -102,12 +102,8 @@ class MarginalUniformTransition:
                 .unsqueeze(0)
             )
 
-        self.u_x = (
-            x_marginals.unsqueeze(0).expand(self.X_classes, -1).unsqueeze(0)
-        )
-        self.u_e = (
-            e_marginals.unsqueeze(0).expand(self.E_classes, -1).unsqueeze(0)
-        )
+        self.u_x = x_marginals.unsqueeze(0).expand(self.X_classes, -1).unsqueeze(0)
+        self.u_e = e_marginals.unsqueeze(0).expand(self.E_classes, -1).unsqueeze(0)
         self.u_y = torch.ones(1, self.y_classes, self.y_classes)
         if self.y_classes > 0:
             self.u_y = self.u_y / self.y_classes
@@ -174,8 +170,7 @@ class MarginalUniformTransition:
         if self.charge_marginals.numel() > 0:
             self.u_charge = self.u_charge.to(device)
             q_charge = (
-                alpha_bar_t
-                * torch.eye(self.charge_classes, device=device).unsqueeze(0)
+                alpha_bar_t * torch.eye(self.charge_classes, device=device).unsqueeze(0)
                 + (1 - alpha_bar_t) * self.u_charge
             )
 
@@ -206,15 +201,9 @@ class AbsorbingStateTransition:
     def get_Qt(self, beta_t):
         """Returns two transition matrix for X and E"""
         beta_t = beta_t.unsqueeze(1)
-        q_x = beta_t * self.u_x + (1 - beta_t) * torch.eye(
-            self.X_classes
-        ).unsqueeze(0)
-        q_e = beta_t * self.u_e + (1 - beta_t) * torch.eye(
-            self.E_classes
-        ).unsqueeze(0)
-        q_y = beta_t * self.u_y + (1 - beta_t) * torch.eye(
-            self.y_classes
-        ).unsqueeze(0)
+        q_x = beta_t * self.u_x + (1 - beta_t) * torch.eye(self.X_classes).unsqueeze(0)
+        q_e = beta_t * self.u_e + (1 - beta_t) * torch.eye(self.E_classes).unsqueeze(0)
+        q_y = beta_t * self.u_y + (1 - beta_t) * torch.eye(self.y_classes).unsqueeze(0)
         return q_x, q_e, q_y
 
     def get_Qt_bar(self, alpha_bar_t):

@@ -29,16 +29,10 @@ class PositionalEncoding:
 
         arange_n = torch.arange(n_max_batch, device=device)  # n_max
         arange_d = torch.arange(self.d, device=device)  # d
-        frequencies = math.pi / torch.pow(
-            self.n_max, 2 * arange_d / self.d
-        )  # d
+        frequencies = math.pi / torch.pow(self.n_max, 2 * arange_d / self.d)  # d
 
-        sines = torch.sin(
-            arange_n.unsqueeze(1) * frequencies.unsqueeze(0)
-        )  # N, d
-        cosines = torch.cos(
-            arange_n.unsqueeze(1) * frequencies.unsqueeze(0)
-        )  # N, d
+        sines = torch.sin(arange_n.unsqueeze(1) * frequencies.unsqueeze(0))  # N, d
+        cosines = torch.cos(arange_n.unsqueeze(1) * frequencies.unsqueeze(0))  # N, d
         encoding = torch.hstack((sines, cosines))  # N, D
         extra_x = encoding.unsqueeze(0)  # 1, N, D
         extra_x = extra_x * dense_noisy_data.node_mask.unsqueeze(-1)  # B, N, D
@@ -60,9 +54,7 @@ class ExtraFeatures:
 
         self.use_positional = use_positional
         if use_positional:
-            self.positional_encoding = PositionalEncoding(
-                dataset_info.max_n_nodes
-            )
+            self.positional_encoding = PositionalEncoding(dataset_info.max_n_nodes)
 
         self.RRWP = RRWPFeatures()
         if extra_features_type in ["eigenvalues", "all"]:
@@ -84,7 +76,7 @@ class ExtraFeatures:
         elif self.features_type == "rrwp":
             E = noisy_data.E.float()[..., 1:].sum(-1)  # bs, n, n
             rrwp_edge_attr = self.RRWP(E, k=self.rrwp_steps)
-            diag_index = torch.arange(  rrwp_edge_attr.shape[1])
+            diag_index = torch.arange(rrwp_edge_attr.shape[1])
             rrwp_node_attr = rrwp_edge_attr[:, diag_index, diag_index, :]
 
             feats = utils.PlaceHolder(
@@ -101,9 +93,7 @@ class ExtraFeatures:
 
             comp_E = 1 - noisy_data.E.float()[..., 1:].sum(-1)  # bs, n, n
             comp_rrwp_edge_attr = self.RRWP(comp_E, k=int(self.rrwp_steps / 2))
-            comp_rrwp_node_attr = comp_rrwp_edge_attr[
-                :, diag_index, diag_index, :
-            ]
+            comp_rrwp_node_attr = comp_rrwp_edge_attr[:, diag_index, diag_index, :]
 
             feats = utils.PlaceHolder(
                 X=torch.cat(
@@ -161,9 +151,7 @@ class ExtraFeatures:
             #     y=torch.hstack((n, y_cycles, n_components, batched_eigenvalues)),
             # )
         else:
-            raise ValueError(
-                f"Features type {self.features_type} not implemented"
-            )
+            raise ValueError(f"Features type {self.features_type} not implemented")
 
         if self.use_positional:
             node_feat = self.positional_encoding(noisy_data)
@@ -193,7 +181,7 @@ class RRWPFeatures:
         id = torch.eye(n, device=E.device).unsqueeze(0).repeat(bs, 1, 1)
         rrwp_list = [id]
 
-        for i in range(k-1):
+        for i in range(k - 1):
             cur_rrwp = rrwp_list[-1] @ E
             rrwp_list.append(cur_rrwp)
 
@@ -210,9 +198,7 @@ class NodeCycleFeatures:
         x_cycles, y_cycles = self.kcycles.k_cycles(
             adj_matrix=adj_matrix
         )  # (bs, n_cycles)
-        x_cycles = x_cycles.type_as(
-            adj_matrix
-        ) * noisy_data.node_mask.unsqueeze(-1)
+        x_cycles = x_cycles.type_as(adj_matrix) * noisy_data.node_mask.unsqueeze(-1)
         # Avoid large values when the graph is dense
         x_cycles = x_cycles / 10
         y_cycles = y_cycles / 10
@@ -233,16 +219,10 @@ class EigenFeatures:
     def __call__(self, noisy_data):
         E_t = noisy_data.E
         mask = noisy_data.node_mask
-        A = (
-            E_t[..., 1:].sum(dim=-1).float()
-            * mask.unsqueeze(1)
-            * mask.unsqueeze(2)
-        )
+        A = E_t[..., 1:].sum(dim=-1).float() * mask.unsqueeze(1) * mask.unsqueeze(2)
         # L = compute_laplacian(A, normalize="sym")
         L = compute_laplacian(A, normalize=False)
-        mask_diag = (
-            2 * L.shape[-1] * torch.eye(A.shape[-1]).type_as(L).unsqueeze(0)
-        )
+        mask_diag = 2 * L.shape[-1] * torch.eye(A.shape[-1]).type_as(L).unsqueeze(0)
         mask_diag = mask_diag * (~mask.unsqueeze(1)) * (~mask.unsqueeze(2))
         L = L * mask.unsqueeze(1) * mask.unsqueeze(2) + mask_diag
 
@@ -301,10 +281,7 @@ def compute_laplacian(adjacency, normalize: bool):
 
     diag_norm = 1 / torch.sqrt(diag)  # (bs, n)
     D_norm = torch.diag_embed(diag_norm)  # (bs, n, n)
-    L = (
-        torch.eye(n, device=adjacency.device).unsqueeze(0)
-        - D_norm @ adjacency @ D_norm
-    )
+    L = torch.eye(n, device=adjacency.device).unsqueeze(0) - D_norm @ adjacency @ D_norm
     L[diag0 == 0] = 0
     return (L + L.transpose(1, 2)) / 2
 
@@ -355,13 +332,9 @@ def get_eigenvectors_features(vectors, node_mask, n_connected, k=2):
     # Create an indicator for the nodes outside the largest connected components
     first_ev = torch.round(vectors[:, :, 0], decimals=3) * node_mask  # bs, n
     # Add random value to the mask to prevent 0 from becoming the mode
-    random = torch.randn(bs, n, device=node_mask.device) * (
-        ~node_mask
-    )  # bs, n
+    random = torch.randn(bs, n, device=node_mask.device) * (~node_mask)  # bs, n
     first_ev = first_ev + random
-    most_common = torch.mode(
-        first_ev, dim=1
-    ).values  # values: bs -- indices: bs
+    most_common = torch.mode(first_ev, dim=1).values  # values: bs -- indices: bs
     mask = ~(first_ev == most_common.unsqueeze(1))
     not_lcc_indicator = (mask * node_mask).unsqueeze(-1).float()
 
@@ -425,9 +398,9 @@ class KNodeCycles:
     def k3_cycle(self):
         """tr(A ** 3)."""
         c3 = batch_diagonal(self.k3_matrix)
-        return (c3 / 2).unsqueeze(-1).float(), (
-            torch.sum(c3, dim=-1) / 6
-        ).unsqueeze(-1).float()
+        return (c3 / 2).unsqueeze(-1).float(), (torch.sum(c3, dim=-1) / 6).unsqueeze(
+            -1
+        ).float()
 
     def k4_cycle(self):
         diag_a4 = batch_diagonal(self.k4_matrix)
@@ -436,9 +409,9 @@ class KNodeCycles:
             - self.d * (self.d - 1)
             - (self.adj_matrix @ self.d.unsqueeze(-1)).sum(dim=-1)
         )
-        return (c4 / 2).unsqueeze(-1).float(), (
-            torch.sum(c4, dim=-1) / 8
-        ).unsqueeze(-1).float()
+        return (c4 / 2).unsqueeze(-1).float(), (torch.sum(c4, dim=-1) / 8).unsqueeze(
+            -1
+        ).float()
 
     def k5_cycle(self):
         diag_a5 = batch_diagonal(self.k5_matrix)

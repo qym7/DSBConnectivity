@@ -41,7 +41,7 @@ samples_to_generate: 32
 samples_to_save: 10
 chains_to_save: 1
 test: False
-save_every_ipf: 5
+save_every_ipf: 2
 
 # checkpoint
 checkpoint_run: False
@@ -62,15 +62,15 @@ use_prev_net: True
 ema: True
 ema_rate: 0.999
 grad_clipping: True
-grad_clip: 1.0
+grad_clip: 0.5
 n_ipf_init: 1
-num_iter: 2000
+num_iter: 5000
 n_ipf: 1000
 lr: 0.001
 limit_dist: marginal_tf            # uniform | marginal | marginal_tf,  ame with marginal when without transfer data
 clean_loss_weight: 0.0001
-noise_level: 1.0
-reg_weight: 0.0
+noise_level: 0.1
+reg_weight: 0.1
 edge_weight: 1.0
 rand_time: False
 

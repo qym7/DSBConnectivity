@@ -92,18 +92,14 @@ def degree_stats(
             for deg_hist in executor.map(degree_worker, graph_ref_list):
                 sample_ref.append(deg_hist)
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for deg_hist in executor.map(
-                degree_worker, graph_pred_list_remove_empty
-            ):
+            for deg_hist in executor.map(degree_worker, graph_pred_list_remove_empty):
                 sample_pred.append(deg_hist)
     else:
         for i in range(len(graph_ref_list)):
             degree_temp = np.array(nx.degree_histogram(graph_ref_list[i]))
             sample_ref.append(degree_temp)
         for i in range(len(graph_pred_list_remove_empty)):
-            degree_temp = np.array(
-                nx.degree_histogram(graph_pred_list_remove_empty[i])
-            )
+            degree_temp = np.array(nx.degree_histogram(graph_pred_list_remove_empty[i]))
             sample_pred.append(degree_temp)
 
     # mmd_dist = compute_mmd(sample_ref, sample_pred, kernel=gaussian_emd)
@@ -133,9 +129,7 @@ def spectral_worker(G, n_eigvals=-1):
         eigs = np.zeros(G.number_of_nodes())
     if n_eigvals > 0:
         eigs = eigs[1 : n_eigvals + 1]
-    spectral_pmf, _ = np.histogram(
-        eigs, bins=200, range=(-1e-5, 2), density=False
-    )
+    spectral_pmf, _ = np.histogram(eigs, bins=200, range=(-1e-5, 2), density=False)
     spectral_pmf = spectral_pmf / spectral_pmf.sum()
     return spectral_pmf
 
@@ -361,9 +355,7 @@ def spectral_stats(
             spectral_temp = spectral_worker(graph_ref_list[i], n_eigvals)
             sample_ref.append(spectral_temp)
         for i in range(len(graph_pred_list_remove_empty)):
-            spectral_temp = spectral_worker(
-                graph_pred_list_remove_empty[i], n_eigvals
-            )
+            spectral_temp = spectral_worker(graph_pred_list_remove_empty[i], n_eigvals)
             sample_pred.append(spectral_temp)
 
     # mmd_dist = compute_mmd(sample_ref, sample_pred, kernel=gaussian_emd)
@@ -433,9 +425,7 @@ def clustering_stats(
         # print(total)
     else:
         for i in range(len(graph_ref_list)):
-            clustering_coeffs_list = list(
-                nx.clustering(graph_ref_list[i]).values()
-            )
+            clustering_coeffs_list = list(nx.clustering(graph_ref_list[i]).values())
             hist, _ = np.histogram(
                 clustering_coeffs_list,
                 bins=bins,
@@ -504,17 +494,10 @@ def edge_list_reindexed(G):
 def orca(graph):
     # tmp_fname = f'analysis/orca/tmp_{"".join(secrets.choice(ascii_uppercase + digits) for i in range(8))}.txt'
     tmp_fname = f'../analysis/orca/tmp_{"".join(secrets.choice(ascii_uppercase + digits) for i in range(8))}.txt'
-    tmp_fname = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), tmp_fname
-    )
+    tmp_fname = os.path.join(os.path.dirname(os.path.realpath(__file__)), tmp_fname)
     # print(tmp_fname, flush=True)
     f = open(tmp_fname, "w")
-    f.write(
-        str(graph.number_of_nodes())
-        + " "
-        + str(graph.number_of_edges())
-        + "\n"
-    )
+    f.write(str(graph.number_of_nodes()) + " " + str(graph.number_of_edges()) + "\n")
     for u, v in edge_list_reindexed(graph):
         f.write(str(u) + " " + str(v) + "\n")
     f.close()
@@ -810,9 +793,7 @@ def is_lobster_graph(G):
         num_degree_one = [d for n, d in G.degree() if d == 1]
         num_degree_two = [d for n, d in G.degree() if d == 2]
 
-        if sum(num_degree_one) == 2 and sum(num_degree_two) == 2 * (
-            num_nodes - 2
-        ):
+        if sum(num_degree_one) == 2 and sum(num_degree_two) == 2 * (num_nodes - 2):
             return True
         elif sum(num_degree_one) == 0 and sum(num_degree_two) == 0:
             return True
@@ -895,18 +876,12 @@ def is_sbm_graph(
     max_intra_edges = node_counts * (node_counts - 1)
     est_p_intra = np.diagonal(edge_counts) / (max_intra_edges + 1e-6)
 
-    max_inter_edges = node_counts.reshape((-1, 1)) @ node_counts.reshape(
-        (1, -1)
-    )
+    max_inter_edges = node_counts.reshape((-1, 1)) @ node_counts.reshape((1, -1))
     np.fill_diagonal(edge_counts, 0)
     est_p_inter = edge_counts / (max_inter_edges + 1e-6)
 
-    W_p_intra = (est_p_intra - p_intra) ** 2 / (
-        est_p_intra * (1 - est_p_intra) + 1e-6
-    )
-    W_p_inter = (est_p_inter - p_inter) ** 2 / (
-        est_p_inter * (1 - est_p_inter) + 1e-6
-    )
+    W_p_intra = (est_p_intra - p_intra) ** 2 / (est_p_intra * (1 - est_p_intra) + 1e-6)
+    W_p_inter = (est_p_inter - p_inter) ** 2 / (est_p_inter * (1 - est_p_inter) + 1e-6)
 
     W = W_p_inter.copy()
     np.fill_diagonal(W, W_p_intra)
@@ -1013,11 +988,9 @@ class SpectreSamplingMetrics(nn.Module):
         self.test_graphs = self.loader_to_nx(dataloaders["test"])
         # import pdb; pdb.set_trace()
         # print(self.test_graphs[0])
-        self.num_graphs_test = len(self.test_graphs)
-        self.num_graphs_val = len(self.val_graphs)
         # print('num_train_graphs is', len(self.train_graphs))
-        # print('num_graphs_test is', self.num_graphs_test)
-        # print('num_graphs_val is', self.num_graphs_val)
+        # print('num_graphs_test is', len(self.test_graphs))
+        # print('num_graphs_val is', len(self.val_graphs))
         self.compute_emd = compute_emd
         self.metrics_list = metrics_list
 
@@ -1076,8 +1049,8 @@ class SpectreSamplingMetrics(nn.Module):
             g = dgl.DGLGraph(g)
             test_max_comp.append(g)
 
-        (generated_dataset, reference_dataset), _ = (
-            fid_evaluator.get_activations(generated_max_comp, test_max_comp)
+        (generated_dataset, reference_dataset), _ = fid_evaluator.get_activations(
+            generated_max_comp, test_max_comp
         )
         fid, _ = fid_evaluator.evaluate(
             generated_dataset=generated_dataset,

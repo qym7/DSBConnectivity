@@ -61,8 +61,9 @@ def get_both_datamodules(cfg):
     pl.seed_everything(cfg.seed)
     # get datamodules for the initial and transfer dataset
     dataset_config = cfg["dataset"]
+    transfer = cfg.transfer
     train_metrics, domain_features, datamodule, datainfos = get_datamodules(
-        dataset_config
+        dataset_config, transfer
     )
     if cfg.transfer:
         tf_dataset_config = cfg["dataset_transfer"]
@@ -71,7 +72,7 @@ def get_both_datamodules(cfg):
             tf_domain_features,
             tf_datamodule,
             tf_datainfos,
-        ) = get_datamodules(tf_dataset_config)
+        ) = get_datamodules(tf_dataset_config, transfer)
     else:
         (
             tf_train_metrics,
@@ -97,20 +98,11 @@ def get_both_datamodules(cfg):
     )
 
 
-def get_datamodules(cfg):
-    from ..metrics.abstract_metrics import (
-        TrainAbstractMetricsDiscrete,
-    )
-    from ..metrics.molecular_metrics import (
-        TrainMolecularMetricsDiscrete,
-    )
-    from ..diffusion.extra_features import (
-        DummyExtraFeatures,
-        ExtraFeatures,
-    )
-    from ..diffusion.extra_features_molecular import (
-        ExtraMolecularFeatures,
-    )
+def get_datamodules(cfg, transfer):
+    from ..metrics.abstract_metrics import TrainAbstractMetricsDiscrete
+    from ..metrics.molecular_metrics import TrainMolecularMetricsDiscrete
+    from ..diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
+    from ..diffusion.extra_features_molecular import ExtraMolecularFeatures
 
     # step 1: get datamodules according to dataset name
 
@@ -135,18 +127,16 @@ def get_datamodules(cfg):
             SpectreDatasetInfos,
         )
 
-        if cfg["name"] == "sbm":
+        if "sbm" in cfg["name"]:
             datamodule = SBMDataModule(cfg)
         elif cfg["name"] == "comm20":
             datamodule = Comm20DataModule(cfg)
         elif cfg["name"] == "ego":
             datamodule = EgoDataModule(cfg)
-        elif "sbm" in cfg["name"]:
-            datamodule = SBMDataModule(cfg)
         elif "planar" in cfg["name"]:
             datamodule = PlanarDataModule(cfg)
 
-        dataset_infos = SpectreDatasetInfos(datamodule)
+        dataset_infos = SpectreDatasetInfos(datamodule, cfg)
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
 
@@ -162,25 +152,16 @@ def get_datamodules(cfg):
         from datasets import point_cloud_dataset
 
         datamodule = point_cloud_dataset.PointCloudDataModule(cfg)
-        dataset_infos = point_cloud_dataset.PointCloudInfos(
-            datamodule=datamodule
-        )
+        dataset_infos = point_cloud_dataset.PointCloudInfos(datamodule=datamodule)
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
 
-    elif cfg["name"] in [
-        "qm9",
-        "guacamol",
-        "moses",
-        "qm9_smiles",
-    ]:
+    elif cfg["name"] in ["qm9", "guacamol", "moses", "qm9_smiles", "zinc"]:
         if cfg["name"] == "qm9":
             from ..datasets import qm9_dataset
 
-            datamodule = qm9_dataset.QM9DataModule(cfg)
-            dataset_infos = qm9_dataset.QM9Infos(
-                datamodule=datamodule, cfg=cfg
-            )
+            datamodule = qm9_dataset.QM9DataModule(cfg, transfer)
+            dataset_infos = qm9_dataset.QM9Infos(datamodule=datamodule, cfg=cfg)
 
         elif cfg["name"] == "qm9_smiles":
             from ..datasets import qm9_smiles_dataset
@@ -189,6 +170,12 @@ def get_datamodules(cfg):
             dataset_infos = qm9_smiles_dataset.QM9SmilesInfos(
                 datamodule=datamodule, cfg=cfg
             )
+
+        elif cfg["name"] == "zinc":
+            from ..datasets import zinc_dataset
+
+            datamodule = zinc_dataset.ZincDataModule(cfg, transfer)
+            dataset_infos = zinc_dataset.ZincInfos(datamodule=datamodule, cfg=cfg)
 
         elif cfg["name"] == "guacamol":
             from ..datasets import guacamol_dataset
@@ -205,9 +192,7 @@ def get_datamodules(cfg):
             raise ValueError("Dataset not implemented")
 
         if cfg.extra_features is not None:
-            domain_features = ExtraMolecularFeatures(
-                dataset_infos=dataset_infos
-            )
+            domain_features = ExtraMolecularFeatures(dataset_infos=dataset_infos)
         else:
             domain_features = DummyExtraFeatures()
 

@@ -43,9 +43,9 @@ class ChargeFeature:
         weighted_E = noisy_data.E * bond_orders  # (bs, n, n, de)
         current_valencies = weighted_E.argmax(dim=-1).sum(dim=-1)  # (bs, n)
 
-        valencies = torch.tensor(
-            self.valencies, device=noisy_data.X.device
-        ).reshape(1, 1, -1)
+        valencies = torch.tensor(self.valencies, device=noisy_data.X.device).reshape(
+            1, 1, -1
+        )
         X = noisy_data.X * valencies  # (bs, n, dx)
         normal_valencies = torch.argmax(X, dim=-1)  # (bs, n)
 
@@ -75,6 +75,5 @@ class WeightFeature:
         X = torch.argmax(noisy_data.X, dim=-1)  # (bs, n)
         X_weights = self.atom_weight_list.to(X.device)[X]  # (bs, n)
         return (
-            X_weights.sum(dim=-1).unsqueeze(-1).type_as(noisy_data.X)
-            / self.max_weight
+            X_weights.sum(dim=-1).unsqueeze(-1).type_as(noisy_data.X) / self.max_weight
         )  # (bs, 1)

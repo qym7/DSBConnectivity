@@ -88,9 +88,7 @@ def load_imported_model(keras_config):
         if layer_type == "Conv1d":
             assert conv, "Can't have conv layers after LSTM"
             if other_info["padding"] == "same":
-                layers.append(
-                    SamePadding1d(kwargs["kernel_size"], kwargs["stride"])
-                )
+                layers.append(SamePadding1d(kwargs["kernel_size"], kwargs["stride"]))
             layer = nn.Conv1d(**kwargs)
             layer.load_state_dict(state_dict)
             layers.append(layer)
@@ -183,9 +181,7 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
 
     tr_covmean = np.trace(covmean)
 
-    return (
-        diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean
-    )
+    return diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean
 
 
 @contextmanager

@@ -44,9 +44,9 @@ class Xtoy(nn.Module):
         m = X.sum(dim=1) / torch.sum(x_mask, dim=1)
         mi = (X + 1e5 * float_imask).min(dim=1)[0]
         ma = (X - 1e5 * float_imask).max(dim=1)[0]
-        std = torch.sum(
-            ((X - m[:, None, :]) ** 2) * x_mask, dim=1
-        ) / torch.sum(x_mask, dim=1)
+        std = torch.sum(((X - m[:, None, :]) ** 2) * x_mask, dim=1) / torch.sum(
+            x_mask, dim=1
+        )
         z = torch.hstack((m, mi, ma, std))
         out = self.lin(z)
         return out

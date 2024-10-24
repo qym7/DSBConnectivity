@@ -65,9 +65,7 @@ class Visualizer:
 
         return nx_graph.to_undirected()
 
-    def visualize_non_molecule(
-        self, graph, pos, path, iterations=100, node_size=100
-    ):
+    def visualize_non_molecule(self, graph, pos, path, iterations=100, node_size=100):
         if pos is None:
             pos = nx.spring_layout(graph, iterations=iterations)
 
@@ -112,9 +110,7 @@ class Visualizer:
         num_graphs = graphs.X.shape[0]
         num_graphs_to_visualize = min(num_graphs_to_visualize, num_graphs)
         if num_graphs_to_visualize > 0:
-            print(
-                f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}"
-            )
+            print(f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}")
 
         import pdb
 
@@ -131,9 +127,7 @@ class Visualizer:
                     print("Can't kekulize molecule")
             else:
                 nx_graph = self.to_networkx_graph(graph_list[i])
-                self.visualize_non_molecule(
-                    graph=nx_graph, pos=None, path=file_path
-                )
+                self.visualize_non_molecule(graph=nx_graph, pos=None, path=file_path)
 
             if wandb.run and log is not None:
                 if i < 3:

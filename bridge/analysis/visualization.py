@@ -21,11 +21,11 @@ class Visualizer:
     def __init__(self, dataset_infos):
         self.dataset_infos = dataset_infos
         self.is_molecular = self.dataset_infos.is_molecular
+        self.is_planar = getattr(self.dataset_infos, "is_planar", None)
 
         if self.is_molecular:
             self.remove_h = dataset_infos.remove_h
 
-    # def to_networkx(self, graph: PlaceHolder):
     def to_networkx(self, graph):
         """
         Convert graphs to networkx graphs
@@ -164,9 +164,7 @@ class Visualizer:
         num_graphs = len(graph_list)
         num_graphs_to_visualize = min(num_graphs_to_visualize, num_graphs)
         if num_graphs_to_visualize > 0:
-            print(
-                f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}"
-            )
+            print(f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}")
 
         # graph_list = graphs.split()
         for i in range(num_graphs_to_visualize):
@@ -186,17 +184,25 @@ class Visualizer:
                     print("Can't kekulize molecule")
             else:
                 nx_graph = self.to_networkx(graph_list[i])
-                self.visualize_non_molecule(
-                    graph=nx_graph, pos=None, path=file_path
-                )
+                self.visualize_non_molecule(graph=nx_graph, pos=None, path=file_path)
 
             if wandb.run and log is not None:
                 if i < 3:
                     print(f"Saving {file_path} to wandb")
-                wandb.log(
-                    {log: [wandb.Image(file_path)]},
-                    commit=False,
-                )
+                wandb.log({log: [wandb.Image(file_path)]}, commit=False)
+
+        # define path to save figures
+        # if not os.path.exists(path):
+        #     os.makedirs(path)
+
+        # # visualize the final molecules
+        # for i in range(num_graphs_to_visualize):
+        #     file_path = os.path.join(path, 'graph_{}.png'.format(i))
+        #     graph = self.to_networkx(graphs[i][0].numpy(), graphs[i][1].numpy())
+        #     self.visualize_non_molecule(graph=graph, pos=None, path=file_path)
+        #     im = plt.imread(file_path)
+        #     if wandb.run and log is not None:
+        #         wandb.log({log: [wandb.Image(im, caption=file_path)]})
 
     def visualize_chains(
         self,
@@ -253,12 +259,14 @@ class Visualizer:
                 else:
                     graphs.append(
                         self.to_networkx(
-                            [
-                                chain.X[j].cpu().numpy(),
-                                chain.E[j].cpu().numpy(),
-                            ]
+                            [chain.X[j].cpu().numpy(), chain.E[j].cpu().numpy()]
                         )
                     )
+
+            # Find the coordinates of nodes in the final graph and align all the molecules
+            # The direction is changed for the cacheloader visualization before
+            # final_graph = graphs[-1] if fb == "b" else graphs[0]
+            # first_graph = graphs[0] if fb == "b" else graphs[-1]
 
             final_graph = graphs[-1]
             first_graph = graphs[0]
@@ -278,17 +286,9 @@ class Visualizer:
                     for l, atom in enumerate(mol.GetAtoms()):
                         x, y, z = coords[l]
                         conf.SetAtomPosition(l, Point3D(x, y, z))
-                color = None
             else:
                 final_pos = nx.spring_layout(final_graph, seed=0)
                 first_pos = nx.spring_layout(first_graph, seed=0)
-                color = self.visualize_non_molecule(
-                    graphs[-1],
-                    final_pos,
-                    "test.png",
-                    iterations=100,
-                    node_size=100,
-                )
 
             # Visualize and save
             save_paths = []
@@ -314,10 +314,7 @@ class Visualizer:
                     else:
                         pos = final_pos
                     self.visualize_non_molecule(
-                        graph=graphs[frame],
-                        pos=pos,
-                        path=file_name,
-                        color=color,
+                        graph=graphs[frame], pos=pos, path=file_name
                     )
                 save_paths.append(file_name)
             print(
@@ -335,20 +332,12 @@ class Visualizer:
                 wandb.log(
                     {
                         f"chain_{fb}": [
-                            wandb.Video(
-                                gif_path,
-                                caption=gif_path,
-                                format="gif",
-                            )
+                            wandb.Video(gif_path, caption=gif_path, format="gif")
                         ],
                     }
                 )
                 print(f"Saving {gif_path} to wandb")
                 wandb.log(
-                    {
-                        f"chain_{fb}": wandb.Video(
-                            gif_path, fps=8, format="gif"
-                        )
-                    },
+                    {f"chain_{fb}": wandb.Video(gif_path, fps=8, format="gif")},
                     commit=True,
                 )

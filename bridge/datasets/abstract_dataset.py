@@ -130,9 +130,7 @@ class AbstractDatasetInfos:
         """
         one_hot_data = data.clone()
         # import pdb; pdb.set_trace()
-        one_hot_data.x = F.one_hot(
-            data.x, num_classes=self.num_node_types
-        ).float()
+        one_hot_data.x = F.one_hot(data.x, num_classes=self.num_node_types).float()
         one_hot_data.edge_attr = F.one_hot(
             data.edge_attr, num_classes=self.num_edge_types
         ).float()
@@ -154,9 +152,7 @@ class AbstractDatasetInfos:
         if not self.use_charge:
             charge = charge.new_zeros((*charge.shape[:-1], 0))
         else:
-            charge = F.one_hot(
-                charge + 1, num_classes=self.num_charge_types
-            ).float()
+            charge = F.one_hot(charge + 1, num_classes=self.num_charge_types).float()
         return charge
 
     def complete_infos(self, statistics, node_types):
@@ -166,9 +162,7 @@ class AbstractDatasetInfos:
         self.charge_types = statistics["train"].charge_types
         self.num_node_types = len(self.node_types)
         self.num_edge_types = len(self.edge_types)
-        self.num_charge_types = (
-            self.charge_types.shape[-1] if self.use_charge else 0
-        )
+        self.num_charge_types = self.charge_types.shape[-1] if self.use_charge else 0
         self.real_node_ratio = statistics["train"].real_node_ratio
 
         # Train + val + test for n_nodes
