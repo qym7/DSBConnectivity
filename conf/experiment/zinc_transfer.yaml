@@ -9,15 +9,27 @@ dataset:
   extra_features: 'molecule'
 
   name: "zinc"
-  datadir: 'data/zinc/zinc_pyg/'
+  datadir: 'data/zinc/zinc_pyg_logP2/'    # logP around 2
   remove_h: True
   random_subset: null
   pin_memory: False
   is_target: False
 
 # transfer
-transfer: False
+transfer: True
 virtual_node: False
+dataset_transfer:
+  batch_size: ${batch_size}
+  num_workers: 8
+  use_charge: False
+  extra_features: 'molecule'
+
+  name: "zinc"
+  datadir: 'data/zinc/zinc_pyg_logP4/'    # logP around 4
+  remove_h: True
+  random_subset: null
+  pin_memory: False
+  is_target: True
 
 # settings for evaluations
 forward_path: null
