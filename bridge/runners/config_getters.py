@@ -47,8 +47,9 @@ def get_both_datamodules(cfg):
     pl.seed_everything(cfg.seed)
     # get datamodules for the initial and transfer dataset
     dataset_config = cfg["dataset"]
+    transfer = cfg.transfer
     train_metrics, domain_features, datamodule, datainfos = get_datamodules(
-        dataset_config
+        dataset_config, transfer
     )
     if cfg.transfer:
         tf_dataset_config = cfg["dataset_transfer"]
@@ -57,7 +58,7 @@ def get_both_datamodules(cfg):
             tf_domain_features,
             tf_datamodule,
             tf_datainfos,
-        ) = get_datamodules(tf_dataset_config)
+        ) = get_datamodules(tf_dataset_config, transfer)
     else:
         tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = (
             None,
@@ -78,7 +79,7 @@ def get_both_datamodules(cfg):
     )
 
 
-def get_datamodules(cfg):
+def get_datamodules(cfg, transfer):
     from ..metrics.abstract_metrics import TrainAbstractMetricsDiscrete
     from ..metrics.molecular_metrics import TrainMolecularMetricsDiscrete
     from ..diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
@@ -106,10 +107,10 @@ def get_datamodules(cfg):
             datamodule = Comm20DataModule(cfg)
         elif cfg["name"] == "ego":
             datamodule = EgoDataModule(cfg)
-        elif cfg["name"] == "planar":
+        else:
             datamodule = PlanarDataModule(cfg)
 
-        dataset_infos = SpectreDatasetInfos(datamodule)
+        dataset_infos = SpectreDatasetInfos(datamodule, cfg)
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
 
@@ -129,11 +130,11 @@ def get_datamodules(cfg):
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
 
-    elif cfg["name"] in ["qm9", "guacamol", "moses", "qm9_smiles"]:
+    elif cfg["name"] in ["qm9", "guacamol", "moses", "qm9_smiles", "zinc"]:
         if cfg["name"] == "qm9":
             from ..datasets import qm9_dataset
 
-            datamodule = qm9_dataset.QM9DataModule(cfg)
+            datamodule = qm9_dataset.QM9DataModule(cfg, transfer)
             dataset_infos = qm9_dataset.QM9Infos(datamodule=datamodule, cfg=cfg)
 
         elif cfg["name"] == "qm9_smiles":
@@ -141,6 +142,12 @@ def get_datamodules(cfg):
 
             datamodule = qm9_smiles_dataset.QM9SmilesDataModule(cfg)
             dataset_infos = qm9_smiles_dataset.QM9SmilesInfos(datamodule=datamodule, cfg=cfg)
+
+        elif cfg["name"] == "zinc":
+            from ..datasets import zinc_dataset
+
+            datamodule = zinc_dataset.ZincDataModule(cfg, transfer)
+            dataset_infos = zinc_dataset.ZincInfos(datamodule=datamodule, cfg=cfg)
 
         elif cfg["name"] == "guacamol":
             from ..datasets import guacamol_dataset

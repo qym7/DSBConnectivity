@@ -496,14 +496,12 @@ class IPFBase(torch.nn.Module):
                 final_ds, batch_size=self.args.batch_size, shuffle=False, drop_last=True
             )
             print("creating the val dataloader")
-            final_val_ds = self.tf_datamodule.validating
             final_val_dl = pygloader.DataLoader(
-                final_val_ds, batch_size=self.args.batch_size, shuffle=False, drop_last=True
+                final_ds_val, batch_size=self.args.batch_size, shuffle=False, drop_last=True
             )
             print("creating the test dataloader")
-            final_test_ds = self.tf_datamodule.testing
             final_test_dl = pygloader.DataLoader(
-                final_test_ds, batch_size=self.args.batch_size, shuffle=False, drop_last=True
+                final_ds_test, batch_size=self.args.batch_size, shuffle=False, drop_last=True
             )
             final_loaders = {
                 "train": final_train_dl,
@@ -889,6 +887,7 @@ class IPFBase(torch.nn.Module):
                     local_rank=0,
                     fb=fb,
                     i=np.round(i / (self.num_iter + 1), 2),
+                    source_graphs=init_list,
                 )
 
                 val_to_log[f"{fb}_X_change"] = X_abs.item()  # the nbr of nodes changed
@@ -902,8 +901,8 @@ class IPFBase(torch.nn.Module):
                 val_to_log[f"{fb}_X_acc_change_ratio"] = X_acc_ratio.item() # the ratio of nodes changed along the trajectory
                 val_to_log[f"{fb}_E_acc_change_ratio"] = E_acc_ratio.item() # the ratio of edges changed along the trajectory
 
-                # save results for valing
-                print("saving results for valing")
+                # save results for validating
+                print("saving results for validating")
                 current_path = os.getcwd()
                 res_path = os.path.join(
                     current_path,

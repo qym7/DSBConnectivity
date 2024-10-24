@@ -1,10 +1,14 @@
 import os
 import os.path as osp
 import pathlib
+import sys
 
 import torch
 import torch.nn.functional as F
 from rdkit import Chem, RDLogger
+from rdkit.Chem import RDConfig, QED, MolFromSmiles, MolToSmiles
+sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+import sascorer
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -59,6 +63,8 @@ class QM9Dataset(InMemoryDataset):
         self,
         split,
         root,
+        transfer,
+        is_target,
         remove_h: bool,
         target_prop=None,
         transform=None,
@@ -66,6 +72,8 @@ class QM9Dataset(InMemoryDataset):
         pre_filter=None,
     ):
         self.split = split
+        self.transfer = transfer
+        self.is_target = is_target
         if self.split == "train":
             self.file_idx = 0
         elif self.split == "val":
@@ -177,80 +185,195 @@ class QM9Dataset(InMemoryDataset):
         n_val = n_samples - (n_train + n_test)
 
         # Shuffle dataset with df.sample, then split
-        train, val, test = np.split(
-            dataset.sample(frac=1, random_state=42), [n_train, n_val + n_train]
-        )
+        train, val, test = np.split(dataset.sample(frac=1, random_state=42), [n_train, n_val + n_train])
 
-        train.to_csv(os.path.join(self.raw_dir, "train.csv"))
-        val.to_csv(os.path.join(self.raw_dir, "val.csv"))
-        test.to_csv(os.path.join(self.raw_dir, "test.csv"))
+        train.to_csv(os.path.join(self.raw_dir, "train_init.csv"))
+        val.to_csv(os.path.join(self.raw_dir, "val_init.csv"))
+        test.to_csv(os.path.join(self.raw_dir, "test_init.csv"))
 
     def process(self):
         RDLogger.DisableLog("rdApp.*")
 
-        target_df = pd.read_csv(self.split_paths[self.file_idx], index_col=0)
-        target_df.drop(columns=["mol_id"], inplace=True)
+        from sklearn.model_selection import train_test_split
 
-        with open(self.raw_paths[-1], "r") as f:
-            skip = [int(x.split()[0]) - 1 for x in f.read().split("\n")[9:-2]]
+        def split_smaller_dataset(dataset):
+            train_set, temp_set = train_test_split(dataset, test_size=0.2, random_state=42)
+            val_set, test_set = train_test_split(temp_set, test_size=0.5, random_state=42)
+            return train_set, val_set, test_set
 
-        suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=self.remove_h, sanitize=self.remove_h)
-        data_list = []
-        all_smiles = []
-        num_errors = 0
-        for i, mol in enumerate(tqdm(suppl)):
-            if i in skip or i not in target_df.index:
-                continue
+        def split_larger_dataset(dataset, train_size, val_size):
+            train_set, temp_set = train_test_split(dataset, train_size=train_size, random_state=42)
+            val_set, test_set = train_test_split(temp_set, train_size=val_size, random_state=42)
+            return train_set, val_set, test_set
 
-            if mol is None:
-                num_errors += 1
-                continue
-
-            smiles = Chem.MolToSmiles(mol, isomericSmiles=False, canonical=True)
-            if smiles is None:
-                num_errors += 1
+        if self.transfer:
+            if os.path.exists(self.split_paths[0]):
+                print('Files with separated data exists')
             else:
-                all_smiles.append(smiles)
+                suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=self.remove_h, sanitize=self.remove_h)
+                all_smiles = []
+                num_errors = 0
+                for i, mol in enumerate(tqdm(suppl)):
+                    if mol is None:
+                        num_errors += 1
+                        continue
 
-            data = mol_to_torch_geometric(mol, atom_encoder, smiles)
-            if self.remove_h:
-                data = remove_hydrogens(data)
+                    smiles = Chem.MolToSmiles(mol, isomericSmiles=False, canonical=True)
+                    if smiles is None:
+                        num_errors += 1
+                    else:
+                        all_smiles.append(smiles)
 
-            if self.pre_filter is not None and not self.pre_filter(data):
-                continue
-            if self.pre_transform is not None:
-                data = self.pre_transform(data)
+                print("Number of molecules that could not be mapped to smiles: ", num_errors)
+                print('Data separation in progress...')
+                sa_greater_3 = []
+                sa_less_3 = []
 
-            # data.edge_attr = F.one_hot(data.edge_attr, num_classes=5).to(torch.float)
-            # data.x = F.one_hot(data.x, num_classes=len(list(self.atom_encoder.keys()))).to(torch.float)
+                for smiles in all_smiles:
+                    mol = Chem.MolFromSmiles(smiles)
+                    if mol is not None:
+                        sa_score = sascorer.calculateScore(mol)
+                        if sa_score <= 3:
+                            sa_less_3.append(smiles)
+                        elif sa_score > 3:
+                            sa_greater_3.append(smiles)
 
-            if data.edge_index.numel() > 0:
-                data_list.append(data)
+                if len(sa_less_3) <= len(sa_greater_3):
+                    train_target, val_target, test_target = split_smaller_dataset(sa_less_3)
+                    train_source, val_source, test_source = split_larger_dataset(sa_greater_3, len(train_target),
+                                                                                 len(val_target))
+                else:
+                    train_source, val_source, test_source = split_smaller_dataset(sa_greater_3)
+                    train_target, val_target, test_target = split_larger_dataset(sa_less_3, len(train_source),
+                                                                                 len(val_source))
 
-        statistics = compute_all_statistics(
-            data_list, self.atom_encoder, charge_dic={-1: 0, 0: 1, 1: 2}
-        )
-        save_pickle(statistics.num_nodes, self.processed_paths[1])
-        np.save(self.processed_paths[2], statistics.node_types)
-        np.save(self.processed_paths[3], statistics.bond_types)
-        np.save(self.processed_paths[4], statistics.charge_types)
-        save_pickle(statistics.valencies, self.processed_paths[5])
-        save_pickle(set(all_smiles), self.processed_paths[6])
-        np.save(self.processed_paths[7], statistics.real_node_ratio)
-    
-        for data in data_list:
-            data.x = F.one_hot(data.x.to(torch.long), num_classes=len(statistics.node_types)).to(torch.float)
-            data.edge_attr = F.one_hot(data.edge_attr.to(torch.long), num_classes=len(statistics.bond_types)).to(torch.float)
-            data.charge = F.one_hot(data.charge.to(torch.long) + 1, num_classes=len(statistics.charge_types[0])).to(torch.float)
-        
-        torch.save(self.collate(data_list), self.processed_paths[0])
-        print("Number of molecules that could not be mapped to smiles: ", num_errors)
+                if self.is_target:
+                    train_target = pd.DataFrame(train_target, columns=['SMILES'])
+                    val_target = pd.DataFrame(val_target, columns=['SMILES'])
+                    test_target = pd.DataFrame(test_target, columns=['SMILES'])
+                    files_to_save = [train_target, val_target, test_target]
+                else:
+                    train_source = pd.DataFrame(train_source, columns=['SMILES'])
+                    val_source = pd.DataFrame(val_source, columns=['SMILES'])
+                    test_source = pd.DataFrame(test_source, columns=['SMILES'])
+                    files_to_save = [train_source, val_source, test_source]
+
+                print('Data saving...')
+                for file, name in zip(files_to_save, self.split_file_name):
+                    file.to_csv(os.path.join(self.raw_dir, name), index=False)
+
+            smile_list = pd.read_csv(self.split_paths[self.file_idx])
+            smile_list = smile_list["SMILES"].values
+            data_list = []
+            smiles_kept = []
+            charge_list = set()
+
+            for i, smile in enumerate(tqdm(smile_list)):
+                mol = Chem.MolFromSmiles(smile)
+
+                if mol is not None:
+                    data = mol_to_torch_geometric(mol, atom_encoder, smile)
+                    if self.remove_h:
+                        data = remove_hydrogens(data)
+                    unique_charge = set(torch.unique(data.charge).int().numpy())
+                    charge_list = charge_list.union(unique_charge)
+
+                    if self.pre_filter is not None and not self.pre_filter(data):
+                        continue
+                    if self.pre_transform is not None:
+                        data = self.pre_transform(data)
+                    if data.edge_index.numel() > 0:
+                        data_list.append(data)
+                    smiles_kept.append(smile)
+
+            statistics = compute_all_statistics(
+                data_list, self.atom_encoder, charge_dic={-1: 0, 0: 1, 1: 2}
+            )
+            save_pickle(statistics.num_nodes, self.processed_paths[1])
+            np.save(self.processed_paths[2], statistics.node_types)
+            np.save(self.processed_paths[3], statistics.bond_types)
+            np.save(self.processed_paths[4], statistics.charge_types)
+            save_pickle(statistics.valencies, self.processed_paths[5])
+            print(
+                "Number of molecules that could not be mapped to smiles: ",
+                len(smile_list) - len(smiles_kept),
+            )
+            save_pickle(set(smiles_kept), self.processed_paths[6])
+            for data in data_list:
+                data.x = F.one_hot(data.x.to(torch.long), num_classes=len(statistics.node_types)).to(torch.float)
+                data.edge_attr = F.one_hot(data.edge_attr.to(torch.long), num_classes=len(statistics.bond_types)).to(
+                    torch.float)
+                data.charge = F.one_hot(data.charge.to(torch.long) + 1, num_classes=len(statistics.charge_types[0])).to(
+                    torch.float)
+            torch.save(self.collate(data_list), self.processed_paths[0])
+            np.save(self.processed_paths[7], statistics.real_node_ratio)
+        else:
+            target_df = pd.read_csv(self.split_paths[self.file_idx], index_col=0)
+            target_df.drop(columns=["mol_id"], inplace=True)
+
+            with open(self.raw_paths[-1], "r") as f:
+                skip = [int(x.split()[0]) - 1 for x in f.read().split("\n")[9:-2]]
+
+            suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=self.remove_h, sanitize=self.remove_h)
+            data_list = []
+            all_smiles = []
+            num_errors = 0
+            for i, mol in enumerate(tqdm(suppl)):
+                if i in skip or i not in target_df.index:
+                    continue
+
+                if mol is None:
+                    num_errors += 1
+                    continue
+
+                smiles = Chem.MolToSmiles(mol, isomericSmiles=False, canonical=True)
+                if smiles is None:
+                    num_errors += 1
+                else:
+                    all_smiles.append(smiles)
+
+                data = mol_to_torch_geometric(mol, atom_encoder, smiles)
+                if self.remove_h:
+                    data = remove_hydrogens(data)
+
+                if self.pre_filter is not None and not self.pre_filter(data):
+                    continue
+                if self.pre_transform is not None:
+                    data = self.pre_transform(data)
+
+                # data.edge_attr = F.one_hot(data.edge_attr, num_classes=5).to(torch.float)
+                # data.x = F.one_hot(data.x, num_classes=len(list(self.atom_encoder.keys()))).to(torch.float)
+
+                if data.edge_index.numel() > 0:
+                    data_list.append(data)
+
+            statistics = compute_all_statistics(
+                data_list, self.atom_encoder, charge_dic={-1: 0, 0: 1, 1: 2}
+            )
+            save_pickle(statistics.num_nodes, self.processed_paths[1])
+            np.save(self.processed_paths[2], statistics.node_types)
+            np.save(self.processed_paths[3], statistics.bond_types)
+            np.save(self.processed_paths[4], statistics.charge_types)
+            save_pickle(statistics.valencies, self.processed_paths[5])
+            save_pickle(set(all_smiles), self.processed_paths[6])
+            np.save(self.processed_paths[7], statistics.real_node_ratio)
+
+            for data in data_list:
+                data.x = F.one_hot(data.x.to(torch.long), num_classes=len(statistics.node_types)).to(torch.float)
+                data.edge_attr = F.one_hot(data.edge_attr.to(torch.long), num_classes=len(statistics.bond_types)).to(
+                    torch.float)
+                data.charge = F.one_hot(data.charge.to(torch.long) + 1, num_classes=len(statistics.charge_types[0])).to(
+                    torch.float)
+
+            torch.save(self.collate(data_list), self.processed_paths[0])
+            print("Number of molecules that could not be mapped to smiles: ", num_errors)
 
 
 class QM9DataModule(MolecularDataModule):
-    def __init__(self, cfg):
+    def __init__(self, cfg, transfer):
         self.cfg = cfg
         self.datadir = cfg.datadir
+        is_target = cfg.is_target
         base_path = pathlib.Path(get_original_cwd())
         root_path = os.path.join(base_path, self.datadir)
 
@@ -271,6 +394,8 @@ class QM9DataModule(MolecularDataModule):
             "train": QM9Dataset(
                 split="train",
                 root=root_path,
+                transfer=transfer,
+                is_target=is_target,
                 remove_h=self.cfg.remove_h,
                 target_prop=target,
                 transform=RemoveYTransform(),
@@ -278,6 +403,8 @@ class QM9DataModule(MolecularDataModule):
             "val": QM9Dataset(
                 split="val",
                 root=root_path,
+                transfer=transfer,
+                is_target=is_target,
                 remove_h=self.cfg.remove_h,
                 target_prop=target,
                 transform=RemoveYTransform(),
@@ -285,6 +412,8 @@ class QM9DataModule(MolecularDataModule):
             "test": QM9Dataset(
                 split="test",
                 root=root_path,
+                transfer=transfer,
+                is_target=is_target,
                 remove_h=self.cfg.remove_h,
                 target_prop=target,
                 transform=transform,

@@ -1,6 +1,6 @@
 ## 0803 Molecular debug
 
-
+CUDA_VISIBLE_DEVICES=1 python3 main.py +experiment=planar_edge_remove name=planar_edge_remove_similar_before num_steps=50 num_iter=5000 n_ipf=100 virtual_node=False noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=1.0 clean_loss_weight=0.00001 limit_dist=marginal 
 
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=debug num_steps=10 num_iter=10 n_ipf=10 virtual_node=False
 
