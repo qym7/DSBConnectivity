@@ -123,7 +123,9 @@ class XEyTransformerLayer(nn.Module):
         if self.predicts_y:
             new_y_d = self.dropout_y1(new_y)
             y = self.norm_y1(oy + new_y_d)
-            ff_output_y = self.lin_y2(self.dropout_y2(self.activation(self.lin_y1(y))))
+            ff_output_y = self.lin_y2(
+                self.dropout_y2(self.activation(self.lin_y1(y)))
+            )
             ff_output_y = self.dropout_y3(ff_output_y)
             y = self.norm_y2(y + ff_output_y)
             # y = y - oy
@@ -134,7 +136,9 @@ class XEyTransformerLayer(nn.Module):
         # X = X - oX
         # E = E - oE
 
-        return utils.PlaceHolder(X=X, E=E, y=y, charge=None, node_mask=node_mask).mask()
+        return utils.PlaceHolder(
+            X=X, E=E, y=y, charge=None, node_mask=node_mask
+        ).mask()
 
 
 class NodeEdgeBlock(nn.Module):
@@ -185,7 +189,9 @@ class NodeEdgeBlock(nn.Module):
         self.x_out = Linear(dx, dx)
         self.e_out = Linear(dx, de)
         if self.predicts_y:
-            self.y_out = nn.Sequential(nn.Linear(dy, dy), nn.ReLU(), nn.Linear(dy, dy))
+            self.y_out = nn.Sequential(
+                nn.Linear(dy, dy), nn.ReLU(), nn.Linear(dy, dy)
+            )
 
     def forward(self, X, E, y, node_mask):
         """
@@ -215,7 +221,9 @@ class NodeEdgeBlock(nn.Module):
         # Compute unnormalized attentions. Y is (bs, n, n, n_head, df)
         Y = Q * K
         Y = Y / math.sqrt(Y.size(-1))
-        diffusion_utils.assert_correctly_masked(Y, (e_mask1 * e_mask2).unsqueeze(-1))
+        diffusion_utils.assert_correctly_masked(
+            Y, (e_mask1 * e_mask2).unsqueeze(-1)
+        )
 
         E1 = self.e_mul(E) * e_mask1 * e_mask2  # bs, n, n, dx
         E1 = E1.reshape(
@@ -363,7 +371,8 @@ class GraphTransformer(nn.Module):
                     n_head=hidden_dims["n_head"],
                     dim_ffX=hidden_dims["dim_ffX"],
                     dim_ffE=hidden_dims["dim_ffE"],
-                    predicts_y=(layer_idx != n_layers - 1) or self.predicts_final_y,
+                    predicts_y=(layer_idx != n_layers - 1)
+                    or self.predicts_final_y,
                     dropout=dropout,
                 )
                 for layer_idx in range(n_layers)
@@ -412,7 +421,9 @@ class GraphTransformer(nn.Module):
             import pdb
 
             pdb.set_trace()
-        time_emb = timestep_embedding(y[:, -1].unsqueeze(-1), self.hidden_dims["dy"])
+        time_emb = timestep_embedding(
+            y[:, -1].unsqueeze(-1), self.hidden_dims["dy"]
+        )
         new_y = self.mlp_in_y(model_input.y) + time_emb
         new_E = self.mlp_in_E(model_input.E)
 

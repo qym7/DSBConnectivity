@@ -91,11 +91,19 @@ class QM9SmilesDataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
-            charge_types=torch.from_numpy(np.load(self.processed_paths[4])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
+            charge_types=torch.from_numpy(
+                np.load(self.processed_paths[4])
+            ).float(),
             valencies=load_pickle(self.processed_paths[5]),
-            real_node_ratio=torch.from_numpy(np.load(self.processed_paths[7])).float(),
+            real_node_ratio=torch.from_numpy(
+                np.load(self.processed_paths[7])
+            ).float(),
         )
         self.smiles = load_pickle(self.processed_paths[6])
 

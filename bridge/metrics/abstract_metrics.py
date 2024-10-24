@@ -50,7 +50,9 @@ class SumExceptBatchMSE(MeanSquaredError):
             target: Ground truth values
         """
         assert preds.shape == target.shape
-        sum_squared_error, n_obs = self._mean_squared_error_update(preds, target)
+        sum_squared_error, n_obs = self._mean_squared_error_update(
+            preds, target
+        )
 
         self.sum_squared_error += sum_squared_error
         self.total += n_obs

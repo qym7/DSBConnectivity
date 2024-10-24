@@ -318,18 +318,24 @@ class SamplingMolecularMetrics(nn.Module):
         n_target_dist = n_target_dist / torch.sum(n_target_dist)
         self.register_buffer("n_target_dist", n_target_dist)
 
-        node_target_dist = di.node_types.type_as(self.generated_node_dist.node_dist)
+        node_target_dist = di.node_types.type_as(
+            self.generated_node_dist.node_dist
+        )
         node_target_dist = node_target_dist / torch.sum(node_target_dist)
         self.register_buffer("node_target_dist", node_target_dist)
 
-        edge_target_dist = di.edge_types.type_as(self.generated_edge_dist.edge_dist)
+        edge_target_dist = di.edge_types.type_as(
+            self.generated_edge_dist.edge_dist
+        )
         edge_target_dist = edge_target_dist / torch.sum(edge_target_dist)
         self.register_buffer("edge_target_dist", edge_target_dist)
 
         valency_target_dist = di.valency_distribution.type_as(
             self.generated_valency_dist.edgepernode_dist
         )
-        valency_target_dist = valency_target_dist / torch.sum(valency_target_dist)
+        valency_target_dist = valency_target_dist / torch.sum(
+            valency_target_dist
+        )
         self.register_buffer("valency_target_dist", valency_target_dist)
 
         self.n_dist_mae = HistogramsMAE(n_target_dist)
@@ -446,7 +452,9 @@ class SamplingMolecularMetrics(nn.Module):
             wandb.run.summary["Gen n distribution"] = generated_n_dist
             wandb.run.summary["Gen node distribution"] = generated_node_dist
             wandb.run.summary["Gen edge distribution"] = generated_edge_dist
-            wandb.run.summary["Gen valency distribution"] = generated_valency_dist
+            wandb.run.summary["Gen valency distribution"] = (
+                generated_valency_dist
+            )
 
         if local_rank == 0:
             print("Custom metrics computed.")
@@ -526,7 +534,9 @@ class GeneratedEdgesDistribution(Metric):
             mask = torch.ones_like(edge_types)
             mask = torch.triu(mask, diagonal=1).bool()
             edge_types = edge_types[mask]
-            unique_edge_types, counts = torch.unique(edge_types, return_counts=True)
+            unique_edge_types, counts = torch.unique(
+                edge_types, return_counts=True
+            )
             for type, count in zip(unique_edge_types, counts):
                 self.edge_dist[type] += count
 
@@ -786,7 +796,8 @@ class Molecule:
         atom_decoder: extracted from dataset_infos."""
 
         assert node_types.dim() == 1 and node_types.dtype == torch.long, (
-            f"shape of atoms {node_types.shape} " f"and dtype {node_types.dtype}"
+            f"shape of atoms {node_types.shape} "
+            f"and dtype {node_types.dtype}"
         )
         assert bond_types.dim() == 2 and bond_types.dtype == torch.long, (
             f"shape of bonds {bond_types.shape} --" f" {bond_types.dtype}"
@@ -796,7 +807,9 @@ class Molecule:
 
         self.node_types = node_types.long()
         self.bond_types = bond_types.long()
-        self.charge = charge if charge is not None else torch.zeros_like(node_types)
+        self.charge = (
+            charge if charge is not None else torch.zeros_like(node_types)
+        )
         self.charge = self.charge.long()
         self.rdkit_mol = self.build_molecule(atom_decoder)
         self.atom_decoder = atom_decoder

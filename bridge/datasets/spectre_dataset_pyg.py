@@ -70,9 +70,15 @@ class SpectreGraphDataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
-            real_node_ratio=torch.from_numpy(np.load(self.processed_paths[4])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
+            real_node_ratio=torch.from_numpy(
+                np.load(self.processed_paths[4])
+            ).float(),
         )
 
     @property
@@ -207,7 +213,9 @@ class SpectreGraphDataset(InMemoryDataset):
             train_len = int(round(self.num_graphs * 0.8))
             val_len = int(round(self.num_graphs * 0.2))
             indices = torch.randperm(self.num_graphs, generator=g_cpu)
-            print(f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}")
+            print(
+                f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}"
+            )
             train_indices = indices[:train_len]
             val_indices = indices[:val_len]
             test_indices = indices[train_len:]
@@ -216,7 +224,9 @@ class SpectreGraphDataset(InMemoryDataset):
             train_len = int(round((self.num_graphs - test_len) * 0.8))
             val_len = self.num_graphs - train_len - test_len
             indices = torch.randperm(self.num_graphs, generator=g_cpu)
-            print(f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}")
+            print(
+                f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}"
+            )
             train_indices = indices[:train_len]
             val_indices = indices[train_len : train_len + val_len]
             test_indices = indices[train_len + val_len :]
@@ -246,7 +256,9 @@ class SpectreGraphDataset(InMemoryDataset):
         torch.save(test_data, self.raw_paths[2])
 
     def process(self):
-        raw_dataset = torch.load(os.path.join(self.raw_dir, "{}.pt".format(self.split)))
+        raw_dataset = torch.load(
+            os.path.join(self.raw_dir, "{}.pt".format(self.split))
+        )
         data_list = []
         for adj in raw_dataset:
             n = adj.shape[-1]

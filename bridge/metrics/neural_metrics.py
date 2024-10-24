@@ -95,7 +95,9 @@ class GINConv(nn.Module):
         elif aggregator_type == "mean":
             self._reducer = fn.mean
         else:
-            raise KeyError("Aggregator type {} not recognized.".format(aggregator_type))
+            raise KeyError(
+                "Aggregator type {} not recognized.".format(aggregator_type)
+            )
         # to specify whether eps is trainable or not.
         if learn_eps:
             self.eps = torch.nn.Parameter(torch.FloatTensor([init_eps]))
@@ -141,9 +143,9 @@ class GINConv(nn.Module):
             graph.srcdata["h"] = feat_src
             graph.update_all(aggregate_fn, self._reducer("m", "neigh"))
 
-            diff = torch.tensor(graph.dstdata["neigh"].shape[1:]) - torch.tensor(
-                feat_dst.shape[1:]
-            )
+            diff = torch.tensor(
+                graph.dstdata["neigh"].shape[1:]
+            ) - torch.tensor(feat_dst.shape[1:])
             zeros = torch.zeros(feat_dst.shape[0], *diff).to(feat_dst.device)
             feat_dst = torch.cat([feat_dst, zeros], dim=1)
             rst = (1 + self.eps) * feat_dst + graph.dstdata["neigh"]
@@ -338,7 +340,9 @@ class GIN(nn.Module):
             if layer == 0:
                 self.linears_prediction.append(nn.Linear(input_dim, output_dim))
             else:
-                self.linears_prediction.append(nn.Linear(hidden_dim, output_dim))
+                self.linears_prediction.append(
+                    nn.Linear(hidden_dim, output_dim)
+                )
 
         if kwargs["init"] == "orthogonal":
             self.linears_prediction.apply(init_weights_orthogonal)
@@ -457,7 +461,9 @@ def load_feature_extractor(
     use_pretrained = kwargs.get("use_pretrained", False)
     if use_pretrained:
         model_path = kwargs.get("model_path")
-        assert model_path is not None, "Please pass model_path if use_pretrained=True"
+        assert (
+            model_path is not None
+        ), "Please pass model_path if use_pretrained=True"
         print("loaded", model_path)
         saved_model = torch.load(model_path)
         model.load_state_dict(saved_model["model_state_dict"])
@@ -521,8 +527,12 @@ class GINMetric:
         return self._get_activations(generated_dataset, reference_dataset)
 
     def _get_activations(self, generated_dataset, reference_dataset):
-        gen_activations = self.__get_activations_single_dataset(generated_dataset)
-        ref_activations = self.__get_activations_single_dataset(reference_dataset)
+        gen_activations = self.__get_activations_single_dataset(
+            generated_dataset
+        )
+        ref_activations = self.__get_activations_single_dataset(
+            reference_dataset
+        )
 
         scaler = StandardScaler()
         scaler.fit(ref_activations)
@@ -535,8 +545,12 @@ class GINMetric:
         node_feat_loc = self.feat_extractor.node_feat_loc
         edge_feat_loc = self.feat_extractor.edge_feat_loc
 
-        ndata = [node_feat_loc] if node_feat_loc in dataset[0].ndata else "__ALL__"
-        edata = [edge_feat_loc] if edge_feat_loc in dataset[0].edata else "__ALL__"
+        ndata = (
+            [node_feat_loc] if node_feat_loc in dataset[0].ndata else "__ALL__"
+        )
+        edata = (
+            [edge_feat_loc] if edge_feat_loc in dataset[0].edata else "__ALL__"
+        )
         graphs = dgl.batch(dataset, ndata=ndata, edata=edata).to(
             self.feat_extractor.device
         )
@@ -703,8 +717,12 @@ class KIDEvaluation(GINMetric):
                 generated_dataset, reference_dataset
             )
 
-        gen_activations = tf.convert_to_tensor(generated_dataset, dtype=tf.float32)
-        ref_activations = tf.convert_to_tensor(reference_dataset, dtype=tf.float32)
+        gen_activations = tf.convert_to_tensor(
+            generated_dataset, dtype=tf.float32
+        )
+        ref_activations = tf.convert_to_tensor(
+            reference_dataset, dtype=tf.float32
+        )
         kid = tfgan.eval.kernel_classifier_distance_and_std_from_activations(
             ref_activations, gen_activations
         )[0].numpy()
@@ -723,7 +741,9 @@ class FIDEvaluation(GINMetric):
             )
 
         mu_ref, cov_ref = self.__calculate_dataset_stats(reference_dataset)
-        mu_generated, cov_generated = self.__calculate_dataset_stats(generated_dataset)
+        mu_generated, cov_generated = self.__calculate_dataset_stats(
+            generated_dataset
+        )
         # print(np.max(mu_generated), np.max(cov_generated), 'mu, cov fid')
         fid = self.compute_FID(mu_ref, mu_generated, cov_ref, cov_generated)
         return {"fid": fid}
@@ -817,8 +837,10 @@ class prdcEvaluation(GINMetric):
                 generated_dataset, reference_dataset
             )
 
-        real_nearest_neighbour_distances = self.__compute_nearest_neighbour_distances(
-            reference_dataset, nearest_k
+        real_nearest_neighbour_distances = (
+            self.__compute_nearest_neighbour_distances(
+                reference_dataset, nearest_k
+            )
         )
         distance_real_fake = self.__compute_pairwise_distance(
             reference_dataset, generated_dataset
@@ -826,7 +848,9 @@ class prdcEvaluation(GINMetric):
 
         if self.use_pr:
             fake_nearest_neighbour_distances = (
-                self.__compute_nearest_neighbour_distances(generated_dataset, nearest_k)
+                self.__compute_nearest_neighbour_distances(
+                    generated_dataset, nearest_k
+                )
             )
             precision = (
                 (
@@ -856,7 +880,8 @@ class prdcEvaluation(GINMetric):
             ).sum(axis=0).mean()
 
             coverage = (
-                distance_real_fake.min(axis=1) <= real_nearest_neighbour_distances
+                distance_real_fake.min(axis=1)
+                <= real_nearest_neighbour_distances
             ).mean()
 
             f1_dc = 2 / ((1 / (density + 1e-5)) + (1 / (coverage + 1e-5)))

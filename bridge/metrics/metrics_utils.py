@@ -64,7 +64,9 @@ def node_counts(data_list):
         all_node_counts[num_nodes] += 1
         total_num_nodes += num_nodes
     print("Done.")
-    return all_node_counts, total_num_nodes / max(all_node_counts) / len(data_list)
+    return all_node_counts, total_num_nodes / max(all_node_counts) / len(
+        data_list
+    )
 
 
 def graph_counts(data_list, num_graph_types):
@@ -215,7 +217,9 @@ def total_variation1d(preds, target):
     ), f"preds: {preds.shape}, target: {target.shape}"
     target = normalize(target)
     preds = normalize(preds)
-    return torch.sum(torch.abs(preds - target)).item(), torch.abs(preds - target)
+    return torch.sum(torch.abs(preds - target)).item(), torch.abs(
+        preds - target
+    )
 
 
 def normalize(tensor):

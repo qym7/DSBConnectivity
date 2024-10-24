@@ -38,10 +38,14 @@ class TrainLossDiscrete(nn.Module):
             to_log = {
                 "train_loss/batch_CE": (loss_X + loss_E + loss_y).detach(),
                 "train_loss/X_CE": (
-                    self.node_loss.compute() if true_data.node.numel() > 0 else -1
+                    self.node_loss.compute()
+                    if true_data.node.numel() > 0
+                    else -1
                 ),
                 "train_loss/E_CE": (
-                    self.edge_loss.compute() if true_data.edge_attr.numel() > 0 else -1
+                    self.edge_loss.compute()
+                    if true_data.edge_attr.numel() > 0
+                    else -1
                 ),
                 # "train_loss/y_CE": loss_y if pred.y.numel() > 0 else -1,
                 "train_loss/y_CE": -1,
@@ -78,7 +82,9 @@ class TrainLossDiscrete(nn.Module):
             self.train_y_loss.compute() if self.y_loss.total_samples > 0 else -1
         )
         epoch_charge_loss = (
-            self.charge_loss.compute() if self.charge_loss.total_samples > 0 else -1
+            self.charge_loss.compute()
+            if self.charge_loss.total_samples > 0
+            else -1
         )
 
         to_log = {

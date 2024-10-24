@@ -130,7 +130,9 @@ def generate_planar_edge_add_graphs(
                 ]
                 potential_edges = sorted(
                     potential_edges,
-                    key=lambda edge: nx.shortest_path_length(G, edge[0], edge[1]),
+                    key=lambda edge: nx.shortest_path_length(
+                        G, edge[0], edge[1]
+                    ),
                 )
 
                 for u, v in potential_edges:
@@ -152,7 +154,10 @@ def generate_planar_edge_add_graphs(
                     if G.number_of_edges() >= max_edges:
                         break
                     G.add_edge(u, v)
-                    if not nx.check_planarity(G)[0] or G.number_of_edges() > max_edges:
+                    if (
+                        not nx.check_planarity(G)[0]
+                        or G.number_of_edges() > max_edges
+                    ):
                         G.remove_edge(u, v)
 
         graphs.append(G)
@@ -195,7 +200,9 @@ def generate_sbm_graphs(
             min_community_size, max_community_size, size=num_communities
         )
         probs = np.ones([num_communities, num_communities]) * intra_prob
-        probs[np.arange(num_communities), np.arange(num_communities)] = inter_prob
+        probs[np.arange(num_communities), np.arange(num_communities)] = (
+            inter_prob
+        )
         G = nx.stochastic_block_model(community_sizes, probs, seed=rng)
         if nx.is_connected(G):
             graphs.append(G)
@@ -222,7 +229,9 @@ def generate_split_2_to_3_sbm_graphs(
             community_sizes = array1
 
         probs = np.ones([num_communities, num_communities]) * intra_prob
-        probs[np.arange(num_communities), np.arange(num_communities)] = inter_prob
+        probs[np.arange(num_communities), np.arange(num_communities)] = (
+            inter_prob
+        )
         probs[0, 0] = inter_prob * 2
         G = nx.stochastic_block_model(community_sizes, probs, seed=rng)
         if nx.is_connected(G):
@@ -254,7 +263,9 @@ def generate_small_split_sbm_graphs(
             community_sizes = array1
 
         probs = np.ones([num_communities, num_communities]) * intra_prob
-        probs[np.arange(num_communities), np.arange(num_communities)] = inter_prob
+        probs[np.arange(num_communities), np.arange(num_communities)] = (
+            inter_prob
+        )
         probs[0, 0] = inter_prob * 2
         G = nx.stochastic_block_model(community_sizes, probs, seed=rng)
         if nx.is_connected(G):
@@ -296,12 +307,16 @@ def generate_sbm_graphs_fixed_size(
         if community_sizes.sum() != num_nodes:
             continue
 
-        print("created", len(graphs), "graphs", num_communities, community_sizes)
+        print(
+            "created", len(graphs), "graphs", num_communities, community_sizes
+        )
 
         community_sizes = community_sizes.astype(int)
 
         probs = np.ones([num_communities, num_communities]) * intra_prob
-        probs[np.arange(num_communities), np.arange(num_communities)] = inter_prob
+        probs[np.arange(num_communities), np.arange(num_communities)] = (
+            inter_prob
+        )
         G = nx.stochastic_block_model(community_sizes, probs, seed=rng)
         if nx.is_connected(G):
             graphs.append(G)

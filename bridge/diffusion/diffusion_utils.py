@@ -375,9 +375,13 @@ def mask_distributions(
     pred_charge=None,
 ):
     # Set masked rows to arbitrary distributions, so it doesn't contribute to loss
-    row_X = torch.zeros(true_X.size(-1), dtype=torch.float, device=true_X.device)
+    row_X = torch.zeros(
+        true_X.size(-1), dtype=torch.float, device=true_X.device
+    )
     row_X[0] = 1.0
-    row_E = torch.zeros(true_E.size(-1), dtype=torch.float, device=true_E.device)
+    row_E = torch.zeros(
+        true_E.size(-1), dtype=torch.float, device=true_E.device
+    )
     row_E[0] = 1.0
 
     diag_mask = ~torch.eye(
@@ -425,7 +429,9 @@ def mask_distributions(
     )
 
 
-def posterior_distributions(X, E, X_t, E_t, y_t, Qt, Qsb, Qtb, charge, charge_t):
+def posterior_distributions(
+    X, E, X_t, E_t, y_t, Qt, Qsb, Qtb, charge, charge_t
+):
     prob_X = compute_posterior_distribution(
         M=X, M_t=X_t, Qt_M=Qt.X, Qsb_M=Qsb.X, Qtb_M=Qtb.X
     )  # (bs, n, dx)
@@ -497,7 +503,9 @@ def sample_sparse_discrete_feature_noise(limit_dist, node_mask):
 
     # expand dimensions
     x_limit = limit_dist.X[None, :].expand(n_node, -1)  # (n_node, dx)
-    e_limit = limit_dist.E[None, :].expand(n_exist_edges.sum(), -1)  # (n_edge, de)
+    e_limit = limit_dist.E[None, :].expand(
+        n_exist_edges.sum(), -1
+    )  # (n_edge, de)
 
     # sample nodes and existing edges
     node = x_limit.multinomial(1)[:, 0]

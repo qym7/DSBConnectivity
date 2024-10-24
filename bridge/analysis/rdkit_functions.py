@@ -86,8 +86,12 @@ class BasicMolecularMetrics(object):
         # Retrieve dataset smiles only for qm9 currently.
         self.test_smiles = test_smiles
         self.dataset_smiles_list = train_smiles
-        self.test_sa_avg, _, self.test_sa_success = self.compute_sascore(test_smiles)
-        self.train_sa_avg, _, self.train_sa_success = self.compute_sascore(train_smiles)
+        self.test_sa_avg, _, self.test_sa_success = self.compute_sascore(
+            test_smiles
+        )
+        self.train_sa_avg, _, self.train_sa_success = self.compute_sascore(
+            train_smiles
+        )
 
     def compute_validity(self, generated):
         """generated: list of couples (positions, atom_types)"""
@@ -384,8 +388,12 @@ class BasicMolecularMetrics(object):
             n_nodes_0 = X_0.size(0)
             n_nodes_T = X_T.size(0)
 
-            X_0_pad = torch.zeros((max_nodes_0,), dtype=X_0.dtype, device=X_0.device)
-            X_T_pad = torch.zeros((max_nodes_T,), dtype=X_T.dtype, device=X_T.device)
+            X_0_pad = torch.zeros(
+                (max_nodes_0,), dtype=X_0.dtype, device=X_0.device
+            )
+            X_T_pad = torch.zeros(
+                (max_nodes_T,), dtype=X_T.dtype, device=X_T.device
+            )
             X_0_pad[:n_nodes_0] = X_0
             X_T_pad[:n_nodes_T] = X_T
 
@@ -406,7 +414,9 @@ class BasicMolecularMetrics(object):
             # create node masks
             node_masks.append(
                 (
-                    torch.arange(max(max_nodes_0, max_nodes_T), device=X_0.device)
+                    torch.arange(
+                        max(max_nodes_0, max_nodes_T), device=X_0.device
+                    )
                     < n_nodes_0
                 ).float()
             )
@@ -452,7 +462,9 @@ class BasicMolecularMetrics(object):
         X_T_aligned = torch.matmul(Y, X_T_padded.unsqueeze(-1)).squeeze(
             -1
         )  # Align node values
-        E_T_aligned = torch.matmul(torch.matmul(Y, E_T_padded), Y.transpose(1, 2))
+        E_T_aligned = torch.matmul(
+            torch.matmul(Y, E_T_padded), Y.transpose(1, 2)
+        )
 
         nll_X = -torch.log(X_0_padded + eps) * X_T_aligned
         nll_E = -torch.log(E_0_padded + eps) * E_T_aligned
@@ -512,8 +524,12 @@ class BasicMolecularMetrics(object):
             n_nodes_0 = X_0.size(0)
             n_nodes_T = X_T.size(0)
 
-            X_0_pad = torch.zeros((max_nodes_0,), dtype=X_0.dtype, device=X_0.device)
-            X_T_pad = torch.zeros((max_nodes_T,), dtype=X_T.dtype, device=X_T.device)
+            X_0_pad = torch.zeros(
+                (max_nodes_0,), dtype=X_0.dtype, device=X_0.device
+            )
+            X_T_pad = torch.zeros(
+                (max_nodes_T,), dtype=X_T.dtype, device=X_T.device
+            )
             X_0_pad[:n_nodes_0] = X_0
             X_T_pad[:n_nodes_T] = X_T
 
@@ -534,7 +550,9 @@ class BasicMolecularMetrics(object):
             # create node masks
             node_masks.append(
                 (
-                    torch.arange(max(max_nodes_0, max_nodes_T), device=X_0.device)
+                    torch.arange(
+                        max(max_nodes_0, max_nodes_T), device=X_0.device
+                    )
                     < n_nodes_0
                 ).float()
             )
@@ -580,7 +598,9 @@ class BasicMolecularMetrics(object):
         X_T_aligned = torch.matmul(Y, X_T_padded.unsqueeze(-1)).squeeze(
             -1
         )  # Align node values
-        E_T_aligned = torch.matmul(torch.matmul(Y, E_T_padded), Y.transpose(1, 2))
+        E_T_aligned = torch.matmul(
+            torch.matmul(Y, E_T_padded), Y.transpose(1, 2)
+        )
 
         nll_X = -torch.log(X_0_padded + eps) * X_T_aligned
         nll_E = -torch.log(E_0_padded + eps) * E_T_aligned
@@ -631,9 +651,11 @@ class BasicMolecularMetrics(object):
         valid, validity, num_components, _ = self.compute_validity(generated)
 
         if source is not None:
-            _, all_relaxed_smiles_source, _ = self.compute_relaxed_validity(source)
-            v_sa_avg_source, sa_values_source, sa_v_source = self.compute_sascore(
-                all_relaxed_smiles_source
+            _, all_relaxed_smiles_source, _ = self.compute_relaxed_validity(
+                source
+            )
+            v_sa_avg_source, sa_values_source, sa_v_source = (
+                self.compute_sascore(all_relaxed_smiles_source)
             )
         else:
             all_relaxed_smiles_source = None
@@ -643,7 +665,9 @@ class BasicMolecularMetrics(object):
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
         nc_max = num_components.max() if len(num_components) > 0 else 0
-        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(
+            f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%"
+        )
         print(
             f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
         )
@@ -660,13 +684,17 @@ class BasicMolecularMetrics(object):
             f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%"
         )
         if relaxed_validity > 0:
-            unique_smiles, uniqueness = self.compute_uniqueness(relaxed_valid_smiles)
+            unique_smiles, uniqueness = self.compute_uniqueness(
+                relaxed_valid_smiles
+            )
             print(
                 f"Uniqueness over {len(relaxed_valid_smiles)} valid molecules: {uniqueness * 100 :.2f}%"
             )
 
             if self.dataset_smiles_list is not None:
-                novel_smiles, novelty, _, coverage = self.compute_novelty(unique_smiles)
+                novel_smiles, novelty, _, coverage = self.compute_novelty(
+                    unique_smiles
+                )
                 print(
                     f"Novelty over {len(unique_smiles)} unique valid molecules: {novelty * 100 :.2f}%"
                 )
@@ -727,10 +755,14 @@ class BasicMolecularMetrics(object):
         """generated: list of pairs (atom_types: n [int], edge_types: n * n)"""
 
         print(f"Number of generated molecules: {len(generated)}")
-        valid, validity, num_components, all_smiles = self.compute_validity(generated)
+        valid, validity, num_components, all_smiles = self.compute_validity(
+            generated
+        )
 
         if source is not None:
-            valid_source, _, _, all_smiles_source = self.compute_validity(source)
+            valid_source, _, _, all_smiles_source = self.compute_validity(
+                source
+            )
             nll, nll_vals = self.check_nll(generated, source)
             print(
                 f"NLL Score over {len(generated)} total generated molecules is: {nll}"
@@ -743,7 +775,9 @@ class BasicMolecularMetrics(object):
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
         nc_max = num_components.max() if len(num_components) > 0 else 0
-        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(
+            f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%"
+        )
         print(
             f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
         )
@@ -753,7 +787,9 @@ class BasicMolecularMetrics(object):
             f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%"
         )
 
-        relaxed_valid, relaxed_validity = self.compute_relaxed_validity(generated)
+        relaxed_valid, all_smiles, relaxed_validity = (
+            self.compute_relaxed_validity(generated)
+        )
         print(
             f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%"
         )
@@ -775,7 +811,9 @@ class BasicMolecularMetrics(object):
                 novelty = -1.0
 
             if valid_source is not None:
-                logP_gen, qed_gen, sa_gen = self.compute_properties(relaxed_valid)
+                logP_gen, qed_gen, sa_gen = self.compute_properties(
+                    relaxed_valid
+                )
                 logP_source, qed_source, sa_source = self.compute_properties(
                     valid_source
                 )
@@ -789,7 +827,9 @@ class BasicMolecularMetrics(object):
                     f"MAD QED over {qed_length} (a portion) valid molecules is: {mad_qed}"
                 )
                 mad_sa, sa_length = self.compute_mad(sa_gen, sa_source)
-                print(f"MAD SA {sa_length} (a portion) valid molecules is: {mad_sa}")
+                print(
+                    f"MAD SA {sa_length} (a portion) valid molecules is: {mad_sa}"
+                )
 
                 fcd_score = self.calculate_fcd(relaxed_valid, valid_source)
                 print(
@@ -839,7 +879,9 @@ class BasicMolecularMetrics(object):
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
         nc_max = num_components.max() if len(num_components) > 0 else 0
-        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(
+            f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%"
+        )
         print(
             f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
         )
@@ -898,123 +940,20 @@ class BasicMolecularMetrics(object):
 
         return relaxed_valid, unique, novel, valid, valid_indices
 
-    def evaluate_zinc(self, generated, source):
-        """generated: list of pairs (atom_types: n [int], edge_types: n * n)"""
-
-        print(f"Number of generated molecules: {len(generated)}")
-        valid, validity, num_components, all_smiles = self.compute_validity(generated)
-
-        if source is not None:
-            valid_source, _, _, all_smiles_source = self.compute_validity(source)
-            nll, nll_vals = self.check_nll(generated, source)
-            print(
-                f"NLL Score over {len(generated)} total generated molecules is: {nll}"
-            )
-        else:
-            valid_source = None
-            all_smiles_source = None
-            nll = -1.0
-
-        nc_mu = num_components.mean() if len(num_components) > 0 else 0
-        nc_min = num_components.min() if len(num_components) > 0 else 0
-        nc_max = num_components.max() if len(num_components) > 0 else 0
-        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
-        print(
-            f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
-        )
-
-        connectivity = (num_components == 1).sum() / len(num_components)
-        print(
-            f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%"
-        )
-
-        relaxed_valid, relaxed_validity = self.compute_relaxed_validity(generated)
-        print(
-            f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%"
-        )
-        if relaxed_validity > 0:
-            unique, uniqueness = self.compute_uniqueness(relaxed_valid)
-            print(
-                f"Uniqueness over {len(relaxed_valid)} valid molecules: {uniqueness * 100 :.2f}%"
-            )
-
-            if self.dataset_smiles_list is not None:
-                _, novelty, _, coverage = self.compute_novelty(unique)
-                print(
-                    f"Novelty over {len(unique)} unique valid molecules: {novelty * 100 :.2f}%"
-                )
-                print(
-                    f"Coverage over {len(unique)} unique valid molecules: {coverage * 100 :.2f}%"
-                )
-            else:
-                novelty = -1.0
-
-            if valid_source is not None:
-                logP_gen, qed_gen, sa_gen = self.compute_properties(relaxed_valid)
-                logP_source, qed_source, sa_source = self.compute_properties(
-                    valid_source
-                )
-
-                w1_logP = self.compute_w1(logP_gen, logP_source)
-                print(
-                    f"W1 LogP over {len(relaxed_valid)} valid molecules is: {w1_logP}"
-                )
-                mad_qed, qed_length = self.compute_mad(qed_gen, qed_source)
-                print(
-                    f"MAD QED over {qed_length} (a portion) valid molecules is: {mad_qed}"
-                )
-                mad_sa, sa_length = self.compute_mad(sa_gen, sa_source)
-                print(f"MAD SA {sa_length} (a portion) valid molecules is: {mad_sa}")
-
-                fcd_score = self.calculate_fcd(relaxed_valid, valid_source)
-                print(
-                    f"FCD Score over {len(relaxed_valid)} valid molecules is: {fcd_score}"
-                )
-            else:
-                w1_logP = -1.0
-                mad_qed = -1.0
-                mad_sa = -1.0
-                fcd_score = -1.0
-        else:
-            novelty = -1.0
-            uniqueness = 0.0
-            w1_logP = -1.0
-            mad_qed = -1.0
-            mad_sa = -1.0
-            fcd_score = -1.0
-            coverage = 0.0
-            unique = []
-        return (
-            [
-                validity,
-                relaxed_validity,
-                uniqueness,
-                novelty,
-                connectivity,
-                w1_logP,
-                mad_qed,
-                mad_sa,
-                fcd_score,
-                coverage,
-                nll,
-            ],
-            unique,
-            dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
-            (all_smiles_source, all_smiles),
-        )
-
     def evaluate_baselines(self, generated):
         """generated: list of pairs (atom_types: n [int], edge_types: n * n)"""
 
         print(f"Number of molecules to evaluate: {len(generated)}")
-        valid, validity, num_components, all_smiles, valid_indices = (
+        valid, validity, num_components, _, valid_indices = (
             self.compute_validity_smiles(generated)
         )
 
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
         nc_max = num_components.max() if len(num_components) > 0 else 0
-        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(
+            f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%"
+        )
         print(
             f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
         )
@@ -1024,7 +963,7 @@ class BasicMolecularMetrics(object):
             f"Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%"
         )
 
-        relaxed_valid, relaxed_validity = self.compute_relaxed_validity_smiles(
+        relaxed_valid, all_smiles, relaxed_validity = self.compute_relaxed_validity_smiles(
             generated
         )
         print(
@@ -1318,7 +1257,9 @@ def compute_molecular_metrics(
         for i, mol in enumerate(molecule_list):
             atom_types, edge_types = mol
 
-            validity_results = check_stability(atom_types, edge_types, dataset_info)
+            validity_results = check_stability(
+                atom_types, edge_types, dataset_info
+            )
 
             molecule_stable += int(validity_results[0])
             nr_stable_bonds += int(validity_results[1])
@@ -1341,7 +1282,9 @@ def compute_molecular_metrics(
 
     metrics = BasicMolecularMetrics(dataset_info, test_smiles, train_smiles)
     if dataset_info.name == "zinc":
-        rdkit_metrics = metrics.evaluate_zinc(molecule_list, source_molecule_list)
+        rdkit_metrics = metrics.evaluate_zinc(
+            molecule_list, source_molecule_list
+        )
 
         all_smiles = rdkit_metrics[-1]
         nc = rdkit_metrics[-2]
@@ -1380,17 +1323,24 @@ def compute_molecular_metrics(
         f"mol_metrics_charts_{fb}/Uniqueness": rdkit_metrics[0][2],
         f"mol_metrics_charts_{fb}/Novelty": rdkit_metrics[0][3],
         f"mol_metrics_charts_{fb}/Connectivity": rdkit_metrics[0][4],
-        f"mol_metrics_charts_{fb}/train SA Average Value": float(rdkit_metrics[0][5]),
+        f"mol_metrics_charts_{fb}/train SA Average Value": float(
+            rdkit_metrics[0][5]
+        ),
         f"mol_metrics_charts_{fb}/train SA Success": float(rdkit_metrics[0][6]),
-        f"mol_metrics_charts_{fb}/test SA Average Value": float(rdkit_metrics[0][7]),
+        f"mol_metrics_charts_{fb}/test SA Average Value": float(
+            rdkit_metrics[0][7]
+        ),
         f"mol_metrics_charts_{fb}/test SA Success": float(rdkit_metrics[0][8]),
-        f"mol_metrics_charts_{fb}/coverage except training": float(rdkit_metrics[0][9]),
+        f"mol_metrics_charts_{fb}/coverage except training": float(
+            rdkit_metrics[0][9]
+        ),
         f"mol_metrics_charts_{fb}/SA V. Average": float(rdkit_metrics[0][10]),
         f"mol_metrics_charts_{fb}/SA V.": float(rdkit_metrics[0][11]),
         f"mol_metrics_charts_{fb}/SA.V.U.": float(rdkit_metrics[0][12]),
         f"mol_metrics_charts_{fb}/SA.V.U.N.": float(rdkit_metrics[0][13]),
         f"mol_metrics_charts_{fb}/V.": rdkit_metrics[0][1],
-        f"mol_metrics_charts_{fb}/V.U.": rdkit_metrics[0][1] * rdkit_metrics[0][2],
+        f"mol_metrics_charts_{fb}/V.U.": rdkit_metrics[0][1]
+        * rdkit_metrics[0][2],
         f"mol_metrics_charts_{fb}/V.U.N.": rdkit_metrics[0][1]
         * rdkit_metrics[0][2]
         * rdkit_metrics[0][3],

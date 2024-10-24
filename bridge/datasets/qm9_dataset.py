@@ -99,11 +99,19 @@ class QM9Dataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
-            charge_types=torch.from_numpy(np.load(self.processed_paths[4])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
+            charge_types=torch.from_numpy(
+                np.load(self.processed_paths[4])
+            ).float(),
             valencies=load_pickle(self.processed_paths[5]),
-            real_node_ratio=torch.from_numpy(np.load(self.processed_paths[7])).float(),
+            real_node_ratio=torch.from_numpy(
+                np.load(self.processed_paths[7])
+            ).float(),
         )
         self.smiles = load_pickle(self.processed_paths[6])
 
@@ -230,7 +238,9 @@ class QM9Dataset(InMemoryDataset):
                 print("Files with separated data exists")
             else:
                 suppl = Chem.SDMolSupplier(
-                    self.raw_paths[0], removeHs=self.remove_h, sanitize=self.remove_h
+                    self.raw_paths[0],
+                    removeHs=self.remove_h,
+                    sanitize=self.remove_h,
                 )
                 all_smiles = []
                 num_errors = 0
@@ -239,7 +249,9 @@ class QM9Dataset(InMemoryDataset):
                         num_errors += 1
                         continue
 
-                    smiles = Chem.MolToSmiles(mol, isomericSmiles=False, canonical=True)
+                    smiles = Chem.MolToSmiles(
+                        mol, isomericSmiles=False, canonical=True
+                    )
                     if smiles is None:
                         num_errors += 1
                     else:
@@ -263,27 +275,35 @@ class QM9Dataset(InMemoryDataset):
                             sa_greater_3.append(smiles)
 
                 if len(sa_less_3) <= len(sa_greater_3):
-                    train_target, val_target, test_target = split_smaller_dataset(
-                        sa_less_3
+                    train_target, val_target, test_target = (
+                        split_smaller_dataset(sa_less_3)
                     )
-                    train_source, val_source, test_source = split_larger_dataset(
-                        sa_greater_3, len(train_target), len(val_target)
+                    train_source, val_source, test_source = (
+                        split_larger_dataset(
+                            sa_greater_3, len(train_target), len(val_target)
+                        )
                     )
                 else:
-                    train_source, val_source, test_source = split_smaller_dataset(
-                        sa_greater_3
+                    train_source, val_source, test_source = (
+                        split_smaller_dataset(sa_greater_3)
                     )
-                    train_target, val_target, test_target = split_larger_dataset(
-                        sa_less_3, len(train_source), len(val_source)
+                    train_target, val_target, test_target = (
+                        split_larger_dataset(
+                            sa_less_3, len(train_source), len(val_source)
+                        )
                     )
 
                 if self.is_target:
-                    train_target = pd.DataFrame(train_target, columns=["SMILES"])
+                    train_target = pd.DataFrame(
+                        train_target, columns=["SMILES"]
+                    )
                     val_target = pd.DataFrame(val_target, columns=["SMILES"])
                     test_target = pd.DataFrame(test_target, columns=["SMILES"])
                     files_to_save = [train_target, val_target, test_target]
                 else:
-                    train_source = pd.DataFrame(train_source, columns=["SMILES"])
+                    train_source = pd.DataFrame(
+                        train_source, columns=["SMILES"]
+                    )
                     val_source = pd.DataFrame(val_source, columns=["SMILES"])
                     test_source = pd.DataFrame(test_source, columns=["SMILES"])
                     files_to_save = [train_source, val_source, test_source]
@@ -308,7 +328,9 @@ class QM9Dataset(InMemoryDataset):
                     unique_charge = set(torch.unique(data.charge).int().numpy())
                     charge_list = charge_list.union(unique_charge)
 
-                    if self.pre_filter is not None and not self.pre_filter(data):
+                    if self.pre_filter is not None and not self.pre_filter(
+                        data
+                    ):
                         continue
                     if self.pre_transform is not None:
                         data = self.pre_transform(data)
@@ -331,7 +353,8 @@ class QM9Dataset(InMemoryDataset):
             save_pickle(set(smiles_kept), self.processed_paths[6])
             for data in data_list:
                 data.x = F.one_hot(
-                    data.x.to(torch.long), num_classes=len(statistics.node_types)
+                    data.x.to(torch.long),
+                    num_classes=len(statistics.node_types),
                 ).to(torch.float)
                 data.edge_attr = F.one_hot(
                     data.edge_attr.to(torch.long),
@@ -344,14 +367,20 @@ class QM9Dataset(InMemoryDataset):
             torch.save(self.collate(data_list), self.processed_paths[0])
             np.save(self.processed_paths[7], statistics.real_node_ratio)
         else:
-            target_df = pd.read_csv(self.split_paths[self.file_idx], index_col=0)
+            target_df = pd.read_csv(
+                self.split_paths[self.file_idx], index_col=0
+            )
             target_df.drop(columns=["mol_id"], inplace=True)
 
             with open(self.raw_paths[-1], "r") as f:
-                skip = [int(x.split()[0]) - 1 for x in f.read().split("\n")[9:-2]]
+                skip = [
+                    int(x.split()[0]) - 1 for x in f.read().split("\n")[9:-2]
+                ]
 
             suppl = Chem.SDMolSupplier(
-                self.raw_paths[0], removeHs=self.remove_h, sanitize=self.remove_h
+                self.raw_paths[0],
+                removeHs=self.remove_h,
+                sanitize=self.remove_h,
             )
             data_list = []
             all_smiles = []
@@ -364,7 +393,9 @@ class QM9Dataset(InMemoryDataset):
                     num_errors += 1
                     continue
 
-                smiles = Chem.MolToSmiles(mol, isomericSmiles=False, canonical=True)
+                smiles = Chem.MolToSmiles(
+                    mol, isomericSmiles=False, canonical=True
+                )
                 if smiles is None:
                     num_errors += 1
                 else:
@@ -398,7 +429,8 @@ class QM9Dataset(InMemoryDataset):
 
             for data in data_list:
                 data.x = F.one_hot(
-                    data.x.to(torch.long), num_classes=len(statistics.node_types)
+                    data.x.to(torch.long),
+                    num_classes=len(statistics.node_types),
                 ).to(torch.float)
                 data.edge_attr = F.one_hot(
                     data.edge_attr.to(torch.long),
@@ -411,7 +443,8 @@ class QM9Dataset(InMemoryDataset):
 
             torch.save(self.collate(data_list), self.processed_paths[0])
             print(
-                "Number of molecules that could not be mapped to smiles: ", num_errors
+                "Number of molecules that could not be mapped to smiles: ",
+                num_errors,
             )
 
 

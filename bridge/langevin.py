@@ -103,7 +103,9 @@ class Langevin(torch.nn.Module):
         de = x.E.shape[-1]
 
         x_tot = utils.PlaceHolder(
-            X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(self.device),
+            X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(
+                self.device
+            ),
             E=torch.Tensor(
                 bs,
                 self.num_steps,
@@ -115,7 +117,9 @@ class Langevin(torch.nn.Module):
         )
 
         out = utils.PlaceHolder(
-            X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(self.device),
+            X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(
+                self.device
+            ),
             E=torch.Tensor(
                 bs,
                 self.num_steps,
@@ -132,8 +136,12 @@ class Langevin(torch.nn.Module):
             gammas = self.gammas
 
         if len(time.shape) == 1:
-            times_expanded = time.reshape((1, self.num_steps + 1, 1)).repeat((bs, 1, 1))
-            gammas_expanded = gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+            times_expanded = time.reshape((1, self.num_steps + 1, 1)).repeat(
+                (bs, 1, 1)
+            )
+            gammas_expanded = gammas.reshape((1, self.num_steps, 1)).repeat(
+                (bs, 1, 1)
+            )
         else:
             times_expanded = time.unsqueeze(-1)
             gammas_expanded = gammas.unsqueeze(-1)
@@ -154,7 +162,9 @@ class Langevin(torch.nn.Module):
             if self.virtual_node:
                 x_k = x_k.sample(
                     onehot=True,
-                    node_mask=torch.ones(x_k.X.shape[:-1]).to(x_k.X.device).bool(),
+                    node_mask=torch.ones(x_k.X.shape[:-1])
+                    .to(x_k.X.device)
+                    .bool(),
                 )
             else:
                 x_k = x_k.sample(onehot=True, node_mask=node_mask)
@@ -180,11 +190,15 @@ class Langevin(torch.nn.Module):
         gammas=None,
     ):
         bs = init_samples.X.shape[0]
-        dx = init_samples.X.shape[-1]  # for virtual nodes, there is an extra dimension
+        dx = init_samples.X.shape[
+            -1
+        ]  # for virtual nodes, there is an extra dimension
         de = init_samples.E.shape[-1]
 
         x_tot = utils.PlaceHolder(
-            X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(self.device),
+            X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(
+                self.device
+            ),
             E=torch.Tensor(
                 bs,
                 self.num_steps,
@@ -197,7 +211,9 @@ class Langevin(torch.nn.Module):
         )
 
         out = utils.PlaceHolder(
-            X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(self.device),
+            X=torch.Tensor(bs, self.num_steps, self.max_n_nodes, dx).to(
+                self.device
+            ),
             E=torch.Tensor(
                 bs,
                 self.num_steps,
@@ -215,8 +231,12 @@ class Langevin(torch.nn.Module):
             gammas = self.gammas
 
         if len(time.shape) == 1:
-            times_expanded = time.reshape((1, self.num_steps + 1, 1)).repeat((bs, 1, 1))
-            gammas_expanded = gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+            times_expanded = time.reshape((1, self.num_steps + 1, 1)).repeat(
+                (bs, 1, 1)
+            )
+            gammas_expanded = gammas.reshape((1, self.num_steps, 1)).repeat(
+                (bs, 1, 1)
+            )
         else:
             times_expanded = time.unsqueeze(-1)
             gammas_expanded = gammas.unsqueeze(-1)

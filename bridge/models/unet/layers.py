@@ -108,7 +108,9 @@ def timestep_embedding(timesteps, dim, max_period=10000):
     """
     half = dim // 2
     freqs = th.exp(
-        -math.log(max_period) * th.arange(start=0, end=half, dtype=th.float32) / half
+        -math.log(max_period)
+        * th.arange(start=0, end=half, dtype=th.float32)
+        / half
     ).to(device=timesteps.device)
     args = timesteps[:, None].float() * freqs[None]
     embedding = th.cat([th.cos(args), th.sin(args)], dim=-1)
@@ -146,7 +148,9 @@ class CheckpointFunction(th.autograd.Function):
 
     @staticmethod
     def backward(ctx, *output_grads):
-        ctx.input_tensors = [x.detach().requires_grad_(True) for x in ctx.input_tensors]
+        ctx.input_tensors = [
+            x.detach().requires_grad_(True) for x in ctx.input_tensors
+        ]
         with th.enable_grad():
             # Fixes a bug where the first op in run_function modifies the
             # Tensor storage in place, which is not allowed for detach()'d
@@ -299,7 +303,11 @@ class ResBlock(TimestepBlock):
             SiLU(),
             linear(
                 emb_channels,
-                (2 * self.out_channels if use_scale_shift_norm else self.out_channels),
+                (
+                    2 * self.out_channels
+                    if use_scale_shift_norm
+                    else self.out_channels
+                ),
             ),
         )
         self.out_layers = nn.Sequential(

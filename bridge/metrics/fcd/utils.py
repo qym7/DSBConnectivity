@@ -88,7 +88,9 @@ def load_imported_model(keras_config):
         if layer_type == "Conv1d":
             assert conv, "Can't have conv layers after LSTM"
             if other_info["padding"] == "same":
-                layers.append(SamePadding1d(kwargs["kernel_size"], kwargs["stride"]))
+                layers.append(
+                    SamePadding1d(kwargs["kernel_size"], kwargs["stride"])
+                )
             layer = nn.Conv1d(**kwargs)
             layer.load_state_dict(state_dict)
             layers.append(layer)

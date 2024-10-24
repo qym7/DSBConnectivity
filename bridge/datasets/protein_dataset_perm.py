@@ -59,8 +59,12 @@ class ProteinDataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
         )
 
     @property
@@ -122,7 +126,9 @@ class ProteinDataset(InMemoryDataset):
         """
         Download raw files.
         """
-        raw_url = "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/DD"
+        raw_url = (
+            "https://raw.githubusercontent.com/KarolisMart/SPECTRE/main/data/DD"
+        )
         for name in [
             "DD_A.txt",
             "DD_graph_indicator.txt",
@@ -147,7 +153,10 @@ class ProteinDataset(InMemoryDataset):
         available_graphs = []
         for idx in np.arange(data_graph_indicator.max()):
             node_idx = data_graph_indicator == idx
-            if node_idx.sum() >= min_num_nodes and node_idx.sum() <= max_num_nodes:
+            if (
+                node_idx.sum() >= min_num_nodes
+                and node_idx.sum() <= max_num_nodes
+            ):
                 available_graphs.append(idx)
         available_graphs = torch.Tensor(available_graphs)
 
@@ -156,7 +165,9 @@ class ProteinDataset(InMemoryDataset):
         train_len = int(round((self.num_graphs - test_len) * 0.8))
         val_len = self.num_graphs - train_len - test_len
         indices = torch.randperm(self.num_graphs, generator=g_cpu)
-        print(f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}")
+        print(
+            f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}"
+        )
         train_indices = available_graphs[indices][:train_len]
         val_indices = available_graphs[indices][train_len : train_len + val_len]
         test_indices = available_graphs[indices][train_len + val_len :]
@@ -269,8 +280,12 @@ class ProteinDataset(InMemoryDataset):
         np.save(self.processed_paths[3], bond_types)
 
         num_nodes = node_counts(perm_data_list)
-        node_types = atom_type_counts(perm_data_list, num_classes=self.num_node_type)
-        bond_types = edge_counts(perm_data_list, num_bond_types=self.num_edge_type)
+        node_types = atom_type_counts(
+            perm_data_list, num_classes=self.num_node_type
+        )
+        bond_types = edge_counts(
+            perm_data_list, num_bond_types=self.num_edge_type
+        )
         torch.save(
             self.collate(perm_data_list),
             self.processed_paths[4],

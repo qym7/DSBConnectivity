@@ -77,7 +77,9 @@ class IPFBase(torch.nn.Module):
         elif self.cfg.sample.time_distortion == "cos":
             time_series = (1 - torch.cos(time_series * torch.pi)) / 2
         elif self.cfg.sample.time_distortion == "revcos":
-            time_series = 2 * time_series - (1 - torch.cos(time_series * torch.pi)) / 2
+            time_series = (
+                2 * time_series - (1 - torch.cos(time_series * torch.pi)) / 2
+            )
         gammas = time_series.diff()
         self.T = torch.sum(gammas)
         self.current_epoch = 0
@@ -277,7 +279,9 @@ class IPFBase(torch.nn.Module):
 
             if self.cfg.checkpoint_run:
                 # sample network
-                sample_net_f, sample_net_b = get_graph_models(self.cfg, self.datainfos)
+                sample_net_f, sample_net_b = get_graph_models(
+                    self.cfg, self.datainfos
+                )
 
                 if "sample_checkpoint_f" in self.cfg:
                     sample_net_f.load_state_dict(
@@ -317,14 +321,18 @@ class IPFBase(torch.nn.Module):
             import pdb
 
             pdb.set_trace()
-            vec = next(iter(pygloader.DataLoader(init_ds, batch_size=NAPPROX)))[0]
+            vec = next(iter(pygloader.DataLoader(init_ds, batch_size=NAPPROX)))[
+                0
+            ]
             mean_final = vec.mean()
             mean_final = vec[0] * 0 + mean_final
             var_final = eval(self.cfg.var_final)
             final_ds = None
         elif self.cfg.final_adaptive:
             NAPPROX = 100
-            vec = next(iter(pygloader.DataLoader(init_ds, batch_size=NAPPROX)))[0]
+            vec = next(iter(pygloader.DataLoader(init_ds, batch_size=NAPPROX)))[
+                0
+            ]
             mean_final = vec.mean(axis=0)
             var_final = vec.var()
             final_ds = None
@@ -390,7 +398,9 @@ class IPFBase(torch.nn.Module):
             )
             self.tf_nodes_dist = self.tf_datainfos.nodes_dist
         else:
-            self.tf_extra_features = self.tf_datainfos = self.tf_nodes_dist = None
+            self.tf_extra_features = self.tf_datainfos = self.tf_nodes_dist = (
+                None
+            )
             self.tf_datainfos = self.datainfos
 
         # get final stats
@@ -431,8 +441,10 @@ class IPFBase(torch.nn.Module):
             batch_size=self.cfg.batch_size,
             shuffle=False,
         )
-        (self.cache_init_dl_test, self.save_init_dl_test) = self.accelerator.prepare(
-            self.cache_init_dl_test, self.save_init_dl_test
+        (self.cache_init_dl_test, self.save_init_dl_test) = (
+            self.accelerator.prepare(
+                self.cache_init_dl_test, self.save_init_dl_test
+            )
         )
         self.cache_init_dl_test = repeater(self.cache_init_dl_test)
         self.save_init_dl_test = repeater(self.save_init_dl_test)
@@ -454,8 +466,10 @@ class IPFBase(torch.nn.Module):
             batch_size=self.cfg.batch_size,
             shuffle=False,
         )
-        (self.cache_init_dl_val, self.save_init_dl_val) = self.accelerator.prepare(
-            self.cache_init_dl_val, self.save_init_dl_val
+        (self.cache_init_dl_val, self.save_init_dl_val) = (
+            self.accelerator.prepare(
+                self.cache_init_dl_val, self.save_init_dl_val
+            )
         )
         self.cache_init_dl_val = repeater(self.cache_init_dl_val)
         self.save_init_dl_val = repeater(self.save_init_dl_val)
@@ -503,8 +517,10 @@ class IPFBase(torch.nn.Module):
                 shuffle=True,
                 drop_last=True,
             )
-            (self.cache_final_dl, self.save_final_dl) = self.accelerator.prepare(
-                self.cache_final_dl, self.save_final_dl
+            (self.cache_final_dl, self.save_final_dl) = (
+                self.accelerator.prepare(
+                    self.cache_final_dl, self.save_final_dl
+                )
             )
             self.cache_final_dl = repeater(self.cache_final_dl)
             self.save_final_dl = repeater(self.save_final_dl)
@@ -635,7 +651,9 @@ class IPFBase(torch.nn.Module):
                 virtual_node=self.cfg.virtual_node,
             )
 
-        new_dl = pygloader.DataLoader(new_dl, batch_size=self.batch_size, shuffle=True)
+        new_dl = pygloader.DataLoader(
+            new_dl, batch_size=self.batch_size, shuffle=True
+        )
 
         new_dl = self.accelerator.prepare(new_dl)
         new_dl = repeater(new_dl)
@@ -667,24 +685,34 @@ class IPFBase(torch.nn.Module):
             if fb == "f" or self.cfg.transfer:
                 if test:
                     loader = (
-                        self.save_init_dl_test if fb == "f" else self.save_final_dl_test
+                        self.save_init_dl_test
+                        if fb == "f"
+                        else self.save_final_dl_test
                     )
                     batch = next(loader)
-                    batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
+                    batch, node_mask = utils.data_to_dense(
+                        batch, self.max_n_nodes
+                    )
                     n_nodes = node_mask.sum(-1)
                 else:
                     loader = (
-                        self.save_init_dl_val if fb == "f" else self.save_final_dl_val
+                        self.save_init_dl_val
+                        if fb == "f"
+                        else self.save_final_dl_val
                     )
                     batch = next(loader)
-                    batch, node_mask = utils.data_to_dense(batch, self.max_n_nodes)
+                    batch, node_mask = utils.data_to_dense(
+                        batch, self.max_n_nodes
+                    )
                     n_nodes = node_mask.sum(-1)
                 if self.cfg.virtual_node:
                     batch.X = torch.cat(
                         [~node_mask.unsqueeze(-1), batch.X],
                         dim=-1,
                     )
-                    node_mask = torch.ones_like(node_mask).to(batch.X.device).bool()
+                    node_mask = (
+                        torch.ones_like(node_mask).to(batch.X.device).bool()
+                    )
                     n_nodes = node_mask.sum(-1)
             else:
                 batch_size = self.cfg.batch_size
@@ -696,13 +724,15 @@ class IPFBase(torch.nn.Module):
                 )
                 node_mask = arange < n_nodes.unsqueeze(1)
                 if self.cfg.virtual_node:
-                    node_mask = torch.ones_like(node_mask).to(self.device).bool()
+                    node_mask = (
+                        torch.ones_like(node_mask).to(self.device).bool()
+                    )
                     n_nodes = node_mask.sum(-1)
 
                 batch = utils.PlaceHolder(
-                    X=self.limit_dist.X.repeat(batch_size, self.max_n_nodes, 1).to(
-                        self.device
-                    ),
+                    X=self.limit_dist.X.repeat(
+                        batch_size, self.max_n_nodes, 1
+                    ).to(self.device),
                     E=self.limit_dist.E.repeat(
                         batch_size,
                         self.max_n_nodes,
@@ -823,7 +853,14 @@ class IPFBase(torch.nn.Module):
 
             if self.cfg.ema:
                 name_net = (
-                    "sample_net" + "_" + fb + "_" + str(n) + "_" + str(i) + ".ckpt"
+                    "sample_net"
+                    + "_"
+                    + fb
+                    + "_"
+                    + str(n)
+                    + "_"
+                    + str(i)
+                    + ".ckpt"
                 )
                 name_net_ckpt = "./checkpoints/" + name_net
                 if self.cfg.dataparallel:
@@ -865,7 +902,10 @@ class IPFBase(torch.nn.Module):
                 if self.cfg.virtual_node:
                     cur_mask = X[l] >= 0
                 else:
-                    cur_mask = torch.arange(X.size(-1), device=self.device) < n_nodes[l]
+                    cur_mask = (
+                        torch.arange(X.size(-1), device=self.device)
+                        < n_nodes[l]
+                    )
 
                 atom_types = X[l, cur_mask].cpu()
                 edge_types = E[l, cur_mask][:, cur_mask].cpu()
@@ -909,7 +949,9 @@ class IPFBase(torch.nn.Module):
             self.visualization_tools.visualize(
                 result_path,
                 graph_list=generated_list[:samples_to_save],
-                num_graphs_to_visualize=min(len(generated_list), samples_to_save),
+                num_graphs_to_visualize=min(
+                    len(generated_list), samples_to_save
+                ),
                 fb=fb,
             )
 
@@ -954,7 +996,9 @@ class IPFBase(torch.nn.Module):
                 else self.tf_test_sampling_metrics
             )
             val_sampling_metrics = (
-                self.val_sampling_metrics if fb == "b" else self.tf_val_sampling_metrics
+                self.val_sampling_metrics
+                if fb == "b"
+                else self.tf_val_sampling_metrics
             )
 
             # using the absolute trajectory for discrete data with one-hot encoding is more intuitive
@@ -976,8 +1020,12 @@ class IPFBase(torch.nn.Module):
                     source_graphs=init_list,
                 )
 
-                test_to_log[f"{fb}_X_change"] = X_abs.item()  # the nbr of nodes changed
-                test_to_log[f"{fb}_E_change"] = E_abs.item()  # the nbr of edges changed
+                test_to_log[f"{fb}_X_change"] = (
+                    X_abs.item()
+                )  # the nbr of nodes changed
+                test_to_log[f"{fb}_E_change"] = (
+                    E_abs.item()
+                )  # the nbr of edges changed
                 test_to_log[f"{fb}_graph_change"] = (
                     X_abs + E_abs
                 ).item()  # the nbr of nodes changed + the nbr of edges changed
@@ -1036,8 +1084,12 @@ class IPFBase(torch.nn.Module):
                     source_graphs=init_list,
                 )
 
-                val_to_log[f"{fb}_X_change"] = X_abs.item()  # the nbr of nodes changed
-                val_to_log[f"{fb}_E_change"] = E_abs.item()  # the nbr of edges changed
+                val_to_log[f"{fb}_X_change"] = (
+                    X_abs.item()
+                )  # the nbr of nodes changed
+                val_to_log[f"{fb}_E_change"] = (
+                    E_abs.item()
+                )  # the nbr of edges changed
                 val_to_log[f"{fb}_graph_change"] = (
                     X_abs + E_abs
                 ).item()  # the nbr of nodes changed + the nbr of edges changed
@@ -1120,8 +1172,12 @@ class IPFSequential(IPFBase):
 
             if self.cfg.virtual_node:
                 # we do not consider node mask when using virtual nodes
-                n_nodes_x = torch.ones_like(x[4]).to(self.device) * self.max_n_nodes
-                n_nodes_out = torch.ones_like(out[4]).to(self.device) * self.max_n_nodes
+                n_nodes_x = (
+                    torch.ones_like(x[4]).to(self.device) * self.max_n_nodes
+                )
+                n_nodes_out = (
+                    torch.ones_like(out[4]).to(self.device) * self.max_n_nodes
+                )
                 n_nodes_clean = (
                     torch.ones_like(clean[4]).to(self.device) * self.max_n_nodes
                 )
@@ -1153,7 +1209,9 @@ class IPFSequential(IPFBase):
             )
 
             eval_steps = self.T - times_expanded
-            pred = self.forward_graph(self.net[forward_or_backward], x, eval_steps)
+            pred = self.forward_graph(
+                self.net[forward_or_backward], x, eval_steps
+            )
 
             pred_R = pred.copy()
 
@@ -1246,7 +1304,9 @@ class IPFSequential(IPFBase):
             if (i % self.cfg.cache_refresh_stride == 0) and (i > 0):
                 new_dl = None
                 torch.cuda.empty_cache()
-                new_dl = self.new_cacheloader(forward_or_backward, n, self.cfg.ema)
+                new_dl = self.new_cacheloader(
+                    forward_or_backward, n, self.cfg.ema
+                )
 
         if n % self.cfg.save_every_ipf == 0:
             self.save_step(i, n, forward_or_backward)
@@ -1342,7 +1402,9 @@ class IPFSequential(IPFBase):
         loss = loss + self.cfg.clean_loss_weight * clean_loss
 
         if pred.charge.numel() > 0:
-            loss = loss + self.cfg.model.lambda_train[0] * F.mse_loss(pred.E, out.E)
+            loss = loss + self.cfg.model.lambda_train[0] * F.mse_loss(
+                pred.E, out.E
+            )
 
         return node_loss, edge_loss, loss
 

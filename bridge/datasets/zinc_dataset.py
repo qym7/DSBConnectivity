@@ -75,11 +75,19 @@ class ZincDataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
-            charge_types=torch.from_numpy(np.load(self.processed_paths[4])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
+            charge_types=torch.from_numpy(
+                np.load(self.processed_paths[4])
+            ).float(),
             valencies=load_pickle(self.processed_paths[5]),
-            real_node_ratio=torch.from_numpy(np.load(self.processed_paths[7])).float(),
+            real_node_ratio=torch.from_numpy(
+                np.load(self.processed_paths[7])
+            ).float(),
         )
         self.smiles = load_pickle(self.processed_paths[6])
 
@@ -135,8 +143,12 @@ class ZincDataset(InMemoryDataset):
         data = data.sample(frac=1, random_state=42)
 
         if self.transfer:
-            source_set = data[(data["logP"] >= 2 - 0.5) & (data["logP"] <= 2 + 0.5)]
-            target_set = data[(data["logP"] >= 4 - 0.5) & (data["logP"] <= 4 + 0.5)]
+            source_set = data[
+                (data["logP"] >= 2 - 0.5) & (data["logP"] <= 2 + 0.5)
+            ]
+            target_set = data[
+                (data["logP"] >= 4 - 0.5) & (data["logP"] <= 4 + 0.5)
+            ]
 
             source_set = source_set[["smiles"]]
             target_set = target_set[["smiles"]]
@@ -164,7 +176,9 @@ class ZincDataset(InMemoryDataset):
             os.remove(osp.join(self.raw_dir, "zinc_250k.csv"))
         else:
             target_set = data[["smiles"]]
-            train_target, val_target, test_target = split_smaller_dataset(target_set)
+            train_target, val_target, test_target = split_smaller_dataset(
+                target_set
+            )
             files_to_save = [train_target, val_target, test_target]
 
         for file, name in zip(files_to_save, self.split_file_name):
@@ -214,7 +228,8 @@ class ZincDataset(InMemoryDataset):
                 data.x.to(torch.long), num_classes=len(statistics.node_types)
             ).to(torch.float)
             data.edge_attr = F.one_hot(
-                data.edge_attr.to(torch.long), num_classes=len(statistics.bond_types)
+                data.edge_attr.to(torch.long),
+                num_classes=len(statistics.bond_types),
             ).to(torch.float)
             data.charge = F.one_hot(
                 data.charge.to(torch.long) + 1,
@@ -311,7 +326,9 @@ class ZincInfos(AbstractDatasetInfos):
         super().complete_infos(datamodule.statistics, self.atom_encoder)
 
         # dimensions
-        self.output_dims = PlaceHolder(X=self.num_node_types, charge=0, E=5, y=0)
+        self.output_dims = PlaceHolder(
+            X=self.num_node_types, charge=0, E=5, y=0
+        )
         if not self.use_charge:
             self.output_dims.charge = 0
 

@@ -164,7 +164,9 @@ class Visualizer:
         num_graphs = len(graph_list)
         num_graphs_to_visualize = min(num_graphs_to_visualize, num_graphs)
         if num_graphs_to_visualize > 0:
-            print(f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}")
+            print(
+                f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}"
+            )
 
         # graph_list = graphs.split()
         for i in range(num_graphs_to_visualize):
@@ -184,7 +186,9 @@ class Visualizer:
                     print("Can't kekulize molecule")
             else:
                 nx_graph = self.to_networkx(graph_list[i])
-                self.visualize_non_molecule(graph=nx_graph, pos=None, path=file_path)
+                self.visualize_non_molecule(
+                    graph=nx_graph, pos=None, path=file_path
+                )
 
             if wandb.run and log is not None:
                 if i < 3:
@@ -332,7 +336,9 @@ class Visualizer:
                 wandb.log(
                     {
                         f"chain_{fb}": [
-                            wandb.Video(gif_path, caption=gif_path, format="gif")
+                            wandb.Video(
+                                gif_path, caption=gif_path, format="gif"
+                            )
                         ],
                     }
                 )

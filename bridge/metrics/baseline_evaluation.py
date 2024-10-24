@@ -11,7 +11,10 @@ import numpy as np
 def smiles_to_graph(smiles):
     mol = Chem.MolFromSmiles(smiles)
     nodes = [atom.GetAtomicNum() for atom in mol.GetAtoms()]
-    edges = [(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()) for bond in mol.GetBonds()]
+    edges = [
+        (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
+        for bond in mol.GetBonds()
+    ]
     return {"nodes": nodes, "edges": edges}
 
 
@@ -105,7 +108,9 @@ if __name__ == "__main__":
     # input from user
     dataset_name = "qm9"
     remove_h = True
-    file_path = "/scratch/uceeosm/EvoMol/evomol/results/test_qm9_noh/all_batches.csv"
+    file_path = (
+        "/scratch/uceeosm/EvoMol/evomol/results/test_qm9_noh/all_batches.csv"
+    )
     alpha = 0.4
 
     data = pd.read_csv(file_path)
@@ -137,7 +142,9 @@ if __name__ == "__main__":
     similarity = []
     graph_edit_distances = []
 
-    for original, optimized in zip(filtered_original_molecules, valid_optimized):
+    for original, optimized in zip(
+        filtered_original_molecules, valid_optimized
+    ):
         similarity_score = smiles_similarity(original, optimized)
         change_score = 1 - similarity_score
         similarity.append(change_score)

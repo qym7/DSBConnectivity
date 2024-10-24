@@ -140,7 +140,9 @@ class UNetModel(nn.Module):
                 input_block_chans.append(ch)
             if level != len(channel_mult) - 1:
                 self.input_blocks.append(
-                    TimestepEmbedSequential(Downsample(ch, conv_resample, dims=dims))
+                    TimestepEmbedSequential(
+                        Downsample(ch, conv_resample, dims=dims)
+                    )
                 )
                 input_block_chans.append(ch)
                 ds *= 2
@@ -241,7 +243,9 @@ class UNetModel(nn.Module):
         ), "must specify y if and only if the model is class-conditional"
 
         hs = []
-        emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
+        emb = self.time_embed(
+            timestep_embedding(timesteps, self.model_channels)
+        )
 
         if self.num_classes is not None:
             assert y.shape == (x.shape[0],)
@@ -277,7 +281,9 @@ class UNetModel(nn.Module):
                  - 'up': a list of hidden state tensors from upsampling.
         """
         hs = []
-        emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
+        emb = self.time_embed(
+            timestep_embedding(timesteps, self.model_channels)
+        )
         if self.num_classes is not None:
             assert y.shape == (x.shape[0],)
             emb = emb + self.label_emb(y)
@@ -307,12 +313,16 @@ class SuperResModel(UNetModel):
 
     def forward(self, x, timesteps, low_res=None, **kwargs):
         _, _, new_height, new_width = x.shape
-        upsampled = F.interpolate(low_res, (new_height, new_width), mode="bilinear")
+        upsampled = F.interpolate(
+            low_res, (new_height, new_width), mode="bilinear"
+        )
         x = th.cat([x, upsampled], dim=1)
         return super().forward(x, timesteps, **kwargs)
 
     def get_feature_vectors(self, x, timesteps, low_res=None, **kwargs):
         _, new_height, new_width, _ = x.shape
-        upsampled = F.interpolate(low_res, (new_height, new_width), mode="bilinear")
+        upsampled = F.interpolate(
+            low_res, (new_height, new_width), mode="bilinear"
+        )
         x = th.cat([x, upsampled], dim=1)
         return super().get_feature_vectors(x, timesteps, **kwargs)

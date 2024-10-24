@@ -152,7 +152,9 @@ def get_datamodules(cfg, transfer):
         from datasets import point_cloud_dataset
 
         datamodule = point_cloud_dataset.PointCloudDataModule(cfg)
-        dataset_infos = point_cloud_dataset.PointCloudInfos(datamodule=datamodule)
+        dataset_infos = point_cloud_dataset.PointCloudInfos(
+            datamodule=datamodule
+        )
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
 
@@ -175,7 +177,9 @@ def get_datamodules(cfg, transfer):
             from ..datasets import zinc_dataset
 
             datamodule = zinc_dataset.ZincDataModule(cfg, transfer)
-            dataset_infos = zinc_dataset.ZincInfos(datamodule=datamodule, cfg=cfg)
+            dataset_infos = zinc_dataset.ZincInfos(
+                datamodule=datamodule, cfg=cfg
+            )
 
         elif cfg["name"] == "guacamol":
             from ..datasets import guacamol_dataset
@@ -192,7 +196,9 @@ def get_datamodules(cfg, transfer):
             raise ValueError("Dataset not implemented")
 
         if cfg.extra_features is not None:
-            domain_features = ExtraMolecularFeatures(dataset_infos=dataset_infos)
+            domain_features = ExtraMolecularFeatures(
+                dataset_infos=dataset_infos
+            )
         else:
             domain_features = DummyExtraFeatures()
 
