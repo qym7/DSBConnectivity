@@ -187,9 +187,9 @@ class QM9Dataset(InMemoryDataset):
         # Shuffle dataset with df.sample, then split
         train, val, test = np.split(dataset.sample(frac=1, random_state=42), [n_train, n_val + n_train])
 
-        train.to_csv(os.path.join(self.raw_dir, "train.csv"))
-        val.to_csv(os.path.join(self.raw_dir, "val.csv"))
-        test.to_csv(os.path.join(self.raw_dir, "test.csv"))
+        train.to_csv(os.path.join(self.raw_dir, "train_init.csv"))
+        val.to_csv(os.path.join(self.raw_dir, "val_init.csv"))
+        test.to_csv(os.path.join(self.raw_dir, "test_init.csv"))
 
     def process(self):
         RDLogger.DisableLog("rdApp.*")
@@ -207,72 +207,60 @@ class QM9Dataset(InMemoryDataset):
             return train_set, val_set, test_set
 
         if self.transfer:
-            datasets = {}
-            # for split, file_name in zip(["train", "val", "test"], self.split_file_name):
-            #     datasets[split] = pd.read_csv(osp.join(self.raw_dir, file_name), index_col=0)
-            #     datasets[split].drop(columns=["mol_id"], inplace=True)
-            #
-            # full_dataset = pd.concat([datasets["train"], datasets["val"], datasets["test"]])
-            #
-            # with open(self.raw_paths[-1], "r") as f:
-            #     skip = [int(x.split()[0]) - 1 for x in f.read().split("\n")[9:-2]]
+            if os.path.exists(self.split_paths[0]):
+                print('Files with separated data exists')
+            else:
+                suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=self.remove_h, sanitize=self.remove_h)
+                all_smiles = []
+                num_errors = 0
+                for i, mol in enumerate(tqdm(suppl)):
+                    if mol is None:
+                        num_errors += 1
+                        continue
 
-            suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=self.remove_h, sanitize=self.remove_h)
-            all_smiles = []
-            num_errors = 0
-            for i, mol in enumerate(tqdm(suppl)):
-                # if i in skip or i not in full_dataset.index:
-                #     continue
+                    smiles = Chem.MolToSmiles(mol, isomericSmiles=False, canonical=True)
+                    if smiles is None:
+                        num_errors += 1
+                    else:
+                        all_smiles.append(smiles)
 
-                if mol is None:
-                    num_errors += 1
-                    continue
+                print("Number of molecules that could not be mapped to smiles: ", num_errors)
+                print('Data separation in progress...')
+                sa_greater_3 = []
+                sa_less_3 = []
 
-                smiles = Chem.MolToSmiles(mol, isomericSmiles=False, canonical=True)
-                if smiles is None:
-                    num_errors += 1
+                for smiles in all_smiles:
+                    mol = Chem.MolFromSmiles(smiles)
+                    if mol is not None:
+                        sa_score = sascorer.calculateScore(mol)
+                        if sa_score <= 3:
+                            sa_less_3.append(smiles)
+                        elif sa_score > 3:
+                            sa_greater_3.append(smiles)
+
+                if len(sa_less_3) <= len(sa_greater_3):
+                    train_target, val_target, test_target = split_smaller_dataset(sa_less_3)
+                    train_source, val_source, test_source = split_larger_dataset(sa_greater_3, len(train_target),
+                                                                                 len(val_target))
                 else:
-                    all_smiles.append(smiles)
+                    train_source, val_source, test_source = split_smaller_dataset(sa_greater_3)
+                    train_target, val_target, test_target = split_larger_dataset(sa_less_3, len(train_source),
+                                                                                 len(val_source))
 
-            print("Number of molecules that could not be mapped to smiles: ", num_errors)
+                if self.is_target:
+                    train_target = pd.DataFrame(train_target, columns=['SMILES'])
+                    val_target = pd.DataFrame(val_target, columns=['SMILES'])
+                    test_target = pd.DataFrame(test_target, columns=['SMILES'])
+                    files_to_save = [train_target, val_target, test_target]
+                else:
+                    train_source = pd.DataFrame(train_source, columns=['SMILES'])
+                    val_source = pd.DataFrame(val_source, columns=['SMILES'])
+                    test_source = pd.DataFrame(test_source, columns=['SMILES'])
+                    files_to_save = [train_source, val_source, test_source]
 
-            print('Data separation in progress...')
-            sa_greater_3 = []
-            sa_less_3 = []
-
-            for smiles in all_smiles:
-                mol = Chem.MolFromSmiles(smiles)
-                if mol is not None:
-                    sa_score = sascorer.calculateScore(mol)
-                    if sa_score <= 3:
-                        sa_less_3.append(smiles)
-                    elif sa_score > 3:
-                        sa_greater_3.append(smiles)
-
-            if len(sa_less_3) <= len(sa_greater_3):
-                train_target, val_target, test_target = split_smaller_dataset(sa_less_3)
-                train_source, val_source, test_source = split_larger_dataset(sa_greater_3, len(train_target),
-                                                                             len(val_target))
-            else:
-                train_source, val_source, test_source = split_smaller_dataset(sa_greater_3)
-                train_target, val_target, test_target = split_larger_dataset(sa_less_3, len(train_source),
-                                                                             len(val_source))
-
-            if self.is_target:
-                train_target = pd.DataFrame(train_target, columns=['SMILES'])
-                val_target = pd.DataFrame(val_target, columns=['SMILES'])
-                test_target = pd.DataFrame(test_target, columns=['SMILES'])
-                files_to_save = [train_target, val_target, test_target]
-            else:
-                train_source = pd.DataFrame(train_source, columns=['SMILES'])
-                val_source = pd.DataFrame(val_source, columns=['SMILES'])
-                test_source = pd.DataFrame(test_source, columns=['SMILES'])
-                files_to_save = [train_source, val_source, test_source]
-
-            print('Data saving...')
-            for file, name in zip(files_to_save, self.split_file_name):
-                file.to_csv(os.path.join(self.raw_dir, name), index=False)
-                print(f"File {name} has been overwritten.")
+                print('Data saving...')
+                for file, name in zip(files_to_save, self.split_file_name):
+                    file.to_csv(os.path.join(self.raw_dir, name), index=False)
 
             smile_list = pd.read_csv(self.split_paths[self.file_idx])
             smile_list = smile_list["SMILES"].values
@@ -285,6 +273,8 @@ class QM9Dataset(InMemoryDataset):
 
                 if mol is not None:
                     data = mol_to_torch_geometric(mol, atom_encoder, smile)
+                    if self.remove_h:
+                        data = remove_hydrogens(data)
                     unique_charge = set(torch.unique(data.charge).int().numpy())
                     charge_list = charge_list.union(unique_charge)
 
@@ -292,7 +282,8 @@ class QM9Dataset(InMemoryDataset):
                         continue
                     if self.pre_transform is not None:
                         data = self.pre_transform(data)
-                    data_list.append(data)
+                    if data.edge_index.numel() > 0:
+                        data_list.append(data)
                     smiles_kept.append(smile)
 
             statistics = compute_all_statistics(
