@@ -13,7 +13,7 @@ dataset:
   remove_h: True
   random_subset: null
   pin_memory: False
-  is_target: False
+  is_logP4: False
 
 # transfer
 transfer: True
@@ -29,7 +29,7 @@ dataset_transfer:
   remove_h: True
   random_subset: null
   pin_memory: False
-  is_target: True
+  is_logP4: True
 
 # settings for evaluations
 forward_path: null

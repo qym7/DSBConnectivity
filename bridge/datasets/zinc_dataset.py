@@ -54,7 +54,7 @@ class ZincDataset(InMemoryDataset):
         split,
         root,
         transfer,
-        is_target,
+        is_logP4,
         transform=None,
         pre_transform=None,
         pre_filter=None,
@@ -62,7 +62,7 @@ class ZincDataset(InMemoryDataset):
         self.split = split
         self.transfer = transfer
         self.atom_encoder = atom_encoder
-        self.is_target = is_target
+        self.is_logP4 = is_logP4
         if self.split == "train":
             self.file_idx = 0
         elif self.split == "val":
@@ -143,35 +143,35 @@ class ZincDataset(InMemoryDataset):
         data = data.sample(frac=1, random_state=42)
 
         if self.transfer:
-            source_set = data[
+            logP2_set = data[
                 (data["logP"] >= 2 - 0.5) & (data["logP"] <= 2 + 0.5)
             ]
-            target_set = data[
+            logP4_set = data[
                 (data["logP"] >= 4 - 0.5) & (data["logP"] <= 4 + 0.5)
             ]
 
-            source_set = source_set[["smiles"]]
-            target_set = target_set[["smiles"]]
+            logP2_set = logP2_set[["smiles"]]
+            logP4_set = logP4_set[["smiles"]]
 
-            if len(source_set) <= len(target_set):
-                train_source, val_source, test_source = split_smaller_dataset(
-                    source_set
+            if len(logP2_set) <= len(logP4_set):
+                train_logP2, val_logP2, test_logP2 = split_smaller_dataset(
+                    logP2_set
                 )
-                train_target, val_target, test_target = split_larger_dataset(
-                    target_set, len(train_source), len(val_source)
+                train_logP4, val_logP4, test_logP4 = split_larger_dataset(
+                    logP4_set, len(train_logP2), len(val_logP2)
                 )
             else:
-                train_target, val_target, test_target = split_smaller_dataset(
-                    target_set
+                train_logP4, val_logP4, test_logP4 = split_smaller_dataset(
+                    logP4_set
                 )
-                train_source, val_source, test_source = split_larger_dataset(
-                    source_set, len(train_target), len(val_target)
+                train_logP2, val_logP2, test_logP2 = split_larger_dataset(
+                    logP2_set, len(train_logP4), len(val_logP4)
                 )
 
-            if self.is_target:
-                files_to_save = [train_target, val_target, test_target]
+            if self.is_logP4:
+                files_to_save = [train_logP4, val_logP4, test_logP4]
             else:
-                files_to_save = [train_source, val_source, test_source]
+                files_to_save = [train_logP2, val_logP2, test_logP2]
 
             os.remove(osp.join(self.raw_dir, "zinc_250k.csv"))
         else:
@@ -242,7 +242,7 @@ class ZincDataset(InMemoryDataset):
 class ZincDataModule(MolecularDataModule):
     def __init__(self, cfg, transfer):
         self.cfg = cfg
-        is_target = cfg.is_target
+        is_logP4 = cfg.is_logP4
         self.remove_h = False
         if transfer:
             self.datadir = cfg.datadir
@@ -253,21 +253,21 @@ class ZincDataModule(MolecularDataModule):
                     split="train",
                     root=root_path_source,
                     transfer=transfer,
-                    is_target=is_target,
+                    is_logP4=is_logP4,
                     pre_transform=RemoveYTransform(),
                 ),
                 "val": ZincDataset(
                     split="val",
                     root=root_path_source,
                     transfer=transfer,
-                    is_target=is_target,
+                    is_logP4=is_logP4,
                     pre_transform=RemoveYTransform(),
                 ),
                 "test": ZincDataset(
                     split="test",
                     root=root_path_source,
                     transfer=transfer,
-                    is_target=is_target,
+                    is_logP4=is_logP4,
                     pre_transform=RemoveYTransform(),
                 ),
             }
@@ -280,18 +280,21 @@ class ZincDataModule(MolecularDataModule):
                     split="train",
                     root=root_path,
                     transfer=transfer,
+                    is_logP4=is_logP4,
                     pre_transform=RemoveYTransform(),
                 ),
                 "val": ZincDataset(
                     split="val",
                     root=root_path,
                     transfer=transfer,
+                    is_logP4=is_logP4,
                     pre_transform=RemoveYTransform(),
                 ),
                 "test": ZincDataset(
                     split="test",
                     root=root_path,
                     transfer=transfer,
+                    is_logP4=is_logP4,
                     pre_transform=RemoveYTransform(),
                 ),
             }

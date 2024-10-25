@@ -13,7 +13,7 @@ dataset:
   remove_h: True
   random_subset: null
   pin_memory: False
-  is_target: False
+  is_less: False
 
 # transfer
 transfer: False
