@@ -32,8 +32,6 @@ wandb: 'online'             # online | offline | disabled
 seed: 1234
 
 # settings for evaluations
-forward_path: null
-backward_path: null
 final_samples_to_generate: 100
 final_samples_to_save: 30
 final_chains_to_save: 20
@@ -43,7 +41,7 @@ chains_to_save: 1
 test: False
 save_every_ipf: 2
 
-# checkpoint
+# checkpoint: those params can be redefined later (TODO)
 checkpoint_run: False
 checkpoint_it: 13
 checkpoint_pass: backward

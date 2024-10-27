@@ -277,28 +277,29 @@ class IPFBase(torch.nn.Module):
             self.update_ema("f")
             self.update_ema("b")
 
-            if self.cfg.checkpoint_run:
-                # sample network
-                sample_net_f, sample_net_b = get_graph_models(
-                    self.cfg, self.datainfos
-                )
+            # sample network
+            sample_net_f, sample_net_b = get_graph_models(
+                self.cfg, self.datainfos
+            )
 
-                if "sample_checkpoint_f" in self.cfg:
-                    sample_net_f.load_state_dict(
-                        torch.load(self.cfg.sample_checkpoint_f)
-                    )
-                    if self.cfg.dataparallel:
-                        sample_net_f = torch.nn.DataParallel(sample_net_f)
-                    sample_net_f = sample_net_f.to(self.device)
-                    self.ema_helpers["f"].register(sample_net_f)
-                if "sample_checkpoint_b" in self.cfg:
-                    sample_net_b.load_state_dict(
-                        torch.load(self.cfg.sample_checkpoint_b)
-                    )
-                    if self.cfg.dataparallel:
-                        sample_net_b = torch.nn.DataParallel(sample_net_b)
-                    sample_net_b = sample_net_b.to(self.device)
-                    self.ema_helpers["b"].register(sample_net_b)
+            if len(self.cfg.sample_checkpoint_f) > 1:
+                sample_net_f.load_state_dict(
+                    torch.load(self.cfg.sample_checkpoint_f)
+                )
+                if self.cfg.dataparallel:
+                    sample_net_f = torch.nn.DataParallel(sample_net_f)
+                sample_net_f = sample_net_f.to(self.device)
+                self.ema_helpers["f"].register(sample_net_f)
+                print('forward model loaded for sampling!')
+            if len(self.cfg.sample_checkpoint_b) > 1:
+                sample_net_b.load_state_dict(
+                    torch.load(self.cfg.sample_checkpoint_b)
+                )
+                if self.cfg.dataparallel:
+                    sample_net_b = torch.nn.DataParallel(sample_net_b)
+                sample_net_b = sample_net_b.to(self.device)
+                self.ema_helpers["b"].register(sample_net_b)
+                print('backward model loaded for sampling!')
 
     def build_optimizers(self, n=0):
         # lr = self.lr / (n+1)  # decay in learning rate
@@ -1050,6 +1051,7 @@ class IPFBase(torch.nn.Module):
                 test_to_log[f"{fb}_E_acc_change_ratio"] = (
                     E_acc_ratio.item()
                 )  # the ratio of edges changed along the trajectory
+                print(test_to_log)
 
                 # save results for testing
                 print("saving results for testing")
@@ -1114,6 +1116,7 @@ class IPFBase(torch.nn.Module):
                 val_to_log[f"{fb}_E_acc_change_ratio"] = (
                     E_acc_ratio.item()
                 )  # the ratio of edges changed along the trajectory
+                print(val_to_log)
 
                 # save results for validating
                 print("saving results for validating")
@@ -1454,7 +1457,7 @@ class IPFSequential(IPFBase):
     def test(self):
         print("Testing...")
 
-        if self.cfg.forward_path is not None:
+        if len(self.cfg.sample_checkpoint_f) > 1:
             self.save_step(0, 0, "f")
-        if self.cfg.backward_path is not None:
+        if len(self.cfg.sample_checkpoint_b) > 1:
             self.save_step(0, 0, "b")
