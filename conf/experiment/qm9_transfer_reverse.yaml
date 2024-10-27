@@ -1,5 +1,5 @@
 # @package _global_
-project_name: qm9_smiles
+project_name: qm9
 
 # data
 dataset:
@@ -8,11 +8,12 @@ dataset:
   use_charge: False
   extra_features: 'molecule'
 
-  name: "qm9_smiles"
-  datadir: 'data/qm9/qm9_pyg_greater/'
+  name: "qm9"
+  datadir: 'data/qm9/qm9_pyg_less/'
   remove_h: True
   random_subset: null
   pin_memory: False
+  is_less: True
 
 # transfer
 transfer: True
@@ -23,14 +24,15 @@ dataset_transfer:
   use_charge: False
   extra_features: 'molecule'
 
-  name: "qm9_smiles"
-  datadir: 'data/qm9/qm9_pyg_less/'
+  name: "qm9"
+  datadir: 'data/qm9/qm9_pyg_greater/'
   remove_h: True
   random_subset: null
   pin_memory: False
+  is_less: False
 
 # settings for evaluations
-forward_path: null #'/scratch/uceeosm/DSBConnectivity/experiments/2024-09-10/qm9_tanimoto/01-25-41/checkpoints/sample_net_f_44_1999.ckpt'
+forward_path: null
 backward_path: null
 samples_to_generate: 1024
 samples_to_save: 20

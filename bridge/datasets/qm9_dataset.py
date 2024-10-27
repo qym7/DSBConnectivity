@@ -69,7 +69,7 @@ class QM9Dataset(InMemoryDataset):
         split,
         root,
         transfer,
-        is_target,
+        is_less,
         remove_h: bool,
         target_prop=None,
         transform=None,
@@ -78,7 +78,7 @@ class QM9Dataset(InMemoryDataset):
     ):
         self.split = split
         self.transfer = transfer
-        self.is_target = is_target
+        self.is_less = is_less
         if self.split == "train":
             self.file_idx = 0
         elif self.split == "val":
@@ -122,6 +122,17 @@ class QM9Dataset(InMemoryDataset):
             "gdb9.sdf.csv",
             "uncharacterized.txt",
         ]
+
+    @property
+    def split_file_name_init(self):
+        return ["train_init.csv", "val_init.csv", "test_init.csv"]
+
+    @property
+    def split_paths_init(self):
+        r"""The absolute filepaths that must be present in order to skip
+        splitting."""
+        files = to_list(self.split_file_name_init)
+        return [osp.join(self.raw_dir, f) for f in files]
 
     @property
     def split_file_name(self):
@@ -191,7 +202,7 @@ class QM9Dataset(InMemoryDataset):
             extract_zip(path, self.raw_dir)
             os.unlink(path)
 
-        if files_exist(self.split_paths):
+        if files_exist(self.split_paths_init):
             return
 
         dataset = pd.read_csv(self.raw_paths[1])
@@ -275,38 +286,38 @@ class QM9Dataset(InMemoryDataset):
                             sa_greater_3.append(smiles)
 
                 if len(sa_less_3) <= len(sa_greater_3):
-                    train_target, val_target, test_target = (
+                    train_less, val_less, test_less = (
                         split_smaller_dataset(sa_less_3)
                     )
-                    train_source, val_source, test_source = (
+                    train_greater, val_greater, test_greater = (
                         split_larger_dataset(
-                            sa_greater_3, len(train_target), len(val_target)
+                            sa_greater_3, len(train_less), len(val_less)
                         )
                     )
                 else:
-                    train_source, val_source, test_source = (
+                    train_greater, val_greater, test_greater = (
                         split_smaller_dataset(sa_greater_3)
                     )
-                    train_target, val_target, test_target = (
+                    train_less, val_less, test_less = (
                         split_larger_dataset(
-                            sa_less_3, len(train_source), len(val_source)
+                            sa_less_3, len(train_greater), len(val_greater)
                         )
                     )
 
-                if self.is_target:
-                    train_target = pd.DataFrame(
-                        train_target, columns=["SMILES"]
+                if self.is_less:
+                    train_less = pd.DataFrame(
+                        train_less, columns=["SMILES"]
                     )
-                    val_target = pd.DataFrame(val_target, columns=["SMILES"])
-                    test_target = pd.DataFrame(test_target, columns=["SMILES"])
-                    files_to_save = [train_target, val_target, test_target]
+                    val_less = pd.DataFrame(val_less, columns=["SMILES"])
+                    test_less = pd.DataFrame(test_less, columns=["SMILES"])
+                    files_to_save = [train_less, val_less, test_less]
                 else:
-                    train_source = pd.DataFrame(
-                        train_source, columns=["SMILES"]
+                    train_greater = pd.DataFrame(
+                        train_greater, columns=["SMILES"]
                     )
-                    val_source = pd.DataFrame(val_source, columns=["SMILES"])
-                    test_source = pd.DataFrame(test_source, columns=["SMILES"])
-                    files_to_save = [train_source, val_source, test_source]
+                    val_greater = pd.DataFrame(val_greater, columns=["SMILES"])
+                    test_greater = pd.DataFrame(test_greater, columns=["SMILES"])
+                    files_to_save = [train_greater, val_greater, test_greater]
 
                 print("Data saving...")
                 for file, name in zip(files_to_save, self.split_file_name):
@@ -366,9 +377,13 @@ class QM9Dataset(InMemoryDataset):
                 ).to(torch.float)
             torch.save(self.collate(data_list), self.processed_paths[0])
             np.save(self.processed_paths[7], statistics.real_node_ratio)
+
+            for file_path in self.split_paths_init:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
         else:
             target_df = pd.read_csv(
-                self.split_paths[self.file_idx], index_col=0
+                self.split_paths_init[self.file_idx], index_col=0
             )
             target_df.drop(columns=["mol_id"], inplace=True)
 
@@ -447,12 +462,11 @@ class QM9Dataset(InMemoryDataset):
                 num_errors,
             )
 
-
 class QM9DataModule(MolecularDataModule):
     def __init__(self, cfg, transfer):
         self.cfg = cfg
         self.datadir = cfg.datadir
-        is_target = cfg.is_target
+        is_less = cfg.is_less
         base_path = pathlib.Path(get_original_cwd())
         root_path = os.path.join(base_path, self.datadir)
 
@@ -474,7 +488,7 @@ class QM9DataModule(MolecularDataModule):
                 split="train",
                 root=root_path,
                 transfer=transfer,
-                is_target=is_target,
+                is_less=is_less,
                 remove_h=self.cfg.remove_h,
                 target_prop=target,
                 transform=RemoveYTransform(),
@@ -483,7 +497,7 @@ class QM9DataModule(MolecularDataModule):
                 split="val",
                 root=root_path,
                 transfer=transfer,
-                is_target=is_target,
+                is_less=is_less,
                 remove_h=self.cfg.remove_h,
                 target_prop=target,
                 transform=RemoveYTransform(),
@@ -492,7 +506,7 @@ class QM9DataModule(MolecularDataModule):
                 split="test",
                 root=root_path,
                 transfer=transfer,
-                is_target=is_target,
+                is_less=is_less,
                 remove_h=self.cfg.remove_h,
                 target_prop=target,
                 transform=transform,

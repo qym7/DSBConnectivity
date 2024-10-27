@@ -1,5 +1,5 @@
 # @package _global_
-project_name: qm9_smiles
+project_name: zinc
 
 # data
 dataset:
@@ -8,11 +8,12 @@ dataset:
   use_charge: False
   extra_features: 'molecule'
 
-  name: "qm9_smiles"
-  datadir: 'data/qm9/qm9_pyg_less/'
+  name: "zinc"
+  datadir: 'data/zinc/zinc_pyg_logP4/'    # logP around 4
   remove_h: True
   random_subset: null
   pin_memory: False
+  is_logP4: True
 
 # transfer
 transfer: True
@@ -23,11 +24,12 @@ dataset_transfer:
   use_charge: False
   extra_features: 'molecule'
 
-  name: "qm9_smiles"
-  datadir: 'data/qm9/qm9_pyg_greater/'
+  name: "zinc"
+  datadir: 'data/zinc/zinc_pyg_logP2/'    # logP around 2
   remove_h: True
   random_subset: null
   pin_memory: False
+  is_logP4: False
 
 # settings for evaluations
 forward_path: null
@@ -35,7 +37,7 @@ backward_path: null
 samples_to_generate: 1024
 samples_to_save: 20
 chains_to_save: 2
-final_samples_to_generate: 10000
+final_samples_to_generate: 16000
 final_samples_to_save: 30
 final_chains_to_save: 20
 
