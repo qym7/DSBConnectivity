@@ -2,6 +2,8 @@ import os
 import os.path as osp
 import pathlib
 import sys
+import random
+random.seed(42)
 
 import torch
 import torch.nn.functional as F
@@ -233,6 +235,9 @@ class QM9Dataset(InMemoryDataset):
             val_set, test_set = train_test_split(
                 temp_set, test_size=0.5, random_state=42
             )
+            random.shuffle(val_set)
+            random.shuffle(test_set)
+            
             return train_set, val_set, test_set
 
         def split_larger_dataset(dataset, train_size, val_size):

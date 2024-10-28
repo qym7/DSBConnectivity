@@ -1,5 +1,5 @@
 # @package _global_
-project_name: qm9
+project_name: qm9_smiles
 
 # data
 dataset:
