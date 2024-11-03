@@ -8,6 +8,7 @@ from scipy.stats import wasserstein_distance
 from sklearn.metrics import mean_absolute_error
 from fcd_torch import FCD
 import functools
+from rdkit.DataStructs import TanimotoSimilarity
 import pygmtools as pygm
 
 pygm.set_backend("pytorch")
@@ -315,6 +316,21 @@ class BasicMolecularMetrics(object):
             sa_values,
             count_true_sa / len(all_smiles),
         )
+
+    def smiles_similarity(self, smiles1, smiles2):
+        mol1 = Chem.MolFromSmiles(smiles1)
+        mol2 = Chem.MolFromSmiles(smiles2)
+
+        if mol1 is None or mol2 is None:
+            raise ValueError("Invalid SMILES string(s)")
+
+        fp1 = AllChem.GetMorganFingerprintAsBitVect(mol1, 2)
+        fp2 = AllChem.GetMorganFingerprintAsBitVect(mol2, 2)
+
+        similarity = TanimotoSimilarity(fp1, fp2)
+
+        return similarity
+
 
     def check_nll(self, generated, source, eps=1e-18):
         # get maximum number of nodes across all graphs in the batch
