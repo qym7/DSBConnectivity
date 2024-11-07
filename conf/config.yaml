@@ -39,7 +39,7 @@ samples_to_generate: 32
 samples_to_save: 10
 chains_to_save: 1
 test: False
-save_every_ipf: 2
+save_every_ipf: 5
 
 # checkpoint: those params can be redefined later (TODO)
 checkpoint_run: False

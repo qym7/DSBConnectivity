@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 import re
 import wandb
 import os
@@ -10,6 +11,7 @@ from fcd_torch import FCD
 import functools
 from rdkit.DataStructs import TanimotoSimilarity
 import pygmtools as pygm
+from ..analysis.graph_matcher import GraphMatcher, preproc_graph_match, construct_K
 
 pygm.set_backend("pytorch")
 _ = torch.manual_seed(1)
@@ -331,8 +333,61 @@ class BasicMolecularMetrics(object):
 
         return similarity
 
+    def pad_and_one_hot_encode(self, graphs, num_edge_types=5):
+        num_features = len(self.atom_decoder)
+        num_nodes = max(node_features.size(0) for node_features, _ in graphs)
+        batch_size = len(graphs)
 
-    def check_nll(self, generated, source, eps=1e-18):
+        X = torch.zeros((batch_size, num_nodes, num_features))
+        E = torch.zeros((batch_size, num_nodes, num_nodes, num_edge_types))
+        mask = torch.zeros((batch_size, num_nodes), dtype=torch.bool)  # Mask for padded nodes
+
+        for i, (node_features, adj_matrix) in enumerate(graphs):
+            one_hot_nodes = F.one_hot(node_features, num_classes=num_features).float()
+            node_count = one_hot_nodes.shape[0]
+            X[i, :node_count, :] = one_hot_nodes
+
+            one_hot_adj = F.one_hot(adj_matrix, num_classes=num_edge_types).float()
+            E[i, :adj_matrix.shape[0], :adj_matrix.shape[1], :] = one_hot_adj
+
+            mask[i, :node_count] = 1  # Set mask for real nodes
+
+        return X, E, mask
+
+    def check_nll_mpm(self, generated, source):
+        X_0, E_0, mask_0 = self.pad_and_one_hot_encode(generated)
+        X_T, E_T, mask_T = self.pad_and_one_hot_encode(source)
+
+        graph_dict = preproc_graph_match(X_0, E_0, X_T, E_T,mask_0, mask_T)
+        X_0 = graph_dict["X_0"]
+        X_T = graph_dict["X_T"]
+        conn_0 = graph_dict["conn_0"]
+        conn_T = graph_dict["conn_T"]
+        attr_0 = graph_dict["attr_0"]
+        attr_T = graph_dict["attr_T"]
+        ne0 = graph_dict["ne0"]
+        neT = graph_dict["neT"]
+        nn0 = graph_dict["nn0"]
+        nnT = graph_dict["nnT"]
+        bsz = X_0.size(0)
+        max_num_nodes = X_0.size(1)
+
+        graph_matcher = GraphMatcher(
+            pooling_type="max",  # or "sum", depending on your needs
+            max_iter=1000,
+            tol=1e-2,
+            noise_coeff=1e-6,
+            num_seed=5,
+            dtype="single"
+        )
+
+        perm, nll_init, nll_final = graph_matcher.solve(
+            X_0, X_T, E_0, E_T, conn_0, conn_T, attr_0, attr_T, ne0, neT, bsz, max_num_nodes, nn0, nnT
+        )
+
+        return perm, nll_init.mean().item(), nll_final.mean().item()
+
+    def check_nll_sm(self, generated, source, eps=1e-18):
         # get maximum number of nodes across all graphs in the batch
         max_nodes_0 = max(graph[0].size(0) for graph in generated)
         max_nodes_T = max(graph[0].size(0) for graph in source)
@@ -587,14 +642,20 @@ class BasicMolecularMetrics(object):
             valid_source, _, _, all_smiles_source = self.compute_validity(
                 source
             )
-            nll, nll_vals = self.check_nll(generated, source)
+            nll_sm, nll_sm_vals = self.check_nll_sm(generated, source)
             print(
-                f"NLL Score over {len(generated)} total generated molecules is: {nll}"
+                f"NLL SM Score over {len(generated)} total generated molecules is: {nll_sm}"
+            )
+            _, nll_mpm_init, nll_mpm = self.check_nll_mpm(generated, source)
+            print(
+                f"NLL MPM Score over {len(generated)} total generated molecules is: {nll_mpm}"
             )
         else:
             valid_source = None
             all_smiles_source = None
-            nll = -1.0
+            nll_sm = -1.0
+            nll_mpm = -1.0
+            nll_mpm_init = -1.0
 
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
@@ -686,7 +747,9 @@ class BasicMolecularMetrics(object):
                 mad_sa,
                 fcd_score,
                 coverage,
-                nll,
+                nll_sm,
+                nll_mpm,
+                nll_mpm_init,
             ],
             unique,
             dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
@@ -1058,7 +1121,9 @@ def compute_molecular_metrics(
             f"mol_metrics_charts_{fb}/MAD QED": float(rdkit_metrics[0][6]),
             f"mol_metrics_charts_{fb}/MAD SA": float(rdkit_metrics[0][7]),
             f"mol_metrics_charts_{fb}/FCD": float(rdkit_metrics[0][8]),
-            f"mol_metrics_charts_{fb}/NLL GED": float(rdkit_metrics[0][10]),
+            f"mol_metrics_charts_{fb}/NLL SM GED": float(rdkit_metrics[0][10]),
+            f"mol_metrics_charts_{fb}/NLL MPM GED": float(rdkit_metrics[0][11]),
+            f"mol_metrics_charts_{fb}/NLL INIT MPM GED": float(rdkit_metrics[0][12]),
             f"mol_metrics_charts_{fb}/coverage except training": float(
                 rdkit_metrics[0][9]
             ),
