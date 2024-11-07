@@ -159,7 +159,7 @@ class Langevin(torch.nn.Module):
         return x_tot, out, gammas_expanded, times_expanded
 
     def record_langevin_seq(
-        self, net, init_samples, node_mask, t_batch=None, ipf_it=0, sample=False
+        self, net, init_samples, node_mask, t_batch=None, ipf_it=0, sample=False, time=None, gammas=None
     ):
         bs = init_samples.X.shape[0]
         dx = init_samples.X.shape[-1]  # for virtual nodes, there is an extra dimension
@@ -182,8 +182,14 @@ class Langevin(torch.nn.Module):
             y=None,
             node_mask=node_mask,
         )
-        times_expanded = self.time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
-        gammas_expanded = self.gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+
+        if time is None:
+            time = self.time
+        if gammas is None:
+            gammas = self.gammas
+        
+        times_expanded = time.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
+        gammas_expanded = gammas.reshape((1, self.num_steps, 1)).repeat((bs, 1, 1))
 
         x = init_samples.copy()
         # for k in range(self.num_steps):

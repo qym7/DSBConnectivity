@@ -52,9 +52,6 @@ CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=qm9_01noise_5k
 
 
 
-
-
-
 CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True num_iter=10 n_ipf=10 virtual_node=True forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/01noise_5k_clip1_virtual/net_f_73_4999.ckpt final_samples_to_generate=10000 name=test_01noise_5k_clip1_virtual_10k
 
 
@@ -120,9 +117,27 @@ CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=noise01_clip05
 
 CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=noise01_clip05_l1_5reg03_edgeweight3 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.2 grad_clip=0.5 reg_weight=0.1 edge_weight=3.0
 
-## initial noise (should we use the marginal distribution or sth else? marginal should be better based on the algorithm given by Clement)
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg005_edgeweight3 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 reg_weight=0.05 edge_weight=3.0
 
-##
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg02_edgeweight3 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 reg_weight=0.2 edge_weight=3.0
+
+## 0912
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg01_edgeweight5 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=5.0
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg01_edgeweight1 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=1.0
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg01_edgeweight1_virtual num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=True noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=1.0
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg05_edgeweight1 num_steps=50 num_iter=5000 n_ipf=1000 noise_level=0.1 grad_clip=0.5 reg_weight=0.5 edge_weight=1.0
+
+CUDA_VISIBLE_DEVICES=2 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg0_edgeweight1 num_steps=50 num_iter=5000 n_ipf=1000 noise_level=0.1 grad_clip=0.5 reg_weight=0. edge_weight=1.0
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg0_edgeweight1_clean1e3 num_steps=50 num_iter=5000 n_ipf=1000 noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=1.0 clean_loss_weight=0.001
+
+CUDA_VISIBLE_DEVICES=1 python main.py +experiment=qm9_smiles name=noise01_clip05_l1reg0_edgeweight1_clean1e5 num_steps=50 num_iter=5000 n_ipf=1000 noise_level=0.1 grad_clip=0.5 reg_weight=0.1 edge_weight=1.0 clean_loss_weight=0.00001
+
+CUDA_VISIBLE_DEVICES=3 python main.py +experiment=qm9_smiles name=noise003_clip05_l1reg01_edgeweight5 num_steps=50 num_iter=5000 n_ipf=1000 virtual_node=False noise_level=0.03 grad_clip=0.5 reg_weight=0.1 edge_weight=5.0
 
 ## QM9
 
@@ -149,12 +164,17 @@ CUDA_VISIBLE_DEVICES=0 python main.py dataset=qm9 model=gnn num_steps=50 num_ite
 
 CUDA_VISIBLE_DEVICES=2 python main.py dataset=qm9 model=gnn num_steps=10 num_iter=10 n_ipf=10 project_name=debug limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
 
-
-
-
 CUDA_VISIBLE_DEVICES=0 python main.py dataset=qm9 model=gnn num_steps=50 num_iter=5000 n_ipf=1000 project_name=RECHECK_ce_loss_5k_Lr3_1e4CleanLossRegByT limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001
 
 CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles  num_steps=50 num_iter=5000 n_ipf=1000 project_name=ce_loss_5k_Lr3_1e4CleanLossRegByT_Virtual_UseEdgeLoss limit_dist=marginal_tf clean_loss_weight=0.0001 lr=0.001 virtual_node=True
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True num_iter=10 n_ipf=10 virtual_node=False forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/noise01_clip05_r1reg01/sample_net_f_133_4999.ckpt final_samples_to_generate=10000 name=01noise_5k_clip01_r1reg01_10k_133ckpt wandb=disabled
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True num_iter=10 n_ipf=10 virtual_node=False forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/noise01_clip05_r1reg01/sample_net_f_86_4999.ckpt final_samples_to_generate=10000 name=01noise_5k_clip01_r1reg01_10k_86ckpt wandb=disabled
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True num_iter=10 n_ipf=10 virtual_node=False forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/noise01_clip05_r1reg01/sample_net_f_40_4999.ckpt final_samples_to_generate=10000 name=01noise_5k_clip01_r1reg01_10k_40ckpt wandb=disabled
+
+CUDA_VISIBLE_DEVICES=0 python main.py +experiment=qm9_smiles test=true num_steps=50 virtual_node=True num_iter=10 n_ipf=10 virtual_node=False forward_path=/home/yqin/coding/flow/DSBConnectivity/checkpoints/noise01_clip05_r1reg01/sample_net_f_20_4999.ckpt final_samples_to_generate=10000 name=01noise_5k_clip01_r1reg01_10k_20ckpt wandb=disabled
 
 # QM9 smiles
 
