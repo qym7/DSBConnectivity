@@ -84,7 +84,9 @@ def get_predictions(
         return np.zeros((0, 512))
 
     dataloader = DataLoader(
-        SmilesDataset(smiles_list), batch_size=batch_size, num_workers=n_jobs
+        SmilesDataset(smiles_list),
+        batch_size=batch_size,
+        num_workers=n_jobs,
     )
     with todevice(model, device), torch.no_grad():
         chemnet_activations = []
@@ -98,7 +100,11 @@ def get_predictions(
     return np.row_stack(chemnet_activations)
 
 
-def get_fcd(smiles1: List[str], smiles2: List[str], model: nn.Module = None) -> float:
+def get_fcd(
+    smiles1: List[str],
+    smiles2: List[str],
+    model: nn.Module = None,
+) -> float:
     """Calculate FCD between two sets of Smiles
 
     Args:

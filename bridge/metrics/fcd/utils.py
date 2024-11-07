@@ -10,7 +10,13 @@ from scipy import linalg
 from torch import nn
 from torch.utils.data import Dataset
 
-from .torch_layers import IndexTensor, IndexTuple, Reverse, SamePadding1d, Transpose
+from .torch_layers import (
+    IndexTensor,
+    IndexTuple,
+    Reverse,
+    SamePadding1d,
+    Transpose,
+)
 
 # fmt: off
 __vocab = ["C","N","O","H","F","Cl","P","B","Br","S","I","Si","#","(",")","+","-","1","2","3","4","5","6","7","8","=","[","]","@","c","n","o","s","X","."]
@@ -82,7 +88,9 @@ def load_imported_model(keras_config):
         if layer_type == "Conv1d":
             assert conv, "Can't have conv layers after LSTM"
             if other_info["padding"] == "same":
-                layers.append(SamePadding1d(kwargs["kernel_size"], kwargs["stride"]))
+                layers.append(
+                    SamePadding1d(kwargs["kernel_size"], kwargs["stride"])
+                )
             layer = nn.Conv1d(**kwargs)
             layer.load_state_dict(state_dict)
             layers.append(layer)

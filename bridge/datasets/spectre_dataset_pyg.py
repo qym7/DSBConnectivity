@@ -28,7 +28,7 @@ from ..metrics.metrics_utils import (
     atom_type_counts,
     edge_counts,
 )
-from ..data.synthetic_graphs import (
+from ..datasets.synthetic_graphs import (
     generate_sbm_graphs,
     generate_tree_graphs,
     generate_planar_graphs,
@@ -70,9 +70,15 @@ class SpectreGraphDataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
-            real_node_ratio=torch.from_numpy(np.load(self.processed_paths[4])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
+            real_node_ratio=torch.from_numpy(
+                np.load(self.processed_paths[4])
+            ).float(),
         )
 
     @property
@@ -155,18 +161,7 @@ class SpectreGraphDataset(InMemoryDataset):
                 torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
                 for network in networks
             ]
-        elif self.dataset_name == "sbm_split_small":
-            networks = generate_small_split_sbm_graphs(
-                num_graphs=self.cfg.num_graphs,
-                num_communities=self.cfg.num_communities,
-                intra_prob=self.cfg.intra_prob,
-                inter_prob=self.cfg.inter_prob,
-            )
-            adjs = [
-                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
-                for network in networks
-            ]
-        elif self.dataset_name == "planar_edge_remove":
+        elif self.dataset_name == "planar_remove":
             networks = generate_planar_edge_remove_graphs(
                 num_graphs=self.cfg.num_graphs,
                 num_nodes=self.cfg.num_nodes,
@@ -176,21 +171,13 @@ class SpectreGraphDataset(InMemoryDataset):
                 torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
                 for network in networks
             ]
-        elif self.dataset_name == "planar_edge_add":
-            networks = generate_planar_edge_add_graphs(
-                num_graphs=self.cfg.num_graphs,
-                num_nodes=self.cfg.num_nodes,
-                avg_degree=self.cfg.avg_degree,
-                shortest_path=self.cfg.shortest_path,
-            )
-            adjs = [
-                torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
-                for network in networks
-            ]
         else:
             raise ValueError(f"Unknown dataset {self.dataset_name}")
 
-        if "syn" not in self.dataset_name and "split" not in self.dataset_name and "edge" not in self.dataset_name:
+        if (
+            "split" not in self.dataset_name  # SBM
+            and "remove" not in self.dataset_name  # Planar
+        ):
             file_path = download_url(raw_url, self.raw_dir)
 
         if self.dataset_name == "ego":
@@ -199,7 +186,11 @@ class SpectreGraphDataset(InMemoryDataset):
                 torch.Tensor(to_numpy_array(network)).fill_diagonal_(0)
                 for network in networks
             ]
-        elif self.dataset_name in ["sbm_syn"] or "sbm_split" in self.dataset_name or "planar_edge_remove" in self.dataset_name or "planar_edge_add" in self.dataset_name:
+        elif (
+            self.dataset_name in ["sbm_syn"]
+            or "sbm_split" in self.dataset_name
+            or "planar_remove" in self.dataset_name
+        ):
             pass
         else:
             (
@@ -222,7 +213,9 @@ class SpectreGraphDataset(InMemoryDataset):
             train_len = int(round(self.num_graphs * 0.8))
             val_len = int(round(self.num_graphs * 0.2))
             indices = torch.randperm(self.num_graphs, generator=g_cpu)
-            print(f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}")
+            print(
+                f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}"
+            )
             train_indices = indices[:train_len]
             val_indices = indices[:val_len]
             test_indices = indices[train_len:]
@@ -231,7 +224,9 @@ class SpectreGraphDataset(InMemoryDataset):
             train_len = int(round((self.num_graphs - test_len) * 0.8))
             val_len = self.num_graphs - train_len - test_len
             indices = torch.randperm(self.num_graphs, generator=g_cpu)
-            print(f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}")
+            print(
+                f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}"
+            )
             train_indices = indices[:train_len]
             val_indices = indices[train_len : train_len + val_len]
             test_indices = indices[train_len + val_len :]
@@ -261,7 +256,9 @@ class SpectreGraphDataset(InMemoryDataset):
         torch.save(test_data, self.raw_paths[2])
 
     def process(self):
-        raw_dataset = torch.load(os.path.join(self.raw_dir, "{}.pt".format(self.split)))
+        raw_dataset = torch.load(
+            os.path.join(self.raw_dir, "{}.pt".format(self.split))
+        )
         data_list = []
         for adj in raw_dataset:
             n = adj.shape[-1]
@@ -275,7 +272,7 @@ class SpectreGraphDataset(InMemoryDataset):
                 edge_index=edge_index,
                 edge_attr=edge_attr.float(),
                 n_nodes=n_nodes,
-                charge=X.new_zeros((*X.shape[:-1], 0))
+                charge=X.new_zeros((*X.shape[:-1], 0)),
             )
 
             if self.pre_filter is not None and not self.pre_filter(data):
@@ -347,17 +344,24 @@ class SpectreDatasetInfos(AbstractDatasetInfos):
         self.spectre = True
         self.use_charge = False
         self.dataset_name = datamodule.dataset_name
-        self.is_planar = True if 'planar' in cfg['name'] else False
+        self.is_planar = True if "planar" in cfg["name"] else False
         self.node_types = datamodule.inner.statistics.node_types
         self.bond_types = datamodule.inner.statistics.bond_types
         super().complete_infos(
-            datamodule.statistics, len(datamodule.inner.statistics.node_types)
+            datamodule.statistics,
+            len(datamodule.inner.statistics.node_types),
         )
         self.input_dims = PlaceHolder(
-            X=len(self.node_types), E=len(self.bond_types), y=0, charge=0
+            X=len(self.node_types),
+            E=len(self.bond_types),
+            y=0,
+            charge=0,
         )
         self.output_dims = PlaceHolder(
-            X=len(self.node_types), E=len(self.bond_types), y=0, charge=0
+            X=len(self.node_types),
+            E=len(self.bond_types),
+            y=0,
+            charge=0,
         )
         self.statistics = {
             "train": datamodule.statistics["train"],
@@ -383,11 +387,6 @@ class Comm20DataModule(SpectreGraphDataModule):
 
 
 class SBMDataModule(SpectreGraphDataModule):
-    def __init__(self, cfg):
-        super().__init__(cfg)
-
-
-class SBMSynDataModule(SpectreGraphDataModule):
     def __init__(self, cfg):
         super().__init__(cfg)
 

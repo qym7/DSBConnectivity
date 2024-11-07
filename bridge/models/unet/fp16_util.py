@@ -3,7 +3,10 @@ Helpers to train with 16-bit precision.
 """
 
 import torch.nn as nn
-from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
+from torch._utils import (
+    _flatten_dense_tensors,
+    _unflatten_dense_tensors,
+)
 
 
 def convert_module_to_f16(l):
@@ -56,7 +59,8 @@ def master_params_to_model_params(model_params, master_params):
     model_params = list(model_params)
 
     for param, master_param in zip(
-        model_params, unflatten_master_params(model_params, master_params)
+        model_params,
+        unflatten_master_params(model_params, master_params),
     ):
         param.detach().copy_(master_param)
 

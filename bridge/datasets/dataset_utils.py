@@ -74,7 +74,13 @@ def to_list(value: Any) -> Sequence:
 
 class Statistics:
     def __init__(
-        self, num_nodes, node_types, bond_types, real_node_ratio, charge_types=None, valencies=None
+        self,
+        num_nodes,
+        node_types,
+        bond_types,
+        real_node_ratio,
+        charge_types=None,
+        valencies=None,
     ):
         self.num_nodes = num_nodes
         self.node_types = node_types

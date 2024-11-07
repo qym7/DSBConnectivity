@@ -9,27 +9,15 @@ dataset:
   extra_features: 'molecule'
 
   name: "qm9"
-  datadir: 'data/qm9_noh_trial/qm9_noh_greater_3/qm9_pyg/'
+  datadir: 'data/qm9/qm9_pyg/'
   remove_h: True
   random_subset: null
   pin_memory: False
-  is_target: False
+  is_less: False
 
 # transfer
-transfer: True
+transfer: False
 virtual_node: False
-dataset_transfer:
-  batch_size: ${batch_size}
-  num_workers: 8
-  use_charge: False
-  extra_features: 'molecule'
-
-  name: "qm9"
-  datadir: 'data/qm9_noh_trial/qm9_noh_less_3/qm9_pyg/'
-  remove_h: True
-  random_subset: null
-  pin_memory: False
-  is_target: True
 
 # settings for evaluations
 forward_path: null

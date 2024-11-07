@@ -16,7 +16,11 @@ from sklearn.metrics import pairwise_distances
 # from dgl.nn.pytorch.conv import GINConv
 import dgl.function as fn
 from dgl.utils import expand_as_pair
-from dgl.nn.pytorch.glob import SumPooling, AvgPooling, MaxPooling
+from dgl.nn.pytorch.glob import (
+    SumPooling,
+    AvgPooling,
+    MaxPooling,
+)
 
 
 class GINConv(nn.Module):
@@ -74,7 +78,13 @@ class GINConv(nn.Module):
             0.5266, -0.4465]], grad_fn=<AddmmBackward>)
     """
 
-    def __init__(self, apply_func, aggregator_type, init_eps=0, learn_eps=False):
+    def __init__(
+        self,
+        apply_func,
+        aggregator_type,
+        init_eps=0,
+        learn_eps=False,
+    ):
         super(GINConv, self).__init__()
         self.apply_func = apply_func
         self._aggregator_type = aggregator_type
@@ -85,7 +95,9 @@ class GINConv(nn.Module):
         elif aggregator_type == "mean":
             self._reducer = fn.mean
         else:
-            raise KeyError("Aggregator type {} not recognized.".format(aggregator_type))
+            raise KeyError(
+                "Aggregator type {} not recognized.".format(aggregator_type)
+            )
         # to specify whether eps is trainable or not.
         if learn_eps:
             self.eps = torch.nn.Parameter(torch.FloatTensor([init_eps]))
@@ -131,9 +143,9 @@ class GINConv(nn.Module):
             graph.srcdata["h"] = feat_src
             graph.update_all(aggregate_fn, self._reducer("m", "neigh"))
 
-            diff = torch.tensor(graph.dstdata["neigh"].shape[1:]) - torch.tensor(
-                feat_dst.shape[1:]
-            )
+            diff = torch.tensor(
+                graph.dstdata["neigh"].shape[1:]
+            ) - torch.tensor(feat_dst.shape[1:])
             zeros = torch.zeros(feat_dst.shape[0], *diff).to(feat_dst.device)
             feat_dst = torch.cat([feat_dst, zeros], dim=1)
             rst = (1 + self.eps) * feat_dst + graph.dstdata["neigh"]
@@ -145,7 +157,13 @@ class GINConv(nn.Module):
         if self.edge_feat_loc not in edges.data:
             return {"m": edges.src["h"]}
         else:
-            m = torch.cat([edges.src["h"], edges.data[self.edge_feat_loc]], dim=1)
+            m = torch.cat(
+                [
+                    edges.src["h"],
+                    edges.data[self.edge_feat_loc],
+                ],
+                dim=1,
+            )
             return {"m": m}
 
 
@@ -289,17 +307,28 @@ class GIN(nn.Module):
         for layer in range(self.num_layers - 1):
             if layer == 0:
                 mlp = MLP(
-                    num_mlp_layers, input_dim + edge_feat_dim, hidden_dim, hidden_dim
+                    num_mlp_layers,
+                    input_dim + edge_feat_dim,
+                    hidden_dim,
+                    hidden_dim,
                 )
             else:
                 mlp = MLP(
-                    num_mlp_layers, hidden_dim + edge_feat_dim, hidden_dim, hidden_dim
+                    num_mlp_layers,
+                    hidden_dim + edge_feat_dim,
+                    hidden_dim,
+                    hidden_dim,
                 )
             if kwargs["init"] == "orthogonal":
                 init_weights_orthogonal(mlp)
 
             self.ginlayers.append(
-                GINConv(ApplyNodeFunc(mlp), neighbor_pooling_type, 0, self.learn_eps)
+                GINConv(
+                    ApplyNodeFunc(mlp),
+                    neighbor_pooling_type,
+                    0,
+                    self.learn_eps,
+                )
             )
             self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
 
@@ -311,7 +340,9 @@ class GIN(nn.Module):
             if layer == 0:
                 self.linears_prediction.append(nn.Linear(input_dim, output_dim))
             else:
-                self.linears_prediction.append(nn.Linear(hidden_dim, output_dim))
+                self.linears_prediction.append(
+                    nn.Linear(hidden_dim, output_dim)
+                )
 
         if kwargs["init"] == "orthogonal":
             self.linears_prediction.apply(init_weights_orthogonal)
@@ -430,7 +461,9 @@ def load_feature_extractor(
     use_pretrained = kwargs.get("use_pretrained", False)
     if use_pretrained:
         model_path = kwargs.get("model_path")
-        assert model_path is not None, "Please pass model_path if use_pretrained=True"
+        assert (
+            model_path is not None
+        ), "Please pass model_path if use_pretrained=True"
         print("loaded", model_path)
         saved_model = torch.load(model_path)
         model.load_state_dict(saved_model["model_state_dict"])
@@ -494,8 +527,12 @@ class GINMetric:
         return self._get_activations(generated_dataset, reference_dataset)
 
     def _get_activations(self, generated_dataset, reference_dataset):
-        gen_activations = self.__get_activations_single_dataset(generated_dataset)
-        ref_activations = self.__get_activations_single_dataset(reference_dataset)
+        gen_activations = self.__get_activations_single_dataset(
+            generated_dataset
+        )
+        ref_activations = self.__get_activations_single_dataset(
+            reference_dataset
+        )
 
         scaler = StandardScaler()
         scaler.fit(ref_activations)
@@ -508,8 +545,12 @@ class GINMetric:
         node_feat_loc = self.feat_extractor.node_feat_loc
         edge_feat_loc = self.feat_extractor.edge_feat_loc
 
-        ndata = [node_feat_loc] if node_feat_loc in dataset[0].ndata else "__ALL__"
-        edata = [edge_feat_loc] if edge_feat_loc in dataset[0].edata else "__ALL__"
+        ndata = (
+            [node_feat_loc] if node_feat_loc in dataset[0].ndata else "__ALL__"
+        )
+        edata = (
+            [edge_feat_loc] if edge_feat_loc in dataset[0].edata else "__ALL__"
+        )
         graphs = dgl.batch(dataset, ndata=ndata, edata=edata).to(
             self.feat_extractor.device
         )
@@ -529,7 +570,13 @@ class GINMetric:
 
 
 class MMDEvaluation(GINMetric):
-    def __init__(self, model, kernel="rbf", sigma="range", multiplier="mean"):
+    def __init__(
+        self,
+        model,
+        kernel="rbf",
+        sigma="range",
+        multiplier="mean",
+    ):
         super().__init__(model)
 
         if multiplier == "mean":
@@ -544,7 +591,18 @@ class MMDEvaluation(GINMetric):
         if "rbf" in kernel:
             if sigma == "range":
                 self.base_sigmas = np.array(
-                    [0.01, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0]
+                    [
+                        0.01,
+                        0.1,
+                        0.25,
+                        0.5,
+                        0.75,
+                        1.0,
+                        2.5,
+                        5.0,
+                        7.5,
+                        10.0,
+                    ]
                 )
 
                 if multiplier == "mean":
@@ -578,7 +636,10 @@ class MMDEvaluation(GINMetric):
     def __get_pairwise_distances(self, generated_dataset, reference_dataset):
         return (
             pairwise_distances(
-                reference_dataset, generated_dataset, metric="euclidean", n_jobs=8
+                reference_dataset,
+                generated_dataset,
+                metric="euclidean",
+                n_jobs=8,
             )
             ** 2
         )
@@ -656,8 +717,12 @@ class KIDEvaluation(GINMetric):
                 generated_dataset, reference_dataset
             )
 
-        gen_activations = tf.convert_to_tensor(generated_dataset, dtype=tf.float32)
-        ref_activations = tf.convert_to_tensor(reference_dataset, dtype=tf.float32)
+        gen_activations = tf.convert_to_tensor(
+            generated_dataset, dtype=tf.float32
+        )
+        ref_activations = tf.convert_to_tensor(
+            reference_dataset, dtype=tf.float32
+        )
         kid = tfgan.eval.kernel_classifier_distance_and_std_from_activations(
             ref_activations, gen_activations
         )[0].numpy()
@@ -676,7 +741,9 @@ class FIDEvaluation(GINMetric):
             )
 
         mu_ref, cov_ref = self.__calculate_dataset_stats(reference_dataset)
-        mu_generated, cov_generated = self.__calculate_dataset_stats(generated_dataset)
+        mu_generated, cov_generated = self.__calculate_dataset_stats(
+            generated_dataset
+        )
         # print(np.max(mu_generated), np.max(cov_generated), 'mu, cov fid')
         fid = self.compute_FID(mu_ref, mu_generated, cov_ref, cov_generated)
         return {"fid": fid}
@@ -747,7 +814,12 @@ class prdcEvaluation(GINMetric):
         self.use_pr = use_pr
 
     @time_function
-    def evaluate(self, generated_dataset=None, reference_dataset=None, nearest_k=5):
+    def evaluate(
+        self,
+        generated_dataset=None,
+        reference_dataset=None,
+        nearest_k=5,
+    ):
         """
         Computes precision, recall, density, and coverage given two manifolds.
         Args:
@@ -765,8 +837,10 @@ class prdcEvaluation(GINMetric):
                 generated_dataset, reference_dataset
             )
 
-        real_nearest_neighbour_distances = self.__compute_nearest_neighbour_distances(
-            reference_dataset, nearest_k
+        real_nearest_neighbour_distances = (
+            self.__compute_nearest_neighbour_distances(
+                reference_dataset, nearest_k
+            )
         )
         distance_real_fake = self.__compute_pairwise_distance(
             reference_dataset, generated_dataset
@@ -774,7 +848,9 @@ class prdcEvaluation(GINMetric):
 
         if self.use_pr:
             fake_nearest_neighbour_distances = (
-                self.__compute_nearest_neighbour_distances(generated_dataset, nearest_k)
+                self.__compute_nearest_neighbour_distances(
+                    generated_dataset, nearest_k
+                )
             )
             precision = (
                 (
@@ -804,7 +880,8 @@ class prdcEvaluation(GINMetric):
             ).sum(axis=0).mean()
 
             coverage = (
-                distance_real_fake.min(axis=1) <= real_nearest_neighbour_distances
+                distance_real_fake.min(axis=1)
+                <= real_nearest_neighbour_distances
             ).mean()
 
             f1_dc = 2 / ((1 / (density + 1e-5)) + (1 / (coverage + 1e-5)))

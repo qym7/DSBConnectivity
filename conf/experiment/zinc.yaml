@@ -9,31 +9,19 @@ dataset:
   extra_features: 'molecule'
 
   name: "zinc"
-  datadir: 'data/zinc/zinc_source/zinc_pyg/'    # logP around 2
+  datadir: 'data/zinc/zinc_pyg/'
   remove_h: True
   random_subset: null
   pin_memory: False
-  is_target: False
+  is_logP4: False
 
 # transfer
-transfer: True
+transfer: False
 virtual_node: False
-dataset_transfer:
-  batch_size: ${batch_size}
-  num_workers: 8
-  use_charge: False
-  extra_features: 'molecule'
-
-  name: "zinc"
-  datadir: 'data/zinc/zinc_target/zinc_pyg/'    # logP around 4
-  remove_h: True
-  random_subset: null
-  pin_memory: False
-  is_target: True
 
 # settings for evaluations
-forward_path: null #'/scratch/uceeosm/DSBConnectivity/experiments/2024-10-09/zinc/03-19-43/checkpoints/sample_net_f_102_4999.ckpt'
-backward_path: '/scratch/uceeosm/DSBConnectivity/experiments/2024-10-09/zinc/03-19-43/checkpoints/sample_net_b_114_4999.ckpt'
+forward_path: null
+backward_path: null
 samples_to_generate: 1024
 samples_to_save: 20
 chains_to_save: 2

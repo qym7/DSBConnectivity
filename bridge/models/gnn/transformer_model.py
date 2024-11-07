@@ -10,7 +10,12 @@ from torch import Tensor
 
 from ... import utils
 from ...diffusion import diffusion_utils
-from ...models.gnn.layers import Xtoy, Etoy, masked_softmax, timestep_embedding
+from ...models.gnn.layers import (
+    Xtoy,
+    Etoy,
+    masked_softmax,
+    timestep_embedding,
+)
 
 
 class XEyTransformerLayer(nn.Module):
@@ -83,14 +88,21 @@ class XEyTransformerLayer(nn.Module):
         node_mask: (bs, n) Mask for the src keys per batch (optional)
         Output: newX, newE, new_y with the same shape.
         """
-        oX, oE, oy, node_mask = features.X, features.E, features.y, features.node_mask
+        oX, oE, oy, node_mask = (
+            features.X,
+            features.E,
+            features.y,
+            features.node_mask,
+        )
 
         # try:
         # import pdb; pdb.set_trace()
         try:
             newX, newE, new_y = self.self_attn(oX, oE, oy, node_mask=node_mask)
         except:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
         # print('new y', new_y.shape)
         # except:
         #     import pdb; pdb.set_trace()
@@ -111,7 +123,9 @@ class XEyTransformerLayer(nn.Module):
         if self.predicts_y:
             new_y_d = self.dropout_y1(new_y)
             y = self.norm_y1(oy + new_y_d)
-            ff_output_y = self.lin_y2(self.dropout_y2(self.activation(self.lin_y1(y))))
+            ff_output_y = self.lin_y2(
+                self.dropout_y2(self.activation(self.lin_y1(y)))
+            )
             ff_output_y = self.dropout_y3(ff_output_y)
             y = self.norm_y2(y + ff_output_y)
             # y = y - oy
@@ -122,7 +136,9 @@ class XEyTransformerLayer(nn.Module):
         # X = X - oX
         # E = E - oE
 
-        return utils.PlaceHolder(X=X, E=E, y=y, charge=None, node_mask=node_mask).mask()
+        return utils.PlaceHolder(
+            X=X, E=E, y=y, charge=None, node_mask=node_mask
+        ).mask()
 
 
 class NodeEdgeBlock(nn.Module):
@@ -173,7 +189,9 @@ class NodeEdgeBlock(nn.Module):
         self.x_out = Linear(dx, dx)
         self.e_out = Linear(dx, de)
         if self.predicts_y:
-            self.y_out = nn.Sequential(nn.Linear(dy, dy), nn.ReLU(), nn.Linear(dy, dy))
+            self.y_out = nn.Sequential(
+                nn.Linear(dy, dy), nn.ReLU(), nn.Linear(dy, dy)
+            )
 
     def forward(self, X, E, y, node_mask):
         """
@@ -203,13 +221,31 @@ class NodeEdgeBlock(nn.Module):
         # Compute unnormalized attentions. Y is (bs, n, n, n_head, df)
         Y = Q * K
         Y = Y / math.sqrt(Y.size(-1))
-        diffusion_utils.assert_correctly_masked(Y, (e_mask1 * e_mask2).unsqueeze(-1))
+        diffusion_utils.assert_correctly_masked(
+            Y, (e_mask1 * e_mask2).unsqueeze(-1)
+        )
 
         E1 = self.e_mul(E) * e_mask1 * e_mask2  # bs, n, n, dx
-        E1 = E1.reshape((E.size(0), E.size(1), E.size(2), self.n_head, self.df))
+        E1 = E1.reshape(
+            (
+                E.size(0),
+                E.size(1),
+                E.size(2),
+                self.n_head,
+                self.df,
+            )
+        )
 
         E2 = self.e_add(E) * e_mask1 * e_mask2  # bs, n, n, dx
-        E2 = E2.reshape((E.size(0), E.size(1), E.size(2), self.n_head, self.df))
+        E2 = E2.reshape(
+            (
+                E.size(0),
+                E.size(1),
+                E.size(2),
+                self.n_head,
+                self.df,
+            )
+        )
 
         # Incorporate edge features to the self attention scores.
         Y = Y * (E1 + 1) + E2  # (bs, n, n, n_head, df)
@@ -303,7 +339,10 @@ class GraphTransformer(nn.Module):
 
         # Layers
         self.mlp_in_X = nn.Sequential(
-            nn.Linear(input_dims.X + input_dims.charge, hidden_mlp_dims["X"]),
+            nn.Linear(
+                input_dims.X + input_dims.charge,
+                hidden_mlp_dims["X"],
+            ),
             act_fn_in,
             nn.Linear(hidden_mlp_dims["X"], hidden_dims["dx"]),
             act_fn_in,
@@ -332,7 +371,8 @@ class GraphTransformer(nn.Module):
                     n_head=hidden_dims["n_head"],
                     dim_ffX=hidden_dims["dim_ffX"],
                     dim_ffE=hidden_dims["dim_ffE"],
-                    predicts_y=(layer_idx != n_layers - 1) or self.predicts_final_y,
+                    predicts_y=(layer_idx != n_layers - 1)
+                    or self.predicts_final_y,
                     dropout=dropout,
                 )
                 for layer_idx in range(n_layers)
@@ -342,7 +382,10 @@ class GraphTransformer(nn.Module):
         self.mlp_out_X = nn.Sequential(
             nn.Linear(hidden_dims["dx"], hidden_mlp_dims["X"]),
             act_fn_out,
-            nn.Linear(hidden_mlp_dims["X"], output_dims.X + output_dims.charge),
+            nn.Linear(
+                hidden_mlp_dims["X"],
+                output_dims.X + output_dims.charge,
+            ),
         )
 
         self.mlp_out_E = nn.Sequential(
@@ -375,22 +418,29 @@ class GraphTransformer(nn.Module):
         # print(0, 'max', E.max(), 'min', E.min(), 'nan', torch.isnan(E).sum(), 'inf', torch.isinf(E).sum())
 
         if torch.isnan(E).sum() > 0 or torch.isinf(E).sum() > 0:
-            import pdb; pdb.set_trace()
-        time_emb = timestep_embedding(y[:, -1].unsqueeze(-1), self.hidden_dims["dy"])
+            import pdb
+
+            pdb.set_trace()
+        time_emb = timestep_embedding(
+            y[:, -1].unsqueeze(-1), self.hidden_dims["dy"]
+        )
         new_y = self.mlp_in_y(model_input.y) + time_emb
         new_E = self.mlp_in_E(model_input.E)
-        
+
         # print(1, 'max', new_E.max(), 'min', new_E.min(), 'nan', torch.isnan(new_E).sum(), 'inf', torch.isinf(new_E).sum())
         if torch.isnan(new_E).sum() > 0 or torch.isinf(new_E).sum() > 0:
-            import pdb; pdb.set_trace()
-        
-        
+            import pdb
+
+            pdb.set_trace()
+
         new_E = (new_E + new_E.transpose(1, 2)) / 2
 
         # print(2, 'max', new_E.max(), 'min', new_E.min(), 'nan', torch.isnan(new_E).sum(), 'inf', torch.isinf(new_E).sum())
 
         if torch.isnan(new_E).sum() > 0 or torch.isinf(new_E).sum() > 0:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
         features = utils.PlaceHolder(
             X=self.mlp_in_X(X),
             E=new_E,
@@ -404,7 +454,9 @@ class GraphTransformer(nn.Module):
             # print('inside', i, 'max', features.E.max(), 'min', features.E.min(), 'nan', torch.isnan(features.E).sum(), 'inf', torch.isinf(features.E).sum())
 
             if torch.isnan(new_E).sum() > 0 or torch.isinf(new_E).sum() > 0:
-                import pdb; pdb.set_trace()
+                import pdb
+
+                pdb.set_trace()
 
         X = self.mlp_out_X(features.X)
         E = self.mlp_out_E(features.E)
@@ -412,7 +464,9 @@ class GraphTransformer(nn.Module):
         # print(3, 'max', E.max(), 'min', E.min(), 'nan', torch.isnan(E).sum(), 'inf', torch.isinf(E).sum())
 
         if torch.isnan(new_E).sum() > 0 or torch.isinf(new_E).sum() > 0:
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
         # X = X + X_to_out
         # E = E + E_to_out
         E = 1 / 2 * (E + torch.transpose(E, 1, 2))  # symmetrize E
@@ -443,5 +497,9 @@ class GraphTransformer(nn.Module):
         # print(4, 'max', E.max(), 'min', E.min(), 'nan', torch.isnan(E).sum(), 'inf', torch.isinf(E).sum())
 
         return utils.PlaceHolder(
-            X=final_X, charge=final_charge, E=E, y=y, node_mask=node_mask
+            X=final_X,
+            charge=final_charge,
+            E=E,
+            y=y,
+            node_mask=node_mask,
         ).mask()

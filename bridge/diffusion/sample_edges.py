@@ -35,35 +35,45 @@ def test_sample_query_edges():
         for i in range(2, 20):
             num_nodes_per_graph = torch.tensor([i], dtype=torch.long)
             edge_proportion = 0.5
-            edge_index, batch = sample_query_edges(num_nodes_per_graph, edge_proportion)
+            edge_index, batch = sample_query_edges(
+                num_nodes_per_graph, edge_proportion
+            )
             print_output(edge_index, num_nodes_per_graph)
 
     if False:
         for i in range(2, 20):
             num_nodes_per_graph = torch.tensor([i])
             edge_proportion = 1
-            edge_index, batch = sample_query_edges(num_nodes_per_graph, edge_proportion)
+            edge_index, batch = sample_query_edges(
+                num_nodes_per_graph, edge_proportion
+            )
             print_output(edge_index, num_nodes_per_graph)
 
     if False:
         for i in range(2, 20):
             num_nodes_per_graph = torch.tensor([i])
             edge_proportion = 0.0001
-            edge_index, batch = sample_query_edges(num_nodes_per_graph, edge_proportion)
+            edge_index, batch = sample_query_edges(
+                num_nodes_per_graph, edge_proportion
+            )
             print_output(edge_index, num_nodes_per_graph)
 
     if False:
         for i in range(2, 20):
             num_nodes_per_graph = torch.tensor([8, 8])
             edge_proportion = 0.5
-            edge_index, batch = sample_query_edges(num_nodes_per_graph, edge_proportion)
+            edge_index, batch = sample_query_edges(
+                num_nodes_per_graph, edge_proportion
+            )
             print_output(edge_index, num_nodes_per_graph, batch)
 
     if False:
         for i in range(2, 20):
             num_nodes_per_graph = torch.tensor([4, 10])
             edge_proportion = 0.5
-            edge_index, batch = sample_query_edges(num_nodes_per_graph, edge_proportion)
+            edge_index, batch = sample_query_edges(
+                num_nodes_per_graph, edge_proportion
+            )
             print_output(edge_index, num_nodes_per_graph, batch)
 
 
@@ -77,7 +87,10 @@ def test_sample_existing_edges_batch():
 
     for i in range(20):
         edge_index = sample_non_existing_edges_batched(
-            num_edges_to_sample, existing_edge_index, num_nodes_per_graph, batch
+            num_edges_to_sample,
+            existing_edge_index,
+            num_nodes_per_graph,
+            batch,
         )
 
         edge_index = torch.hstack((edge_index, edge_index, existing_edge_index))
@@ -105,15 +118,25 @@ def sampled_condensed_indices_uniformly(
         max_val = max_condensed_value[0]
         to_sample = num_edges_to_sample[0]
         sampled_condensed = torch.multinomial(
-            torch.ones(max_val, device=device), num_samples=to_sample, replacement=False
+            torch.ones(max_val, device=device),
+            num_samples=to_sample,
+            replacement=False,
         )
         edge_batch = torch.zeros(
-            num_edges_to_sample[0], device=device, dtype=torch.long
+            num_edges_to_sample[0],
+            device=device,
+            dtype=torch.long,
         )
         if batch_size == 1:
             if return_mask:
-                condensed_mask = torch.arange(num_edges_to_sample[0], device=device)
-                return sampled_condensed, edge_batch, condensed_mask
+                condensed_mask = torch.arange(
+                    num_edges_to_sample[0], device=device
+                )
+                return (
+                    sampled_condensed,
+                    edge_batch,
+                    condensed_mask,
+                )
 
             return sampled_condensed, edge_batch
 
@@ -131,7 +154,11 @@ def sampled_condensed_indices_uniformly(
             condensed_mask = (
                 condensed_mask.unsqueeze(0).expand(batch_size, -1).flatten()
             )
-            return sampled_condensed_repeated, edge_batch, condensed_mask
+            return (
+                sampled_condensed_repeated,
+                edge_batch,
+                condensed_mask,
+            )
 
         return sampled_condensed_repeated, edge_batch
 
@@ -148,7 +175,9 @@ def sampled_condensed_indices_uniformly(
 
     # General goal: keep the indices on the left that are not too big for each graph
     # Mask1 is used to mask the indices that are too large for current graph
-    mask1 = randperm_expanded < max_condensed_value.unsqueeze(1)  # (bs, max_condensed)
+    mask1 = randperm_expanded < max_condensed_value.unsqueeze(
+        1
+    )  # (bs, max_condensed)
 
     # Cumsum(mask1) is the number of valid indices on the left of each index
     # Mask2 will select the right number of indices on the left
@@ -156,7 +185,9 @@ def sampled_condensed_indices_uniformly(
         1
     )  # (bs, max_condensed)
     complete_mask = mask1 * mask2
-    condensed_index = randperm_expanded[complete_mask]  # (sum(num_edges_per_graph))
+    condensed_index = randperm_expanded[
+        complete_mask
+    ]  # (sum(num_edges_per_graph))
     edge_batch = (
         torch.arange(batch_size, device=device)
         .unsqueeze(1)
@@ -171,7 +202,9 @@ def sampled_condensed_indices_uniformly(
 
 
 def sample_query_edges(
-    num_nodes_per_graph: Tensor, edge_proportion=None, num_edges_to_sample=None
+    num_nodes_per_graph: Tensor,
+    edge_proportion=None,
+    num_edges_to_sample=None,
 ):
     """Sample edge_proportion % of edges in each graph
     num_nodes_per_graph: (bs): tensor of int.
@@ -188,7 +221,9 @@ def sample_query_edges(
     max_condensed_value = (n * (n - 1) / 2).long()
     if num_edges_to_sample is None and edge_proportion is not None:
         assert 0 < edge_proportion <= 1, edge_proportion
-        num_edges_to_sample = torch.ceil(edge_proportion * max_condensed_value).long()
+        num_edges_to_sample = torch.ceil(
+            edge_proportion * max_condensed_value
+        ).long()
     elif num_edges_to_sample is not None:
         assert num_edges_to_sample.dtype == torch.long
     else:
@@ -209,7 +244,10 @@ def sample_query_edges(
         # Add the offset to the edge_index
         offset = torch.cumsum(num_nodes_per_graph, dim=0)[:-1]  # (bs - 1)
         offset = torch.cat(
-            (torch.zeros(1, device=device, dtype=torch.long), offset)
+            (
+                torch.zeros(1, device=device, dtype=torch.long),
+                offset,
+            )
         )  # (bs)
 
         edge_index = condensed_to_matrix_index_batch(
@@ -218,13 +256,18 @@ def sample_query_edges(
             edge_batch=edge_batch,
             ptr=offset,
         )
-        return edge_index, torch.arange(batch_size, device=device).repeat_interleave(n)
+        return edge_index, torch.arange(
+            batch_size, device=device
+        ).repeat_interleave(n)
 
     # Most general case: graphs of varying sizes
     # condensed_index = randperm_expanded[complete_mask]                                       # (sum(num_edges_per_graph))
     offset = torch.cumsum(num_nodes_per_graph, dim=0)[:-1]  # (bs - 1)
     offset = torch.cat(
-        (torch.zeros(1, device=device, dtype=torch.long), offset)
+        (
+            torch.zeros(1, device=device, dtype=torch.long),
+            offset,
+        )
     )  # (bs)
     edge_index = condensed_to_matrix_index_batch(
         condensed_index,
@@ -252,7 +295,10 @@ def sample_non_existing_edges_batched(
     device = existing_edge_index.device
     unit_graph_mask = num_nodes == 1
     unit_graph_mask_offset = torch.cat(
-        (torch.zeros(1, device=device, dtype=torch.bool), unit_graph_mask[:-1])
+        (
+            torch.zeros(1, device=device, dtype=torch.bool),
+            unit_graph_mask[:-1],
+        )
     )
 
     # Compute the number of existing and non-existing edges.
@@ -291,21 +337,29 @@ def sample_non_existing_edges_batched(
     sq_offset = torch.cumsum(num_edges_total, dim=0)[:-1]  # (bs - 1)
     # Prepend a 0
     sq_offset = torch.cat(
-        (torch.zeros(1, device=device, dtype=torch.long), sq_offset)
+        (
+            torch.zeros(1, device=device, dtype=torch.long),
+            sq_offset,
+        )
     )  # (bs)
 
     offset = torch.cumsum(num_nodes, dim=0)[
         :-1
     ]  # (bs - 1)                                            # (bs - 1)
     offset = torch.cat(
-        (torch.zeros(1, device=device, dtype=torch.long), offset)
+        (
+            torch.zeros(1, device=device, dtype=torch.long),
+            offset,
+        )
     )  # (bs)
     # existing_indices (E, ) is of form [0 1 2 3 4 0 2 3 4]
     rescaled_edge_index = (
         existing_edge_index - offset[existing_edge_batch]
     )  # of form [0 1 2 3 4 0 2 3 4]
     existing_indices = matrix_to_condensed_index_batch(
-        rescaled_edge_index, num_nodes=num_nodes, edge_batch=existing_edge_batch
+        rescaled_edge_index,
+        num_nodes=num_nodes,
+        edge_batch=existing_edge_batch,
     )
 
     # Add offset to the sampled indices
@@ -338,7 +392,11 @@ def sample_non_existing_edges_batched(
     # print("Existing condensed indices with offset", existing_ind_w_offset)
     virtual_existing_mask = torch.cat(
         (
-            torch.zeros(len(existing_indices), dtype=torch.long, device=device),
+            torch.zeros(
+                len(existing_indices),
+                dtype=torch.long,
+                device=device,
+            ),
             torch.ones(len(sq_offset), dtype=torch.long, device=device),
         )
     )
@@ -351,7 +409,11 @@ def sample_non_existing_edges_batched(
     # When there exists graphs with size 1, free spots might be negative, which means that
     # existing condensed indices have same neighbor value
     free_spots = (
-        torch.diff(existing_ind_w_offset, prepend=torch.tensor([-1]).to(device)) - 1
+        torch.diff(
+            existing_ind_w_offset,
+            prepend=torch.tensor([-1]).to(device),
+        )
+        - 1
     )  # [-0.1, 0, 2, 9, 9.9, 18, 25]
     free_spots = torch.ceil(free_spots).long()  # [0,    0, 1, 6, 0,   8,  6]
     # print("Free spots", free_spots)
@@ -384,13 +446,17 @@ def sample_non_existing_edges_batched(
     # Create the masks corresponding to these 3 types of objects
     num_total = num_sampled_edges + num_virtual_nodes + num_free_spots_indices
     # mask is created for virtual nodes, in order to reduce the offset for cumsum
-    virtual_sampled_mask = torch.zeros(num_total, dtype=torch.bool, device=device)
+    virtual_sampled_mask = torch.zeros(
+        num_total, dtype=torch.bool, device=device
+    )
     virtual_sampled_mask[
         num_sampled_edges : num_sampled_edges + num_virtual_nodes
     ] = True
     virtual_sampled_mask = virtual_sampled_mask[argsort]
 
-    free_spots_ind_mask = torch.zeros(num_total, dtype=torch.bool, device=device)
+    free_spots_ind_mask = torch.zeros(
+        num_total, dtype=torch.bool, device=device
+    )
     free_spots_ind_mask[-num_free_spots_indices:] = True
     free_spots_ind_mask = free_spots_ind_mask[argsort]
 
@@ -406,7 +472,9 @@ def sample_non_existing_edges_batched(
     new_indices = new_indices[sampled_ind_mask] - epsilon
     # remove cumsum_offset to unify the indices of different graphs from cumsum_mask
     # 1 is added to compensate the fact that cumsum is computed with virtual nodes
-    cumsum_offset = to_shift[virtual_sampled_mask.bool()][sampled_edge_batch] + 1
+    cumsum_offset = (
+        to_shift[virtual_sampled_mask.bool()][sampled_edge_batch] + 1
+    )
     cumsum_offset[unit_graph_mask_offset[sampled_edge_batch]] = (
         cumsum_offset[unit_graph_mask_offset[sampled_edge_batch]] + 1
     )
@@ -452,7 +520,9 @@ def print_output(edge_index: Tensor, num_nodes_per_graph: Tensor, batch=None):
         adj = adjs[i]
         adj = adj[:n, :][:, :n]
         print_adj_matrix(adj)
-        print(f"Proportion of edges {100 * torch.sum(adj>0) / (0.5 * n * (n - 1))} %")
+        print(
+            f"Proportion of edges {100 * torch.sum(adj>0) / (0.5 * n * (n - 1))} %"
+        )
         print()
 
         if adj.max() > 2:
@@ -486,15 +556,24 @@ if __name__ == "__main__":
             num_nodes_per_graph = torch.tensor([i], dtype=torch.long)
             num_edges = (num_nodes_per_graph * (num_nodes_per_graph - 1)) / 2
             condensed_index = torch.randperm(int(num_edges))
-            condensed_index = condensed_index[: int(num_edges * exist_edge_proportion)]
+            condensed_index = condensed_index[
+                : int(num_edges * exist_edge_proportion)
+            ]
             existing_edge_index = condensed_to_matrix_index(condensed_index, i)
-            num_edges_to_sample = torch.ceil(sample_edge_proportion * num_edges).long()
+            num_edges_to_sample = torch.ceil(
+                sample_edge_proportion * num_edges
+            ).long()
             batch = (torch.ones(i) * 0).long()
             edge_index = sample_non_existing_edges_batched(
-                num_edges_to_sample, existing_edge_index, num_nodes_per_graph, batch
+                num_edges_to_sample,
+                existing_edge_index,
+                num_nodes_per_graph,
+                batch,
             )
 
-            edge_index = torch.hstack((edge_index, edge_index, existing_edge_index))
+            edge_index = torch.hstack(
+                (edge_index, edge_index, existing_edge_index)
+            )
 
             print_output(edge_index, num_nodes_per_graph, batch)
 
@@ -510,7 +589,9 @@ if __name__ == "__main__":
             condensed_index0 = condensed_index0[
                 : int(num_edges[0] * exist_edge_proportion)
             ]
-            existing_edge_index0 = condensed_to_matrix_index(condensed_index0, i)
+            existing_edge_index0 = condensed_to_matrix_index(
+                condensed_index0, i
+            )
             condensed_index1 = torch.randperm(int(num_edges[1]))
             condensed_index1 = condensed_index1[
                 : int(num_edges[1] * exist_edge_proportion)
@@ -521,14 +602,21 @@ if __name__ == "__main__":
             existing_edge_index = torch.hstack(
                 (existing_edge_index0, existing_edge_index1)
             ).long()
-            num_edges_to_sample = torch.ceil(sample_edge_proportion * num_edges).long()
+            num_edges_to_sample = torch.ceil(
+                sample_edge_proportion * num_edges
+            ).long()
 
             # import pdb; pdb.set_trace()
             edge_index = sample_non_existing_edges_batched(
-                num_edges_to_sample, existing_edge_index, num_nodes_per_graph, batch
+                num_edges_to_sample,
+                existing_edge_index,
+                num_nodes_per_graph,
+                batch,
             )
 
-            edge_index = torch.hstack((edge_index, edge_index, existing_edge_index))
+            edge_index = torch.hstack(
+                (edge_index, edge_index, existing_edge_index)
+            )
 
             print_output(edge_index, num_nodes_per_graph, batch)
 
@@ -537,16 +625,24 @@ if __name__ == "__main__":
         for i in range(3, 10):
             sample_edge_proportion = 0.4
             exist_edge_proportion = 0.2
-            num_nodes_per_graph = torch.tensor([i, i + 5, i + 5], dtype=torch.long)
+            num_nodes_per_graph = torch.tensor(
+                [i, i + 5, i + 5], dtype=torch.long
+            )
             batch = torch.cat(
-                [torch.ones(i) * 0, torch.ones(i + 5) * 1, torch.ones(i + 5) * 2]
+                [
+                    torch.ones(i) * 0,
+                    torch.ones(i + 5) * 1,
+                    torch.ones(i + 5) * 2,
+                ]
             ).long()
             num_edges = (num_nodes_per_graph * (num_nodes_per_graph - 1)) / 2
             condensed_index0 = torch.randperm(int(num_edges[0]))
             condensed_index0 = condensed_index0[
                 : int(num_edges[0] * exist_edge_proportion)
             ]
-            existing_edge_index0 = condensed_to_matrix_index(condensed_index0, i)
+            existing_edge_index0 = condensed_to_matrix_index(
+                condensed_index0, i
+            )
             condensed_index1 = torch.randperm(int(num_edges[1]))
             condensed_index1 = condensed_index1[
                 : int(num_edges[1] * exist_edge_proportion)
@@ -561,14 +657,21 @@ if __name__ == "__main__":
                     existing_edge_index1 + i + 5,
                 )
             ).long()
-            num_edges_to_sample = torch.ceil(sample_edge_proportion * num_edges).long()
+            num_edges_to_sample = torch.ceil(
+                sample_edge_proportion * num_edges
+            ).long()
 
             # import pdb; pdb.set_trace()
             edge_index = sample_non_existing_edges_batched(
-                num_edges_to_sample, existing_edge_index, num_nodes_per_graph, batch
+                num_edges_to_sample,
+                existing_edge_index,
+                num_nodes_per_graph,
+                batch,
             )
 
-            edge_index = torch.hstack((edge_index, edge_index, existing_edge_index))
+            edge_index = torch.hstack(
+                (edge_index, edge_index, existing_edge_index)
+            )
 
             print_output(edge_index, num_nodes_per_graph, batch)
 
@@ -577,16 +680,24 @@ if __name__ == "__main__":
         for i in range(3, 10):
             sample_edge_proportion = torch.tensor([0.2, 0.3, 0.4])
             exist_edge_proportion = torch.tensor([0.2, 0.4, 0.6])
-            num_nodes_per_graph = torch.tensor([i, i + 5, i + 5], dtype=torch.long)
+            num_nodes_per_graph = torch.tensor(
+                [i, i + 5, i + 5], dtype=torch.long
+            )
             batch = torch.cat(
-                [torch.ones(i) * 0, torch.ones(i + 5) * 1, torch.ones(i + 5) * 2]
+                [
+                    torch.ones(i) * 0,
+                    torch.ones(i + 5) * 1,
+                    torch.ones(i + 5) * 2,
+                ]
             ).long()
             num_edges = (num_nodes_per_graph * (num_nodes_per_graph - 1)) / 2
             condensed_index0 = torch.randperm(int(num_edges[0]))
             condensed_index0 = condensed_index0[
                 : int((num_edges * exist_edge_proportion)[0])
             ]
-            existing_edge_index0 = condensed_to_matrix_index(condensed_index0, i)
+            existing_edge_index0 = condensed_to_matrix_index(
+                condensed_index0, i
+            )
             condensed_index1 = torch.randperm(int(num_edges[1]))
             condensed_index1 = condensed_index1[
                 : int((num_edges * exist_edge_proportion)[1])
@@ -602,16 +713,27 @@ if __name__ == "__main__":
                 condensed_to_matrix_index(condensed_index2, i + 5) + i + i + 5
             )
             existing_edge_index = torch.hstack(
-                (existing_edge_index0, existing_edge_index1, existing_edge_index2)
+                (
+                    existing_edge_index0,
+                    existing_edge_index1,
+                    existing_edge_index2,
+                )
             ).long()
-            num_edges_to_sample = torch.ceil(sample_edge_proportion * num_edges).long()
+            num_edges_to_sample = torch.ceil(
+                sample_edge_proportion * num_edges
+            ).long()
 
             # import pdb; pdb.set_trace()
             edge_index = sample_non_existing_edges_batched(
-                num_edges_to_sample, existing_edge_index, num_nodes_per_graph, batch
+                num_edges_to_sample,
+                existing_edge_index,
+                num_nodes_per_graph,
+                batch,
             )
 
-            edge_index = torch.hstack((edge_index, edge_index, existing_edge_index))
+            edge_index = torch.hstack(
+                (edge_index, edge_index, existing_edge_index)
+            )
 
             print_output(edge_index, num_nodes_per_graph, batch)
 
@@ -631,7 +753,9 @@ if __name__ == "__main__":
             condensed_index0 = condensed_index0[
                 : int(num_edges[0] * exist_edge_proportion)
             ]
-            existing_edge_index0 = condensed_to_matrix_index(condensed_index0, i)
+            existing_edge_index0 = condensed_to_matrix_index(
+                condensed_index0, i
+            )
             condensed_index1 = torch.randperm(int(num_edges[1]))
             condensed_index1 = condensed_index1[
                 : int(num_edges[1] * exist_edge_proportion)
@@ -642,14 +766,21 @@ if __name__ == "__main__":
             existing_edge_index = torch.hstack(
                 (existing_edge_index0, existing_edge_index1)
             ).long()
-            num_edges_to_sample = torch.ceil(sample_edge_proportion * num_edges).long()
+            num_edges_to_sample = torch.ceil(
+                sample_edge_proportion * num_edges
+            ).long()
 
             # import pdb; pdb.set_trace()
             edge_index = sample_non_existing_edges_batched(
-                num_edges_to_sample, existing_edge_index, num_nodes_per_graph, batch
+                num_edges_to_sample,
+                existing_edge_index,
+                num_nodes_per_graph,
+                batch,
             )
 
-            edge_index = torch.hstack((edge_index, edge_index, existing_edge_index))
+            edge_index = torch.hstack(
+                (edge_index, edge_index, existing_edge_index)
+            )
 
             print_output(edge_index, num_nodes_per_graph, batch)
 
@@ -665,7 +796,9 @@ if __name__ == "__main__":
             condensed_index0 = condensed_index0[
                 : int(num_edges[0] * exist_edge_proportion)
             ]
-            existing_edge_index0 = condensed_to_matrix_index(condensed_index0, i)
+            existing_edge_index0 = condensed_to_matrix_index(
+                condensed_index0, i
+            )
             condensed_index1 = torch.randperm(int(num_edges[1]))
             condensed_index1 = condensed_index1[
                 : int(num_edges[1] * exist_edge_proportion)
@@ -676,13 +809,20 @@ if __name__ == "__main__":
             existing_edge_index = torch.hstack(
                 (existing_edge_index0, existing_edge_index1)
             ).long()
-            num_edges_to_sample = torch.ceil(sample_edge_proportion * num_edges).long()
+            num_edges_to_sample = torch.ceil(
+                sample_edge_proportion * num_edges
+            ).long()
 
             # import pdb; pdb.set_trace()
             edge_index = sample_non_existing_edges_batched(
-                num_edges_to_sample, existing_edge_index, num_nodes_per_graph, batch
+                num_edges_to_sample,
+                existing_edge_index,
+                num_nodes_per_graph,
+                batch,
             )
 
-            edge_index = torch.hstack((edge_index, edge_index, existing_edge_index))
+            edge_index = torch.hstack(
+                (edge_index, edge_index, existing_edge_index)
+            )
 
             print_output(edge_index, num_nodes_per_graph, batch)

@@ -1,4 +1,6 @@
-from pytorch_lightning.loggers import NeptuneLogger as _NeptuneLogger
+from pytorch_lightning.loggers import (
+    NeptuneLogger as _NeptuneLogger,
+)
 
 from pytorch_lightning.loggers import CSVLogger as _CSVLogger
 

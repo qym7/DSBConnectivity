@@ -22,8 +22,16 @@ class TrainAbstractMetricsDiscrete(torch.nn.Module):
 class SumExceptBatchMetric(Metric):
     def __init__(self):
         super().__init__()
-        self.add_state("total_value", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total_samples", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state(
+            "total_value",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "total_samples",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
 
     def update(self, values) -> None:
         self.total_value += torch.sum(values)
@@ -42,7 +50,9 @@ class SumExceptBatchMSE(MeanSquaredError):
             target: Ground truth values
         """
         assert preds.shape == target.shape
-        sum_squared_error, n_obs = self._mean_squared_error_update(preds, target)
+        sum_squared_error, n_obs = self._mean_squared_error_update(
+            preds, target
+        )
 
         self.sum_squared_error += sum_squared_error
         self.total += n_obs
@@ -65,8 +75,16 @@ class CEPerClass(Metric):
     def __init__(self, class_id):
         super().__init__()
         self.class_id = class_id
-        self.add_state("total_ce", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total_samples", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state(
+            "total_ce",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "total_samples",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
         self.softmax = torch.nn.Softmax(dim=-1)
         self.binary_cross_entropy = torch.nn.BCELoss(reduction="sum")
 
@@ -96,8 +114,16 @@ class CEPerClass(Metric):
 class SumExceptBatchKL(Metric):
     def __init__(self):
         super().__init__()
-        self.add_state("total_value", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total_samples", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state(
+            "total_value",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "total_samples",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
 
     def update(self, p, q) -> None:
         self.total_value += F.kl_div(q, p, reduction="sum")
@@ -110,13 +136,27 @@ class SumExceptBatchKL(Metric):
 class CrossEntropyMetric(Metric):
     def __init__(self):
         super().__init__()
-        self.add_state("total_ce", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total_samples", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state(
+            "total_ce",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "total_samples",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
 
-    def update(self, preds: Tensor, target: Tensor, weight: Tensor = None) -> None:
+    def update(
+        self,
+        preds: Tensor,
+        target: Tensor,
+        weight: Tensor = None,
+    ) -> None:
         """Update state with predictions and targets.
         preds: Predictions from model   (bs * n, d) or (bs * n * n, d)
-        target: Ground truth values     (bs * n, d) or (bs * n * n, d)."""
+        target: Ground truth values     (bs * n, d) or (bs * n * n, d).
+        """
         # output = F.cross_entropy(preds, target, reduction="sum")
         if weight is not None:
             output = F.cross_entropy(preds, target, reduction="none")
@@ -135,8 +175,16 @@ class ProbabilityMetric(Metric):
     def __init__(self):
         """This metric is used to track the marginal predicted probability of a class during training."""
         super().__init__()
-        self.add_state("prob", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state(
+            "prob",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "total",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
 
     def update(self, preds: Tensor) -> None:
         self.prob += preds.sum()
@@ -149,8 +197,16 @@ class ProbabilityMetric(Metric):
 class NLL(Metric):
     def __init__(self):
         super().__init__()
-        self.add_state("total_nll", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total_samples", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state(
+            "total_nll",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "total_samples",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
 
     def update(self, batch_nll) -> None:
         self.total_nll += torch.sum(batch_nll)

@@ -38,7 +38,9 @@ def compute_all_statistics(data_list, atom_encoder, charge_dic):
     bond_types = edge_counts(data_list)
     print(f"Bond types: {bond_types}")
     charge_types = charge_counts(
-        data_list, num_classes=len(atom_encoder), charge_dic=charge_dic
+        data_list,
+        num_classes=len(atom_encoder),
+        charge_dic=charge_dic,
     )
     print(f"Charge types: {charge_types}")
     valency = valency_count(data_list, atom_encoder)
@@ -62,7 +64,9 @@ def node_counts(data_list):
         all_node_counts[num_nodes] += 1
         total_num_nodes += num_nodes
     print("Done.")
-    return all_node_counts, total_num_nodes / max(all_node_counts) / len(data_list)
+    return all_node_counts, total_num_nodes / max(all_node_counts) / len(
+        data_list
+    )
 
 
 def graph_counts(data_list, num_graph_types):
@@ -107,7 +111,8 @@ def edge_counts(data_list, num_bond_types=5):
         if len(data.edge_attr.shape) == 1:
             edge_types = (
                 torch.nn.functional.one_hot(
-                    data.edge_attr - 1, num_classes=num_bond_types - 1
+                    data.edge_attr - 1,
+                    num_classes=num_bond_types - 1,
                 )
                 .sum(dim=0)
                 .cpu()
@@ -117,7 +122,8 @@ def edge_counts(data_list, num_bond_types=5):
             edge_types = data.edge_attr.argmax(-1)
             edge_types = (
                 torch.nn.functional.one_hot(
-                    edge_types - 1, num_classes=num_bond_types - 1
+                    edge_types - 1,
+                    num_classes=num_bond_types - 1,
                 )
                 .sum(dim=0)
                 .cpu()
@@ -211,7 +217,9 @@ def total_variation1d(preds, target):
     ), f"preds: {preds.shape}, target: {target.shape}"
     target = normalize(target)
     preds = normalize(preds)
-    return torch.sum(torch.abs(preds - target)).item(), torch.abs(preds - target)
+    return torch.sum(torch.abs(preds - target)).item(), torch.abs(
+        preds - target
+    )
 
 
 def normalize(tensor):

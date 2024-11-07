@@ -161,7 +161,9 @@ def check_tensor_same_size(*args):
 
 
 def sigma_and_alpha_t_given_s(
-    gamma_t: torch.Tensor, gamma_s: torch.Tensor, target_size: torch.Size
+    gamma_t: torch.Tensor,
+    gamma_s: torch.Tensor,
+    target_size: torch.Size,
 ):
     """
     Computes sigma t given s, using gamma_t and gamma_s. Used during sampling.
@@ -171,7 +173,8 @@ def sigma_and_alpha_t_given_s(
         sigma t given s = sqrt(1 - (alpha t given s) ^2 ).
     """
     sigma2_t_given_s = inflate_batch_array(
-        -torch.expm1(F.softplus(gamma_s) - F.softplus(gamma_t)), target_size
+        -torch.expm1(F.softplus(gamma_s) - F.softplus(gamma_t)),
+        target_size,
     )
 
     # alpha_t_given_s = alpha_t / alpha_s
@@ -231,7 +234,12 @@ def sample_discrete_features(probX, probE, node_mask, prob_charge=None):
         charge_t = prob_charge.multinomial(1)
         charge_t = charge_t.reshape(bs, n)
 
-    return PlaceHolder(X=X_t, E=E_t, y=torch.zeros(bs, 0).type_as(X_t), charge=charge_t)
+    return PlaceHolder(
+        X=X_t,
+        E=E_t,
+        y=torch.zeros(bs, 0).type_as(X_t),
+        charge=charge_t,
+    )
 
 
 def sample_discrete_edge_features(probE, node_mask):
@@ -358,21 +366,39 @@ def compute_batched_over0_posterior_distribution(X_t, Qt, Qsb, Qtb):
 
 
 def mask_distributions(
-    true_X, true_E, pred_X, pred_E, node_mask, true_charge=None, pred_charge=None
+    true_X,
+    true_E,
+    pred_X,
+    pred_E,
+    node_mask,
+    true_charge=None,
+    pred_charge=None,
 ):
     # Set masked rows to arbitrary distributions, so it doesn't contribute to loss
-    row_X = torch.zeros(true_X.size(-1), dtype=torch.float, device=true_X.device)
+    row_X = torch.zeros(
+        true_X.size(-1), dtype=torch.float, device=true_X.device
+    )
     row_X[0] = 1.0
-    row_E = torch.zeros(true_E.size(-1), dtype=torch.float, device=true_E.device)
+    row_E = torch.zeros(
+        true_E.size(-1), dtype=torch.float, device=true_E.device
+    )
     row_E[0] = 1.0
 
     diag_mask = ~torch.eye(
-        node_mask.size(1), device=node_mask.device, dtype=torch.bool
+        node_mask.size(1),
+        device=node_mask.device,
+        dtype=torch.bool,
     ).unsqueeze(0)
     true_X[~node_mask] = row_X
     pred_X[~node_mask] = row_X
-    true_E[~(node_mask.unsqueeze(1) * node_mask.unsqueeze(2) * diag_mask), :] = row_E
-    pred_E[~(node_mask.unsqueeze(1) * node_mask.unsqueeze(2) * diag_mask), :] = row_E
+    true_E[
+        ~(node_mask.unsqueeze(1) * node_mask.unsqueeze(2) * diag_mask),
+        :,
+    ] = row_E
+    pred_E[
+        ~(node_mask.unsqueeze(1) * node_mask.unsqueeze(2) * diag_mask),
+        :,
+    ] = row_E
 
     # Add a small value everywhere to avoid nans
     pred_X = pred_X + 1e-7
@@ -382,7 +408,9 @@ def mask_distributions(
 
     if true_charge is not None and pred_charge is not None:
         row_charge = torch.zeros(
-            true_charge.size(-1), dtype=torch.float, device=true_charge.device
+            true_charge.size(-1),
+            dtype=torch.float,
+            device=true_charge.device,
         )
         row_charge[0] = 1.0
         true_charge[~node_mask] = row_charge
@@ -391,10 +419,19 @@ def mask_distributions(
         pred_charge = pred_charge + 1e-7
         pred_charge = pred_charge / torch.sum(pred_charge, dim=-1, keepdim=True)
 
-    return true_X, true_E, pred_X, pred_E, true_charge, pred_charge
+    return (
+        true_X,
+        true_E,
+        pred_X,
+        pred_E,
+        true_charge,
+        pred_charge,
+    )
 
 
-def posterior_distributions(X, E, X_t, E_t, y_t, Qt, Qsb, Qtb, charge, charge_t):
+def posterior_distributions(
+    X, E, X_t, E_t, y_t, Qt, Qsb, Qtb, charge, charge_t
+):
     prob_X = compute_posterior_distribution(
         M=X, M_t=X_t, Qt_M=Qt.X, Qsb_M=Qsb.X, Qtb_M=Qtb.X
     )  # (bs, n, dx)
@@ -405,7 +442,11 @@ def posterior_distributions(X, E, X_t, E_t, y_t, Qt, Qsb, Qtb, charge, charge_t)
     prob_charge = None
     if charge is not None and charge_t is not None:
         prob_charge = compute_posterior_distribution(
-            M=charge, M_t=charge_t, Qt_M=Qt.charge, Qsb_M=Qsb.charge, Qtb_M=Qtb.charge
+            M=charge,
+            M_t=charge_t,
+            Qt_M=Qt.charge,
+            Qsb_M=Qsb.charge,
+            Qtb_M=Qtb.charge,
         )
 
     return PlaceHolder(X=prob_X, E=prob_E, y=y_t, charge=prob_charge)
@@ -462,7 +503,9 @@ def sample_sparse_discrete_feature_noise(limit_dist, node_mask):
 
     # expand dimensions
     x_limit = limit_dist.X[None, :].expand(n_node, -1)  # (n_node, dx)
-    e_limit = limit_dist.E[None, :].expand(n_exist_edges.sum(), -1)  # (n_edge, de)
+    e_limit = limit_dist.E[None, :].expand(
+        n_exist_edges.sum(), -1
+    )  # (n_edge, de)
 
     # sample nodes and existing edges
     node = x_limit.multinomial(1)[:, 0]

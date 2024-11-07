@@ -8,8 +8,10 @@ dataset:
   remove_h: null
   molecules: False
   spectre: True
-  datadir: 'data/planar/'
+  datadir: 'data/planar/planar'
 
+batch_size: 128
+num_iter: 2000
 
 # settings for evaluations
 samples_to_generate: 40

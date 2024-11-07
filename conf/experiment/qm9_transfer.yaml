@@ -1,0 +1,45 @@
+# @package _global_
+project_name: qm9_smiles
+
+# data
+dataset:
+  batch_size: ${batch_size}
+  num_workers: 8
+  use_charge: False
+  extra_features: 'molecule'
+
+  name: "qm9"
+  datadir: 'data/qm9/qm9_pyg_greater/'
+  remove_h: True
+  random_subset: null
+  pin_memory: False
+  is_less: False
+
+# transfer
+transfer: True
+virtual_node: False
+dataset_transfer:
+  batch_size: ${batch_size}
+  num_workers: 8
+  use_charge: False
+  extra_features: 'molecule'
+
+  name: "qm9"
+  datadir: 'data/qm9/qm9_pyg_less/'
+  remove_h: True
+  random_subset: null
+  pin_memory: False
+  is_less: True
+
+# settings for evaluations
+forward_path: null
+backward_path: null
+samples_to_generate: 1024
+samples_to_save: 20
+chains_to_save: 2
+final_samples_to_generate: 10000
+final_samples_to_save: 30
+final_chains_to_save: 20
+
+# training
+batch_size: 1024

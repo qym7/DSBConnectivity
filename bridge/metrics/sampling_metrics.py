@@ -9,7 +9,12 @@ import torch
 from torch import Tensor
 from torch_geometric.utils import to_scipy_sparse_matrix
 import torch_geometric as pyg
-from torchmetrics import MeanMetric, MaxMetric, Metric, MeanAbsoluteError
+from torchmetrics import (
+    MeanMetric,
+    MaxMetric,
+    Metric,
+    MeanAbsoluteError,
+)
 
 from ..utils import undirected_to_directed
 from ..metrics.metrics_utils import (
@@ -38,7 +43,9 @@ class SamplingMetrics(nn.Module):
                 SamplingMolecularMetrics,
             )
 
-            all_val_smiles = set(list(dataset_infos.val_smiles) + list(dataset_infos.test_smiles))
+            all_val_smiles = set(
+                list(dataset_infos.val_smiles) + list(dataset_infos.test_smiles)
+            )
             self.domain_metrics = SamplingMolecularMetrics(
                 dataset_infos,
                 # dataset_infos.val_smiles if not test else dataset_infos.test_smiles,
@@ -57,28 +64,30 @@ class SamplingMetrics(nn.Module):
 
             # self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
             if dataset_infos.dataset_name == "comm20":
-                self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
-            elif dataset_infos.dataset_name == "planar":
-                self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
-            elif dataset_infos.dataset_name == "sbm":
-                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
-            elif dataset_infos.dataset_name == "sbm_syn":
-                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
-            elif dataset_infos.dataset_name == "sbm_split":
-                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
-            elif dataset_infos.dataset_name == "sbm_split_small":
-                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
+                self.domain_metrics = Comm20SamplingMetrics(
+                    dataloaders=dataloaders
+                )
+            elif "planar" in dataset_infos.dataset_name:
+                self.domain_metrics = PlanarSamplingMetrics(
+                    dataloaders=dataloaders
+                )
+            elif "sbm" in dataset_infos.dataset_name:
+                self.domain_metrics = SBMSamplingMetrics(
+                    dataloaders=dataloaders
+                )
             elif dataset_infos.dataset_name == "protein":
-                self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders)
+                self.domain_metrics = ProteinSamplingMetrics(
+                    dataloaders=dataloaders
+                )
             elif dataset_infos.dataset_name == "ego":
-                self.domain_metrics = EgoSamplingMetrics(dataloaders=dataloaders)
-            elif dataset_infos.dataset_name == "planar_edge_remove":
-                self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
-            elif dataset_infos.dataset_name == "planar_edge_add":
-                self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
+                self.domain_metrics = EgoSamplingMetrics(
+                    dataloaders=dataloaders
+                )
             else:
                 raise ValueError(
-                    "Dataset {} not implemented".format(dataset_infos.dataset_name)
+                    "Dataset {} not implemented".format(
+                        dataset_infos.dataset_name
+                    )
                 )
 
     def reset(self):
@@ -95,7 +104,13 @@ class SamplingMetrics(nn.Module):
             self.domain_metrics.reset()
 
     def compute_all_metrics(
-        self, generated_graphs: list, current_epoch, local_rank, fb, i, source_graphs
+        self,
+        generated_graphs: list,
+        current_epoch,
+        local_rank,
+        fb,
+        i,
+        source_graphs,
     ):
         """Compare statistics of the generated data with statistics of the val/test set"""
         self.reset()
@@ -117,18 +132,34 @@ class SamplingMetrics(nn.Module):
 
         if self.domain_metrics is not None:
             if self.dataset_infos.is_molecular:
-                domain_key = f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
-                do_metrics = self.domain_metrics.forward(
-                    generated_graphs, current_epoch, local_rank, fb, test=self.test, source_graphs=source_graphs
+                domain_key = (
+                    f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
                 )
-                do_metrics = {f"{domain_key}/{k}": do_metrics[k] for k in do_metrics}
+                do_metrics = self.domain_metrics.forward(
+                    generated_graphs,
+                    current_epoch,
+                    local_rank,
+                    fb,
+                    test=self.test,
+                    source_graphs=source_graphs,
+                )
+                do_metrics = {
+                    f"{domain_key}/{k}": do_metrics[k] for k in do_metrics
+                }
                 to_log.update(do_metrics)
             else:
-                domain_key = f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
-                do_metrics = self.domain_metrics.forward(
-                    generated_graphs, current_epoch, local_rank, test=self.test
+                domain_key = (
+                    f"domain_val_{fb}" if not self.test else f"domain_test_{fb}"
                 )
-                do_metrics = {f"{domain_key}/{k}": do_metrics[k] for k in do_metrics}
+                do_metrics = self.domain_metrics.forward(
+                    generated_graphs,
+                    current_epoch,
+                    local_rank,
+                    test=self.test,
+                )
+                do_metrics = {
+                    f"{domain_key}/{k}": do_metrics[k] for k in do_metrics
+                }
                 to_log.update(do_metrics)
 
         # if wandb.run:
@@ -142,7 +173,8 @@ class SamplingMetrics(nn.Module):
 def number_nodes_distance(generated_graphs, dataset_counts):
     max_number_nodes = max(dataset_counts.keys())
     reference_n = torch.zeros(
-        max_number_nodes + 1, device=generated_graphs.batch.device
+        max_number_nodes + 1,
+        device=generated_graphs.batch.device,
     )
     for n, count in dataset_counts.items():
         reference_n[n] = count
@@ -166,19 +198,25 @@ def node_types_distance(generated_graphs, target, save_histogram=True):
             data = [
                 [k, l]
                 for k, l in zip(
-                    target, generated_distribution / generated_distribution.sum()
+                    target,
+                    generated_distribution / generated_distribution.sum(),
                 )
             ]
             table = wandb.Table(data=data, columns=["target", "generate"])
             wandb.log(
                 {
                     "node distribution": wandb.plot.histogram(
-                        table, "types", title="node distribution"
+                        table,
+                        "types",
+                        title="node distribution",
                     )
                 }
             )
 
-        np.save("generated_node_types.npy", generated_distribution.cpu().numpy())
+        np.save(
+            "generated_node_types.npy",
+            generated_distribution.cpu().numpy(),
+        )
 
     return total_variation1d(generated_distribution, target)
 
@@ -194,7 +232,8 @@ def bond_types_distance(generated_graphs, target, save_histogram=True):
 
     # get the number of non-existing edges
     n_nodes = pyg.nn.pool.global_add_pool(
-        torch.ones_like(generated_graphs.batch).unsqueeze(-1), generated_graphs.batch
+        torch.ones_like(generated_graphs.batch).unsqueeze(-1),
+        generated_graphs.batch,
     ).flatten()
     generated_distribution[0] = (n_nodes * (n_nodes - 1) / 2).sum()
     generated_distribution[0] = (
@@ -206,21 +245,29 @@ def bond_types_distance(generated_graphs, target, save_histogram=True):
             data = [
                 [k, l]
                 for k, l in zip(
-                    target, generated_distribution / generated_distribution.sum()
+                    target,
+                    generated_distribution / generated_distribution.sum(),
                 )
             ]
             table = wandb.Table(data=data, columns=["target", "generate"])
             wandb.log(
                 {
                     "edge distribution": wandb.plot.histogram(
-                        table, "types", title="edge distribution"
+                        table,
+                        "types",
+                        title="edge distribution",
                     )
                 }
             )
 
-        np.save("generated_bond_types.npy", generated_distribution.cpu().numpy())
+        np.save(
+            "generated_bond_types.npy",
+            generated_distribution.cpu().numpy(),
+        )
 
-    tv, tv_per_class = total_variation1d(generated_distribution, target.to(device))
+    tv, tv_per_class = total_variation1d(
+        generated_distribution, target.to(device)
+    )
     return tv, tv_per_class
 
 
@@ -234,10 +281,14 @@ def connected_components(generated_graphs):
         node_mask = batch == i
         edge_mask = edge_batch == i
         node = generated_graphs.node[node_mask]
-        edge_index = generated_graphs.edge_index[:, edge_mask] - generated_graphs.ptr[i]
+        edge_index = (
+            generated_graphs.edge_index[:, edge_mask] - generated_graphs.ptr[i]
+        )
         # DENSE OPERATIONS
         sp_adj = to_scipy_sparse_matrix(edge_index, num_nodes=len(node))
-        num_components, component = sp.csgraph.connected_components(sp_adj.toarray())
+        num_components, component = sp.csgraph.connected_components(
+            sp_adj.toarray()
+        )
         all_num_components[i] = num_components
 
     return all_num_components
@@ -262,8 +313,16 @@ class CEPerClass(Metric):
     def __init__(self, class_id):
         super().__init__()
         self.class_id = class_id
-        self.add_state("total_ce", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total_samples", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state(
+            "total_ce",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "total_samples",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
         self.softmax = torch.nn.Softmax(dim=-1)
         self.binary_cross_entropy = torch.nn.BCELoss(reduction="sum")
 
@@ -295,8 +354,16 @@ class MeanNumberEdge(Metric):
 
     def __init__(self):
         super().__init__()
-        self.add_state("total_edge", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total_samples", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state(
+            "total_edge",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "total_samples",
+            default=torch.tensor(0.0),
+            dist_reduce_fx="sum",
+        )
 
     def update(self, molecules, weight=1.0) -> None:
         for molecule in molecules:

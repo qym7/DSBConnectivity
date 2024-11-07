@@ -21,7 +21,7 @@ class Visualizer:
     def __init__(self, dataset_infos):
         self.dataset_infos = dataset_infos
         self.is_molecular = self.dataset_infos.is_molecular
-        self.is_planar = getattr(self.dataset_infos, 'is_planar', None)
+        self.is_planar = getattr(self.dataset_infos, "is_planar", None)
 
         if self.is_molecular:
             self.remove_h = dataset_infos.remove_h
@@ -51,12 +51,23 @@ class Visualizer:
         for edge in edges:
             edge_type = adj[edge[0], edge[1]]
             nx_graph.add_edge(
-                edge[0], edge[1], color=float(edge_type), weight=3 * edge_type
+                edge[0],
+                edge[1],
+                color=float(edge_type),
+                weight=3 * edge_type,
             )
 
         return nx_graph.to_undirected()
 
-    def visualize_non_molecule(self, graph, pos, path, iterations=100, node_size=100):
+    def visualize_non_molecule(
+        self,
+        graph,
+        pos,
+        path,
+        color=None,
+        iterations=100,
+        node_size=100,
+    ):
         if pos is None:
             pos = nx.spring_layout(graph, iterations=iterations)
 
@@ -67,6 +78,9 @@ class Visualizer:
         m = max(np.abs(vmin), vmax)
         vmin, vmax = -m, m
 
+        if color is None:
+            color = U[:, 1]
+
         plt.figure()
         nx.draw(
             graph,
@@ -74,7 +88,7 @@ class Visualizer:
             font_size=5,
             node_size=node_size,
             with_labels=False,
-            node_color=U[:, 1],
+            node_color=color,
             cmap=plt.cm.coolwarm,
             vmin=vmin,
             vmax=vmax,
@@ -84,6 +98,8 @@ class Visualizer:
         plt.tight_layout()
         plt.savefig(path)
         plt.close("all")
+
+        return color
 
     def mol_from_graphs(self, node_list, adjacency_matrix):
         """
@@ -148,7 +164,9 @@ class Visualizer:
         num_graphs = len(graph_list)
         num_graphs_to_visualize = min(num_graphs_to_visualize, num_graphs)
         if num_graphs_to_visualize > 0:
-            print(f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}")
+            print(
+                f"Visualizing {num_graphs_to_visualize} graphs out of {num_graphs}"
+            )
 
         # graph_list = graphs.split()
         for i in range(num_graphs_to_visualize):
@@ -156,19 +174,39 @@ class Visualizer:
 
             if self.is_molecular:
                 # import pdb; pdb.set_trace()
-                mol = Molecule(torch.Tensor(graph_list[i][0]), torch.Tensor(graph_list[i][1]), self.dataset_infos.atom_decoder, charge=None).rdkit_mol
+                mol = Molecule(
+                    torch.Tensor(graph_list[i][0]),
+                    torch.Tensor(graph_list[i][1]),
+                    self.dataset_infos.atom_decoder,
+                    charge=None,
+                ).rdkit_mol
                 try:
                     Draw.MolToFile(mol, file_path)
                 except rdkit.Chem.KekulizeException:
                     print("Can't kekulize molecule")
             else:
                 nx_graph = self.to_networkx(graph_list[i])
-                self.visualize_non_molecule(graph=nx_graph, pos=None, path=file_path)
+                self.visualize_non_molecule(
+                    graph=nx_graph, pos=None, path=file_path
+                )
 
             if wandb.run and log is not None:
                 if i < 3:
                     print(f"Saving {file_path} to wandb")
                 wandb.log({log: [wandb.Image(file_path)]}, commit=False)
+
+        # define path to save figures
+        # if not os.path.exists(path):
+        #     os.makedirs(path)
+
+        # # visualize the final molecules
+        # for i in range(num_graphs_to_visualize):
+        #     file_path = os.path.join(path, 'graph_{}.png'.format(i))
+        #     graph = self.to_networkx(graphs[i][0].numpy(), graphs[i][1].numpy())
+        #     self.visualize_non_molecule(graph=graph, pos=None, path=file_path)
+        #     im = plt.imread(file_path)
+        #     if wandb.run and log is not None:
+        #         wandb.log({log: [wandb.Image(im, caption=file_path)]})
 
     def visualize_chains(
         self,
@@ -216,11 +254,23 @@ class Visualizer:
                 if self.is_molecular:
                     graphs.append(
                         Molecule(
-                            node_types=graph.X.argmax(-1), bond_types=graph.E.argmax(-1), atom_decoder=self.dataset_infos.atom_decoder, charge=None
+                            node_types=graph.X.argmax(-1),
+                            bond_types=graph.E.argmax(-1),
+                            atom_decoder=self.dataset_infos.atom_decoder,
+                            charge=None,
                         )
                     )
                 else:
-                    graphs.append(self.to_networkx([chain.X[j].cpu().numpy(), chain.E[j].cpu().numpy()]))
+                    graphs.append(
+                        self.to_networkx(
+                            [chain.X[j].cpu().numpy(), chain.E[j].cpu().numpy()]
+                        )
+                    )
+
+            # Find the coordinates of nodes in the final graph and align all the molecules
+            # The direction is changed for the cacheloader visualization before
+            # final_graph = graphs[-1] if fb == "b" else graphs[0]
+            # first_graph = graphs[0] if fb == "b" else graphs[-1]
 
             final_graph = graphs[-1]
             first_graph = graphs[0]
@@ -241,13 +291,8 @@ class Visualizer:
                         x, y, z = coords[l]
                         conf.SetAtomPosition(l, Point3D(x, y, z))
             else:
-                if self.is_planar:
-                    final_pos = nx.spring_layout(final_graph, seed=0)
-                    num_edges_start = first_graph.number_of_edges() if not self.is_molecular else first_graph.rdkit_mol.GetNumBonds()
-                    num_edges_end = final_graph.number_of_edges() if not self.is_molecular else final_graph.rdkit_mol.GetNumBonds()
-                else:
-                    final_pos = nx.spring_layout(final_graph, seed=0)
-                    first_pos = nx.spring_layout(first_graph, seed=0)
+                final_pos = nx.spring_layout(final_graph, seed=0)
+                first_pos = nx.spring_layout(first_graph, seed=0)
 
             # Visualize and save
             save_paths = []
@@ -264,18 +309,17 @@ class Visualizer:
                         legend=f"Frame {frame}",
                     )
                 else:
-                    if self.is_planar:
-                        pos = final_pos
+                    if transfer:
+                        t = frame / len(graphs)
+                        pos = {
+                            key: final_pos[key] * t + first_pos[key] * (1 - t)
+                            for key in final_pos.keys()
+                        }
                     else:
-                        if transfer:
-                            t = frame / len(graphs)
-                            pos = {
-                                key: final_pos[key] * t + first_pos[key] * (1 - t)
-                                for key in final_pos.keys()
-                            }
-                        else:
-                            pos = final_pos
-                    self.visualize_non_molecule(graph=graphs[frame], pos=pos, path=file_name)
+                        pos = final_pos
+                    self.visualize_non_molecule(
+                        graph=graphs[frame], pos=pos, path=file_name
+                    )
                 save_paths.append(file_name)
             print(
                 f"{i + 1}/{chains.X.shape[0]} chains saved on local rank {local_rank}.",
@@ -288,26 +332,16 @@ class Visualizer:
             gif_path = os.path.join(cur_path, f"{cur_folder}.gif")
             imgs.extend([imgs[-1]] * 10)
             imageio.mimsave(gif_path, imgs, subrectangles=True, duration=200)
-            if wandb.run and i==0:
-                if self.is_planar:
-                    wandb.log(
-                        {
-                            f"chain_{fb}": [
-                                wandb.Video(gif_path, caption=gif_path, format="gif")
-                            ],
-                            f"num_edges_start_{fb}": num_edges_start,
-                            f"num_edges_end_{fb}": num_edges_end
-                        }
-                    )
-                else:
-                    wandb.log(
-                        {
-                            f"chain_{fb}": [
-                                wandb.Video(gif_path, caption=gif_path, format="gif")
-                            ],
-                        }
-                    )
-
+            if wandb.run and i == 0:
+                wandb.log(
+                    {
+                        f"chain_{fb}": [
+                            wandb.Video(
+                                gif_path, caption=gif_path, format="gif"
+                            )
+                        ],
+                    }
+                )
                 print(f"Saving {gif_path} to wandb")
                 wandb.log(
                     {f"chain_{fb}": wandb.Video(gif_path, fps=8, format="gif")},

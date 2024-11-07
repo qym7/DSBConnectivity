@@ -33,10 +33,24 @@ def get_graph_models(args, dataset_infos):
 
     net_f, net_b = GraphTransformer(**kwargs), GraphTransformer(**kwargs)
 
-    if args.forward_path is not None:
-        net_f.load_state_dict(torch.load(args.forward_path, map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu')))
-    if args.backward_path is not None:
-        net_b.load_state_dict(torch.load(args.backward_path, map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu')))
+    # if args.forward_path is not None:
+    #     net_f.load_state_dict(
+    #         torch.load(
+    #             args.forward_path,
+    #             map_location=torch.device(
+    #                 "cuda" if torch.cuda.is_available() else "cpu"
+    #             ),
+    #         )
+    #     )
+    # if args.backward_path is not None:
+    #     net_b.load_state_dict(
+    #         torch.load(
+    #             args.backward_path,
+    #             map_location=torch.device(
+    #                 "cuda" if torch.cuda.is_available() else "cpu"
+    #             ),
+    #         )
+    #     )
 
     return net_f, net_b
 
@@ -60,7 +74,12 @@ def get_both_datamodules(cfg):
             tf_datainfos,
         ) = get_datamodules(tf_dataset_config, transfer)
     else:
-        tf_train_metrics, tf_domain_features, tf_datamodule, tf_datainfos = (
+        (
+            tf_train_metrics,
+            tf_domain_features,
+            tf_datamodule,
+            tf_datainfos,
+        ) = (
             None,
             None,
             None,
@@ -88,26 +107,33 @@ def get_datamodules(cfg, transfer):
     # step 1: get datamodules according to dataset name
 
     print("creating datasets")
-    if cfg["name"] in ["sbm", "sbm_syn", "comm20", "planar", "ego", "planar_edge_remove", "planar_edge_add"] or "sbm_split" in cfg["name"] :
+    if (
+        cfg["name"]
+        in [
+            "sbm",
+            "comm20",
+            "planar",
+            "ego",
+            "planar_remove",
+            "planar_add",
+        ]
+        or "sbm_split" in cfg["name"]
+    ):
         from ..datasets.spectre_dataset_pyg import (
             SBMDataModule,
-            SBMSynDataModule,
             Comm20DataModule,
             EgoDataModule,
             PlanarDataModule,
             SpectreDatasetInfos,
         )
-        if cfg["name"] == "sbm":
+
+        if "sbm" in cfg["name"]:
             datamodule = SBMDataModule(cfg)
-        elif cfg["name"] == "sbm_syn":
-            datamodule = SBMSynDataModule(cfg)
-        elif "sbm_split" in cfg["name"]:
-            datamodule = SBMSynDataModule(cfg)
         elif cfg["name"] == "comm20":
             datamodule = Comm20DataModule(cfg)
         elif cfg["name"] == "ego":
             datamodule = EgoDataModule(cfg)
-        else:
+        elif "planar" in cfg["name"]:
             datamodule = PlanarDataModule(cfg)
 
         dataset_infos = SpectreDatasetInfos(datamodule, cfg)
@@ -126,28 +152,26 @@ def get_datamodules(cfg, transfer):
         from datasets import point_cloud_dataset
 
         datamodule = point_cloud_dataset.PointCloudDataModule(cfg)
-        dataset_infos = point_cloud_dataset.PointCloudInfos(datamodule=datamodule)
+        dataset_infos = point_cloud_dataset.PointCloudInfos(
+            datamodule=datamodule
+        )
         train_metrics = TrainAbstractMetricsDiscrete()
         domain_features = DummyExtraFeatures()
 
-    elif cfg["name"] in ["qm9", "guacamol", "moses", "qm9_smiles", "zinc"]:
+    elif cfg["name"] in ["qm9", "guacamol", "moses", "zinc"]:
         if cfg["name"] == "qm9":
             from ..datasets import qm9_dataset
 
             datamodule = qm9_dataset.QM9DataModule(cfg, transfer)
             dataset_infos = qm9_dataset.QM9Infos(datamodule=datamodule, cfg=cfg)
 
-        elif cfg["name"] == "qm9_smiles":
-            from ..datasets import qm9_smiles_dataset
-
-            datamodule = qm9_smiles_dataset.QM9SmilesDataModule(cfg)
-            dataset_infos = qm9_smiles_dataset.QM9SmilesInfos(datamodule=datamodule, cfg=cfg)
-
         elif cfg["name"] == "zinc":
             from ..datasets import zinc_dataset
 
             datamodule = zinc_dataset.ZincDataModule(cfg, transfer)
-            dataset_infos = zinc_dataset.ZincInfos(datamodule=datamodule, cfg=cfg)
+            dataset_infos = zinc_dataset.ZincInfos(
+                datamodule=datamodule, cfg=cfg
+            )
 
         elif cfg["name"] == "guacamol":
             from ..datasets import guacamol_dataset
@@ -164,7 +188,9 @@ def get_datamodules(cfg, transfer):
             raise ValueError("Dataset not implemented")
 
         if cfg.extra_features is not None:
-            domain_features = ExtraMolecularFeatures(dataset_infos=dataset_infos)
+            domain_features = ExtraMolecularFeatures(
+                dataset_infos=dataset_infos
+            )
         else:
             domain_features = DummyExtraFeatures()
 
@@ -172,25 +198,38 @@ def get_datamodules(cfg, transfer):
     else:
         raise NotImplementedError("Unknown dataset {}".format(cfg["name"]))
 
-    return train_metrics, domain_features, datamodule, dataset_infos
+    return (
+        train_metrics,
+        domain_features,
+        datamodule,
+        dataset_infos,
+    )
 
 
 # Optimizer
 # --------------------------------------------------------------------------------
 def get_optimizers(net_f, net_b, lr, n, N):
     # return torch.optim.Adam(net_f.parameters(), lr=lr), torch.optim.Adam(net_b.parameters(), lr=lr)
-    print('the new learning rate is', lr * np.exp(-n/N*10))
+    print("the new learning rate is", lr * np.exp(-n / N * 10))
     return (
         # The code is using the Adam optimizer from the PyTorch library to
         # optimize the parameters of a neural network model `net_f`. It sets the
         # learning rate `lr`, enables the AMSGrad variant of the Adam optimizer by
         # setting `amsgrad=True`, and applies weight decay regularization with a
         # weight decay factor of `1e-12`.
-        torch.optim.Adam(net_f.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
-        torch.optim.Adam(net_b.parameters(), lr=lr, amsgrad=True, weight_decay=1e-12),
+        torch.optim.Adam(
+            net_f.parameters(),
+            lr=lr,
+            amsgrad=True,
+            weight_decay=1e-12,
+        ),
+        torch.optim.Adam(
+            net_b.parameters(),
+            lr=lr,
+            amsgrad=True,
+            weight_decay=1e-12,
+        ),
     )
-
-
 
 
 # Logger

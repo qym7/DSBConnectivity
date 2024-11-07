@@ -1,0 +1,48 @@
+# @package _global_
+project_name: sbm_3cluster_consistency
+#wandb: disabled # offline/disabled/online
+
+# data 
+dataset_transfer:
+  batch_size: 128
+  num_workers: 8
+
+  name: sbm_split
+  remove_h: null
+  molecules: False
+  spectre: True
+  datadir: 'data/sbm/sbm_3clusters/'
+
+  num_graphs: 200
+  num_nodes: 35
+  num_communities: 2
+  intra_prob: 0.005
+  inter_prob: 0.3
+
+# transfer
+transfer: True
+
+dataset:
+  batch_size: 128
+  num_workers: 8
+
+  name: sbm_split
+  remove_h: null
+  molecules: False
+  spectre: True
+  datadir: 'data/sbm/sbm_3clusters/'
+
+  num_graphs: 200
+  num_nodes: 35
+  num_communities: 3
+  intra_prob: 0.005
+  inter_prob: 0.3
+
+# settings for evaluations
+samples_to_generate: 40
+samples_to_save: 20
+chains_to_save: 4
+final_samples_to_generate: 40
+final_samples_to_save: 30
+clean_loss_weight: 0.0
+final_chains_to_save: 8

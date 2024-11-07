@@ -16,8 +16,8 @@ model:
     diffusion_steps: 500
     diffusion_noise_schedule: 'cosine'              # 'cosine', 'polynomial_2'
 
-    extra_features: 'rrwp_comp'        # 'all', 'cycles', or null
-    rrwp_steps: 12
+    extra_features: 'rrwp'        # 'all', 'cycles', or null
+    rrwp_steps: 20
     
     eigenfeatures: True
     edge_features: 'all'          # 'all', 'dist', 'localngbs' or null

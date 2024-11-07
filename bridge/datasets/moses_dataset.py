@@ -7,9 +7,11 @@ import os.path as osp
 import pathlib
 
 from rdkit import Chem, DataStructs, RDLogger
+
 print("Found rdkit, all good")
 from rdkit.Chem import RDConfig, QED, MolFromSmiles, MolToSmiles
-sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+
+sys.path.append(os.path.join(RDConfig.RDContribDir, "SA_Score"))
 import sascorer
 
 import torch
@@ -34,7 +36,15 @@ from ..datasets.dataset_utils import (
 from ..metrics.metrics_utils import compute_all_statistics
 
 
-atom_encoder = {"C": 0, "N": 1, "S": 2, "O": 3, "F": 4, "Cl": 5, "Br": 6}
+atom_encoder = {
+    "C": 0,
+    "N": 1,
+    "S": 2,
+    "O": 3,
+    "F": 4,
+    "Cl": 5,
+    "Br": 6,
+}
 atom_decoder = ["C", "N", "S", "O", "F", "Cl", "Br"]
 
 
@@ -71,20 +81,34 @@ class MosesDataset(InMemoryDataset):
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
-            node_types=torch.from_numpy(np.load(self.processed_paths[2])).float(),
-            bond_types=torch.from_numpy(np.load(self.processed_paths[3])).float(),
-            charge_types=torch.from_numpy(np.load(self.processed_paths[4])).float(),
+            node_types=torch.from_numpy(
+                np.load(self.processed_paths[2])
+            ).float(),
+            bond_types=torch.from_numpy(
+                np.load(self.processed_paths[3])
+            ).float(),
+            charge_types=torch.from_numpy(
+                np.load(self.processed_paths[4])
+            ).float(),
             valencies=load_pickle(self.processed_paths[5]),
         )
         self.smiles = load_pickle(self.processed_paths[6])
 
     @property
     def raw_file_names(self):
-        return ["train_moses.csv", "val_moses.csv", "test_moses.csv"]
+        return [
+            "train_moses.csv",
+            "val_moses.csv",
+            "test_moses.csv",
+        ]
 
     @property
     def split_file_name(self):
-        return ["train_moses.csv", "val_moses.csv", "test_moses.csv"]
+        return [
+            "train_moses.csv",
+            "val_moses.csv",
+            "test_moses.csv",
+        ]
 
     @property
     def processed_file_names(self):
@@ -102,7 +126,10 @@ class MosesDataset(InMemoryDataset):
         import rdkit  # noqa
 
         train_path = download_url(self.train_url, self.raw_dir)
-        os.rename(train_path, osp.join(self.raw_dir, "train_moses.csv"))
+        os.rename(
+            train_path,
+            osp.join(self.raw_dir, "train_moses.csv"),
+        )
 
         test_path = download_url(self.test_url, self.raw_dir)
         os.rename(test_path, osp.join(self.raw_dir, "val_moses.csv"))
@@ -160,13 +187,19 @@ class MosesDataModule(MolecularDataModule):
         self.remove_h = False
         datasets = {
             "train": MosesDataset(
-                split="train", root=root_path, pre_transform=RemoveYTransform()
+                split="train",
+                root=root_path,
+                pre_transform=RemoveYTransform(),
             ),
             "val": MosesDataset(
-                split="val", root=root_path, pre_transform=RemoveYTransform()
+                split="val",
+                root=root_path,
+                pre_transform=RemoveYTransform(),
             ),
             "test": MosesDataset(
-                split="test", root=root_path, pre_transform=RemoveYTransform()
+                split="test",
+                root=root_path,
+                pre_transform=RemoveYTransform(),
             ),
         }
 
@@ -201,7 +234,9 @@ class MosesInfos(AbstractDatasetInfos):
 
         # dimensions
         # atom_decoder = ['C', 'N', 'S', 'O', 'F', 'Cl', 'Br']
-        self.output_dims = PlaceHolder(X=self.num_node_types, charge=0, E=5, y=0)
+        self.output_dims = PlaceHolder(
+            X=self.num_node_types, charge=0, E=5, y=0
+        )
 
         # data specific settings
         # atom_decoder = ['C', 'N', 'S', 'O', 'F', 'Cl', 'Br']
@@ -212,14 +247,16 @@ class MosesInfos(AbstractDatasetInfos):
 
 
 def SA_score_data_separation(path, path_greater, path_less):
-    RDLogger.DisableLog('rdApp.*')
-    list_file = ['train_moses.csv', 'test_moses.csv', 'val_moses.csv']
+    RDLogger.DisableLog("rdApp.*")
+    list_file = ["train_moses.csv", "test_moses.csv", "val_moses.csv"]
     os.makedirs(path_greater, exist_ok=True)
     os.makedirs(path_less, exist_ok=True)
 
-    list_file_paths = [os.path.join(path, 'train_moses.csv'),
-                os.path.join(path, 'test_moses.csv'),
-                os.path.join(path, 'val_moses.csv')]
+    list_file_paths = [
+        os.path.join(path, "train_moses.csv"),
+        os.path.join(path, "test_moses.csv"),
+        os.path.join(path, "val_moses.csv"),
+    ]
 
     all_data = []
     for file in list_file_paths:
@@ -258,24 +295,24 @@ def SA_score_data_separation(path, path_greater, path_less):
 
     for dataset, selected_less in zip(list_file, less_lists):
         file_path = os.path.join(path_less, dataset)
-        with open(file_path, 'w', newline='') as file:
+        with open(file_path, "w", newline="") as file:
             writer = csv.writer(file)
-            writer.writerow(['SMILES'])
+            writer.writerow(["SMILES"])
             for point in selected_less:
                 writer.writerow([point])
 
     for dataset, selected_greater in zip(list_file, greater_lists):
         file_path = os.path.join(path_greater, dataset)
-        with open(file_path, 'w', newline='') as file:
+        with open(file_path, "w", newline="") as file:
             writer = csv.writer(file)
-            writer.writerow(['SMILES'])
+            writer.writerow(["SMILES"])
             for point in selected_greater:
                 writer.writerow([point])
 
 
 if __name__ == "__main__":
-    path = './data/moses/moses_pyg/raw'
-    path_greater = './data/moses_greater/moses_pyg_greater/raw'
-    path_less = './data/moses_less/moses_pyg_less/raw'
+    path = "./data/moses/moses_pyg/raw"
+    path_greater = "./data/moses_greater/moses_pyg_greater/raw"
+    path_less = "./data/moses_less/moses_pyg_less/raw"
 
     SA_score_data_separation(path, path_greater, path_less)
