@@ -97,29 +97,43 @@ class IPFBase(torch.nn.Module):
         # create metrics for graph dataset
         print("creating metrics for graph dataset")
         # create the training/test/val dataloader
-        self.val_sampling_metrics = SamplingMetrics(
-            dataset_infos=self.datainfos,
-            test=False,
-            dataloaders=dataloaders,
-        )
-        self.test_sampling_metrics = SamplingMetrics(
-            dataset_infos=self.datainfos,
-            test=True,
-            dataloaders=dataloaders,
-        )
 
         if self.cfg.transfer:
+            self.val_sampling_metrics = SamplingMetrics(
+                dataset_infos=self.datainfos,
+                test=False,
+                dataloaders=dataloaders,
+                tf_dataloaders=tf_dataloaders,
+            )
+            self.test_sampling_metrics = SamplingMetrics(
+                dataset_infos=self.datainfos,
+                test=True,
+                dataloaders=dataloaders,
+                tf_dataloaders=tf_dataloaders,
+            )
             self.tf_val_sampling_metrics = SamplingMetrics(
                 dataset_infos=self.tf_datainfos,
                 test=False,
                 dataloaders=tf_dataloaders,
+                tf_dataloaders=dataloaders,
             )
             self.tf_test_sampling_metrics = SamplingMetrics(
                 dataset_infos=self.tf_datainfos,
                 test=True,
                 dataloaders=tf_dataloaders,
+                tf_dataloaders=dataloaders,
             )
         else:
+            self.val_sampling_metrics = SamplingMetrics(
+                dataset_infos=self.datainfos,
+                test=False,
+                dataloaders=dataloaders,
+            )
+            self.test_sampling_metrics = SamplingMetrics(
+                dataset_infos=self.datainfos,
+                test=True,
+                dataloaders=dataloaders,
+            )
             self.tf_val_sampling_metrics = self.tf_test_sampling_metrics = None
 
         # get models

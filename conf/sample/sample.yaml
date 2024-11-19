@@ -1,3 +1,5 @@
+# @package _global_
+
 sample:
   # balanced rate matrice settings
   eta: 0.

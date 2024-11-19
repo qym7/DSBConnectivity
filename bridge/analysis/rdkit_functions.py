@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import torch
 import torch.nn.functional as F
 import re
@@ -332,14 +333,16 @@ class BasicMolecularMetrics(object):
 
         return similarity
 
-    def pad_and_one_hot_encode(self, graphs, num_edge_types=5):
+    def pad_and_one_hot_encode(self, graphs, graphs_other, num_edge_types=5):
         num_features = len(self.atom_decoder)
-        num_nodes = max(node_features.size(0) for node_features, _ in graphs)
+        num_nodes_graphs = max(node_features.size(0) for node_features, _ in graphs)
+        num_nodes_graphs_other = max(node_features.size(0) for node_features, _ in graphs_other)
+        num_nodes = max(num_nodes_graphs, num_nodes_graphs_other)
         batch_size = len(graphs)
 
         X = torch.zeros((batch_size, num_nodes, num_features))
         E = torch.zeros((batch_size, num_nodes, num_nodes, num_edge_types))
-        mask = torch.zeros((batch_size, num_nodes), dtype=torch.bool)  # Mask for padded nodes
+        mask = torch.zeros((batch_size, num_nodes), dtype=torch.bool)
 
         for i, (node_features, adj_matrix) in enumerate(graphs):
             one_hot_nodes = F.one_hot(node_features, num_classes=num_features).float()
@@ -349,13 +352,13 @@ class BasicMolecularMetrics(object):
             one_hot_adj = F.one_hot(adj_matrix, num_classes=num_edge_types).float()
             E[i, :adj_matrix.shape[0], :adj_matrix.shape[1], :] = one_hot_adj
 
-            mask[i, :node_count] = 1  # Set mask for real nodes
+            mask[i, :node_count] = 1
 
         return X, E, mask
 
     def check_nll_mpm(self, generated, source):
-        X_0, E_0, mask_0 = self.pad_and_one_hot_encode(generated)
-        X_T, E_T, mask_T = self.pad_and_one_hot_encode(source)
+        X_0, E_0, mask_0 = self.pad_and_one_hot_encode(generated, source)
+        X_T, E_T, mask_T = self.pad_and_one_hot_encode(source, generated)
 
         graph_dict = preproc_graph_match(X_0, E_0, X_T, E_T,mask_0, mask_T)
         X_0 = graph_dict["X_0"]
@@ -386,123 +389,16 @@ class BasicMolecularMetrics(object):
 
         return perm, nll_init.mean().item(), nll_final.mean().item()
 
-    def check_nll_sm(self, generated, source, eps=1e-18):
-        # get maximum number of nodes across all graphs in the batch
-        max_nodes_0 = max(graph[0].size(0) for graph in generated)
-        max_nodes_T = max(graph[0].size(0) for graph in source)
-
-        X_0_padded = []
-        E_0_padded = []
-        X_T_padded = []
-        E_T_padded = []
-        node_masks = []
-
-        # pad each graph to the maximum size in the batch
-        for (X_0, E_0), (X_T, E_T) in zip(generated, source):
-            n_nodes_0 = X_0.size(0)
-            n_nodes_T = X_T.size(0)
-
-            X_0_pad = torch.zeros(
-                (max_nodes_0,), dtype=X_0.dtype, device=X_0.device
-            )
-            X_T_pad = torch.zeros(
-                (max_nodes_T,), dtype=X_T.dtype, device=X_T.device
-            )
-            X_0_pad[:n_nodes_0] = X_0
-            X_T_pad[:n_nodes_T] = X_T
-
-            E_0_pad = torch.zeros(
-                (max_nodes_0, max_nodes_0), dtype=E_0.dtype, device=E_0.device
-            )
-            E_T_pad = torch.zeros(
-                (max_nodes_T, max_nodes_T), dtype=E_T.dtype, device=E_T.device
-            )
-            E_0_pad[:n_nodes_0, :n_nodes_0] = E_0
-            E_T_pad[:n_nodes_T, :n_nodes_T] = E_T
-
-            X_0_padded.append(X_0_pad)
-            E_0_padded.append(E_0_pad)
-            X_T_padded.append(X_T_pad)
-            E_T_padded.append(E_T_pad)
-
-            # create node masks
-            node_masks.append(
-                (
-                    torch.arange(
-                        max(max_nodes_0, max_nodes_T), device=X_0.device
-                    )
-                    < n_nodes_0
-                ).float()
-            )
-
-        X_0_padded = torch.stack(X_0_padded)
-        E_0_padded = torch.stack(E_0_padded)
-        X_T_padded = torch.stack(X_T_padded)
-        E_T_padded = torch.stack(E_T_padded)
-        node_masks = torch.stack(node_masks)
-
-        n0 = torch.tensor(
-            [X.shape[0] for X, _ in generated], device=X_0_padded.device
-        ).unsqueeze(1)
-        nT = torch.tensor(
-            [X.shape[0] for X, _ in source], device=X_T_padded.device
-        ).unsqueeze(1)
-
-        conn0, edge0, ne0 = pygm.utils.dense_to_sparse(E_0_padded)
-        connT, edgeT, neT = pygm.utils.dense_to_sparse(E_T_padded)
-
-        gaussian_aff = functools.partial(pygm.utils.gaussian_aff_fn, sigma=0.1)
-
-        K = pygm.utils.build_aff_mat(
-            X_0_padded.unsqueeze(-1),
-            edge0,
-            conn0,
-            X_T_padded.unsqueeze(-1),
-            edgeT,
-            connT,
-            n0,
-            ne0,
-            nT,
-            neT,
-            node_aff_fn=gaussian_aff,
-            edge_aff_fn=gaussian_aff,
-        )
-
-        Y = pygm.sm(K, n0, nT)
-        Y = pygm.hungarian(Y)
-        Y = Y.to(X_T_padded.dtype)
-
-        # align the node and edge feature matrices using the matching matrices
-        X_T_aligned = torch.matmul(Y, X_T_padded.unsqueeze(-1)).squeeze(
-            -1
-        )  # Align node values
-        E_T_aligned = torch.matmul(
-            torch.matmul(Y, E_T_padded), Y.transpose(1, 2)
-        )
-
-        nll_X = -torch.log(X_0_padded + eps) * X_T_aligned
-        nll_E = -torch.log(E_0_padded + eps) * E_T_aligned
-
-        # mask the padded entries
-        nll_X = nll_X * node_masks  # Mask node values
-        nll_E = (
-            nll_E * node_masks.unsqueeze(-1) * node_masks.unsqueeze(-2)
-        )  # Mask edge values
-
-        nll_X = nll_X.sum(dim=-1)
-        nll_E = nll_E.view(E_0_padded.size(0), -1).sum(dim=-1)
-        nll_graph = nll_X + nll_E
-
-        return nll_graph.mean().item(), nll_graph.tolist()
-
-    def compute_w1(self, generated_values, source_values):
-        return wasserstein_distance(generated_values, source_values)
+    def compute_w1(self, generated_values, target_values):
+        return wasserstein_distance(generated_values, target_values)
 
     def compute_mad(self, generated_values, source_values):
-        min_length = min(len(generated_values), len(source_values))
-        property_gen = generated_values[:min_length]
-        property_source = source_values[:min_length]
-        return mean_absolute_error(property_gen, property_source), min_length
+        valid_diffs = [
+            abs(g - s) for g, s in zip(generated_values, source_values) if g is not None and s is not None
+        ]
+        if len(valid_diffs) == 0:
+            return 0
+        return sum(valid_diffs) / len(valid_diffs)
 
     def compute_properties(self, molecules):
         logP_values = []
@@ -510,16 +406,20 @@ class BasicMolecularMetrics(object):
         sa_scores = []
 
         for smiles in molecules:
-            mol = Chem.MolFromSmiles(smiles)
-            logP_values.append(Descriptors.MolLogP(mol))
-            qed_values.append(QED.qed(mol))
-            sa_scores.append(sascorer.calculateScore(mol))
+            if smiles is None:
+                qed_values.append(None)
+                sa_scores.append(None)
+            else:
+                mol = Chem.MolFromSmiles(smiles)
+                logP_values.append(Descriptors.MolLogP(mol))
+                qed_values.append(QED.qed(mol))
+                sa_scores.append(sascorer.calculateScore(mol))
 
         return np.array(logP_values), np.array(qed_values), np.array(sa_scores)
 
-    def calculate_fcd(self, generated, source):
+    def calculate_fcd(self, generated, target):
         fcd = FCD(device='cuda', n_jobs=8)
-        fcd_score = fcd(generated, source)
+        fcd_score = fcd(generated, target)
         return fcd_score
 
     def evaluate(self, generated, source):
@@ -629,32 +529,12 @@ class BasicMolecularMetrics(object):
             (sa_values_source, sa_values),
         )
 
-    def evaluate_zinc(self, generated, source):
+    def evaluate_zinc(self, generated, source, target):
         """generated: list of pairs (atom_types: n [int], edge_types: n * n)"""
-
         print(f"Number of generated molecules: {len(generated)}")
         valid, validity, num_components, all_smiles = self.compute_validity(
             generated
         )
-
-        if source is not None:
-            valid_source, _, _, all_smiles_source = self.compute_validity(
-                source
-            )
-            nll_sm, nll_sm_vals = self.check_nll_sm(generated, source)
-            print(
-                f"NLL SM Score over {len(generated)} total generated molecules is: {nll_sm}"
-            )
-            _, nll_mpm_init, nll_mpm = self.check_nll_mpm(generated, source)
-            print(
-                f"NLL MPM Score over {len(generated)} total generated molecules is: {nll_mpm}"
-            )
-        else:
-            valid_source = None
-            all_smiles_source = None
-            nll_sm = -1.0
-            nll_mpm = -1.0
-            nll_mpm_init = -1.0
 
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
@@ -677,6 +557,53 @@ class BasicMolecularMetrics(object):
         print(
             f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%"
         )
+
+        _, nll_mpm_init, nll_mpm = self.check_nll_mpm(generated, source)
+        print(
+            f"NLL MPM Score over {len(generated)} total generated molecules is: {nll_mpm}"
+        )
+
+        logP_gen, qed_gen, sa_gen = self.compute_properties(
+            all_smiles
+        )
+
+        if target is not None:
+            valid_target, all_smiles_target, _ = self.compute_relaxed_validity(
+                target
+            )
+            logP_target, _, _ = self.compute_properties(
+                all_smiles_target
+            )
+            w1_logP = self.compute_w1(logP_gen, logP_target)
+            print(
+                f"W1 LogP over {len(relaxed_valid)} valid molecules is: {w1_logP}"
+            )
+        else:
+            valid_target = None
+            all_smiles_target = None
+            w1_logP = -1.0
+
+        if source is not None:
+            valid_source, all_smiles_source, _ = self.compute_relaxed_validity(
+                source
+            )
+            _, qed_source, sa_source = self.compute_properties(
+                all_smiles_source
+            )
+            mad_qed = self.compute_mad(qed_gen, qed_source)
+            print(
+                f"MAD QED valid molecules is: {mad_qed}"
+            )
+            mad_sa = self.compute_mad(sa_gen, sa_source)
+            print(
+                f"MAD SA valid molecules is: {mad_sa}"
+            )
+        else:
+            valid_source = None
+            all_smiles_source = None
+            mad_qed = -1.0
+            mad_sa = -1.0
+
         if relaxed_validity > 0:
             unique, uniqueness = self.compute_uniqueness(relaxed_valid)
             print(
@@ -695,42 +622,16 @@ class BasicMolecularMetrics(object):
                 novelty = -1.0
                 coverage = -1.0
 
-            if valid_source is not None:
-                logP_gen, qed_gen, sa_gen = self.compute_properties(
-                    relaxed_valid
-                )
-                logP_source, qed_source, sa_source = self.compute_properties(
-                    valid_source
-                )
-
-                w1_logP = self.compute_w1(logP_gen, logP_source)
-                print(
-                    f"W1 LogP over {len(relaxed_valid)} valid molecules is: {w1_logP}"
-                )
-                mad_qed, qed_length = self.compute_mad(qed_gen, qed_source)
-                print(
-                    f"MAD QED over {qed_length} (a portion) valid molecules is: {mad_qed}"
-                )
-                mad_sa, sa_length = self.compute_mad(sa_gen, sa_source)
-                print(
-                    f"MAD SA {sa_length} (a portion) valid molecules is: {mad_sa}"
-                )
-
-                fcd_score = self.calculate_fcd(relaxed_valid, valid_source)
+            if valid_target is not None:
+                fcd_score = self.calculate_fcd(relaxed_valid, valid_target)
                 print(
                     f"FCD Score over {len(relaxed_valid)} valid molecules is: {fcd_score}"
                 )
             else:
-                w1_logP = -1.0
-                mad_qed = -1.0
-                mad_sa = -1.0
                 fcd_score = -1.0
         else:
             novelty = -1.0
             uniqueness = 0.0
-            w1_logP = -1.0
-            mad_qed = -1.0
-            mad_sa = -1.0
             fcd_score = -1.0
             coverage = 0.0
             unique = []
@@ -746,7 +647,6 @@ class BasicMolecularMetrics(object):
                 mad_sa,
                 fcd_score,
                 coverage,
-                nll_sm,
                 nll_mpm,
                 nll_mpm_init,
             ],
@@ -1065,6 +965,7 @@ def compute_molecular_metrics(
     dataset_info,
     fb,
     source_molecule_list,
+    target_graphs,
 ):
     """molecule_list: (dict)"""
 
@@ -1105,7 +1006,7 @@ def compute_molecular_metrics(
     metrics = BasicMolecularMetrics(dataset_info, test_smiles, train_smiles)
     if dataset_info.name == "zinc":
         rdkit_metrics = metrics.evaluate_zinc(
-            molecule_list, source_molecule_list
+            molecule_list, source_molecule_list, target_graphs
         )
 
         all_smiles = rdkit_metrics[-1]
@@ -1120,9 +1021,8 @@ def compute_molecular_metrics(
             f"mol_metrics_charts_{fb}/MAD QED": float(rdkit_metrics[0][6]),
             f"mol_metrics_charts_{fb}/MAD SA": float(rdkit_metrics[0][7]),
             f"mol_metrics_charts_{fb}/FCD": float(rdkit_metrics[0][8]),
-            f"mol_metrics_charts_{fb}/NLL SM GED": float(rdkit_metrics[0][10]),
-            f"mol_metrics_charts_{fb}/NLL MPM GED": float(rdkit_metrics[0][11]),
-            f"mol_metrics_charts_{fb}/NLL INIT MPM GED": float(rdkit_metrics[0][12]),
+            f"mol_metrics_charts_{fb}/NLL MPM GED": float(rdkit_metrics[0][10]),
+            f"mol_metrics_charts_{fb}/NLL INIT MPM GED": float(rdkit_metrics[0][11]),
             f"mol_metrics_charts_{fb}/coverage except training": float(
                 rdkit_metrics[0][9]
             ),

@@ -302,7 +302,7 @@ class TrainMolecularMetricsDiscrete(nn.Module):
 
 
 class SamplingMolecularMetrics(nn.Module):
-    def __init__(self, dataset_infos, test_smiles, train_smiles):
+    def __init__(self, dataset_infos, test_smiles, train_smiles, target_graphs):
         super().__init__()
         di = dataset_infos
 
@@ -346,6 +346,7 @@ class SamplingMolecularMetrics(nn.Module):
         self.train_smiles = train_smiles
         self.test_smiles = test_smiles
         self.dataset_info = di
+        self.target_graphs = target_graphs
 
     def forward(
         self,
@@ -370,6 +371,7 @@ class SamplingMolecularMetrics(nn.Module):
             self.dataset_info,
             fb,
             source_graphs,
+            self.target_graphs,
         )
 
         if test and sa_values_tuple[0] is not None:
