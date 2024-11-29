@@ -302,7 +302,7 @@ class TrainMolecularMetricsDiscrete(nn.Module):
 
 
 class SamplingMolecularMetrics(nn.Module):
-    def __init__(self, dataset_infos, test_smiles, train_smiles, target_graphs):
+    def __init__(self, dataset_infos, test_smiles, train_smiles):
         super().__init__()
         di = dataset_infos
 
@@ -346,7 +346,6 @@ class SamplingMolecularMetrics(nn.Module):
         self.train_smiles = train_smiles
         self.test_smiles = test_smiles
         self.dataset_info = di
-        self.target_graphs = target_graphs
 
     def forward(
         self,
@@ -371,7 +370,6 @@ class SamplingMolecularMetrics(nn.Module):
             self.dataset_info,
             fb,
             source_graphs,
-            self.target_graphs,
         )
 
         if test and sa_values_tuple[0] is not None:
@@ -384,13 +382,14 @@ class SamplingMolecularMetrics(nn.Module):
             df = pd.DataFrame(sa_data)
             df.to_csv("SA_values.csv", index=False)
 
-        all_smiles = all_smiles[1]
+        all_smiles_gen = all_smiles[1]
+        source_smiles = all_smiles[0]
         if test and local_rank == 0:
-            with open(r"final_smiles.csv", "w", newline="") as fp:
+            with open(r"final_smiles_with_source.csv", "w", newline="") as fp:
                 writer = csv.writer(fp)
-                writer.writerow(["SMILES"])
-                for smiles in all_smiles:
-                    writer.writerow([smiles])
+                writer.writerow(["SMILES", "Source_SMILES"])
+                for smiles, source in zip(all_smiles_gen, source_smiles):
+                    writer.writerow([smiles, source])
                 print("All smiles saved")
 
         print("Starting custom metrics")

@@ -26,7 +26,7 @@ from ..metrics.metrics_utils import (
 
 
 class SamplingMetrics(nn.Module):
-    def __init__(self, dataset_infos, test, dataloaders=None, tf_dataloaders=None):
+    def __init__(self, dataset_infos, test, dataloaders=None):
         super().__init__()
         self.dataset_infos = dataset_infos
         self.test = test
@@ -44,43 +44,6 @@ class SamplingMetrics(nn.Module):
                 SamplingMolecularMetrics,
             )
 
-            if tf_dataloaders is not None:
-                target_graphs = []
-
-                for i, batch in enumerate(tf_dataloaders["test"]):
-                    data_batch, node_mask = utils.data_to_dense(
-                            batch,
-                            max_n_nodes=self.dataset_infos.max_n_nodes,
-                        )
-                    n_nodes = node_mask.sum(-1)
-                    data_batch = data_batch.collapse()
-
-                    batch_size, max_nodes = data_batch.X.size(0), data_batch.X.size(1)
-                    node_indices = torch.arange(max_nodes, device=data_batch.X.device).expand(batch_size, max_nodes)
-                    cur_mask = node_indices < n_nodes.unsqueeze(1)
-
-                    atom_types_batch = [data_batch.X[b][cur_mask[b]].cpu() for b in range(batch_size)]
-                    edge_types_batch = [data_batch.E[b][cur_mask[b]][:, cur_mask[b]].cpu() for b in range(batch_size)]
-                    target_graphs.extend(zip(atom_types_batch, edge_types_batch))
-
-                for i, batch in enumerate(tf_dataloaders["val"]):
-                    data_batch, node_mask = utils.data_to_dense(
-                            batch,
-                            max_n_nodes=self.dataset_infos.max_n_nodes,
-                        )
-                    n_nodes = node_mask.sum(-1)
-                    data_batch = data_batch.collapse()
-
-                    batch_size, max_nodes = data_batch.X.size(0), data_batch.X.size(1)
-                    node_indices = torch.arange(max_nodes, device=data_batch.X.device).expand(batch_size, max_nodes)
-                    cur_mask = node_indices < n_nodes.unsqueeze(1)
-
-                    atom_types_batch = [data_batch.X[b][cur_mask[b]].cpu() for b in range(batch_size)]
-                    edge_types_batch = [data_batch.E[b][cur_mask[b]][:, cur_mask[b]].cpu() for b in range(batch_size)]
-                    target_graphs.extend(zip(atom_types_batch, edge_types_batch))
-            else:
-                target_graphs = None
-
             all_val_smiles = set(
                 list(dataset_infos.val_smiles) + list(dataset_infos.test_smiles)
             )
@@ -89,7 +52,6 @@ class SamplingMetrics(nn.Module):
                 # dataset_infos.val_smiles if not test else dataset_infos.test_smiles,
                 all_val_smiles,
                 dataset_infos.train_smiles,
-                target_graphs,
             )
 
         elif dataset_infos.spectre:

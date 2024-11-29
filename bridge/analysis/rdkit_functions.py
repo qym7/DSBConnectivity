@@ -568,7 +568,7 @@ class BasicMolecularMetrics(object):
         )
 
         if target is not None:
-            valid_target, all_smiles_target, _ = self.compute_relaxed_validity(
+            valid_target, all_smiles_target, _ = self.compute_relaxed_validity_smiles(
                 target
             )
             logP_target, _, _ = self.compute_properties(
@@ -626,6 +626,14 @@ class BasicMolecularMetrics(object):
                 fcd_score = self.calculate_fcd(relaxed_valid, valid_target)
                 print(
                     f"FCD Score over {len(relaxed_valid)} valid molecules is: {fcd_score}"
+                )
+                fcd_score = self.calculate_fcd(valid_source, valid_target)
+                print(
+                    f"FCD Score over {len(valid_source)} valid molecules is: {fcd_score}"
+                )
+                fcd_score = self.calculate_fcd(valid_source, relaxed_valid)
+                print(
+                    f"FCD Score over {len(valid_source)} valid molecules is: {fcd_score}"
                 )
             else:
                 fcd_score = -1.0
@@ -965,7 +973,6 @@ def compute_molecular_metrics(
     dataset_info,
     fb,
     source_molecule_list,
-    target_graphs,
 ):
     """molecule_list: (dict)"""
 
@@ -1006,7 +1013,7 @@ def compute_molecular_metrics(
     metrics = BasicMolecularMetrics(dataset_info, test_smiles, train_smiles)
     if dataset_info.name == "zinc":
         rdkit_metrics = metrics.evaluate_zinc(
-            molecule_list, source_molecule_list, target_graphs
+            molecule_list, source_molecule_list, test_smiles
         )
 
         all_smiles = rdkit_metrics[-1]

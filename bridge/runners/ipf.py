@@ -103,25 +103,21 @@ class IPFBase(torch.nn.Module):
                 dataset_infos=self.datainfos,
                 test=False,
                 dataloaders=dataloaders,
-                tf_dataloaders=tf_dataloaders,
             )
             self.test_sampling_metrics = SamplingMetrics(
                 dataset_infos=self.datainfos,
                 test=True,
                 dataloaders=dataloaders,
-                tf_dataloaders=tf_dataloaders,
             )
             self.tf_val_sampling_metrics = SamplingMetrics(
                 dataset_infos=self.tf_datainfos,
                 test=False,
                 dataloaders=tf_dataloaders,
-                tf_dataloaders=dataloaders,
             )
             self.tf_test_sampling_metrics = SamplingMetrics(
                 dataset_infos=self.tf_datainfos,
                 test=True,
                 dataloaders=tf_dataloaders,
-                tf_dataloaders=dataloaders,
             )
         else:
             self.val_sampling_metrics = SamplingMetrics(
